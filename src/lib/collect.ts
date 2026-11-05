@@ -139,6 +139,9 @@ export async function runCollection(env: CollectorEnv, opts: CollectOptions = {}
     if (prev) snapshot.sources[def.id] = prev;
   }
   for (const { rec } of records) snapshot.sources[rec.id] = rec;
+  // Storm memory is per forecast area. Mitchell's production starts with its own
+  // empty KV (docs/EXPANSION_PLAN.md: no Cottonwoods import), so there is no
+  // retired single-region stormTracking to migrate; it is never read here.
   snapshot.areaStorms={};
   snapshot.resortLastOperatingAt={...previous?.resortLastOperatingAt};
   for(const area of FORECAST_AREAS){

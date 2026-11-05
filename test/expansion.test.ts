@@ -22,6 +22,9 @@ import { validateDailySnow } from "@/lib/dailysnow/llm";
 import { collectSource } from "@/lib/collect";
 import { nwsSource } from "@/lib/sources/nws";
 import { plumesSource } from "@/lib/sources/plumes";
+import { nwsAfdSource } from "@/lib/sources/nwsafd";
+import { historyEntry } from "@/lib/dailysnow/continuity";
+import type { AfdPayload } from "@/lib/types";
 import { dailySnowPublicationStatus } from "@/lib/dailysnow/publication";
 import { recordSnowLog } from "@/lib/snowlog/record";
 const now = new Date("2026-11-05T15:00:00Z");
@@ -663,5 +666,85 @@ describe("prompt tuning inputs", () => {
     expect(production.areaStorms).toHaveLength(1);
     expect(production.figures.map((f) => f.id)).toContain("storm-recap-telluride");
     expect(rebuilt).toEqual(production);
+  });
+});
+
+describe("partial and total upstream outages", () => {
+  const down = () => new Response("down", { status: 503 });
+  it.each([
+    ["nws", nwsSource, /api\.weather\.gov\/(points|gridpoints)/],
+    ["nwsafd", nwsAfdSource, /api\.weather\.gov\/products/],
+    ["plumes", plumesSource, /weather\.utah\.edu/],
+  ] as const)("records a total %s outage as a failed collection that keeps the last good payload", async (_id, source, pattern) => {
+    const ok = await collectSource(source as never, undefined, {}, now, createFixtureFetch().fetchImpl);
+    expect(ok.status).toBe("ok");
+    const later = new Date(+now + 3_600_000);
+    const failed = await collectSource(source as never, ok, {}, later, createFixtureFetch([[pattern, down]]).fetchImpl);
+    expect(failed.status).toBe("error");
+    expect(failed.consecutiveFailures).toBe(1);
+    expect(failed.lastSuccessfulFetchAt).toBe(ok.lastSuccessfulFetchAt);
+    expect(failed.payload).toEqual(ok.payload);
+  });
+  it("marks one office's retained discussion and dates the source from fresh products only", async () => {
+    const ok = await collectSource(nwsAfdSource, undefined, {}, now, createFixtureFetch().fetchImpl);
+    const prior = ok.payload as AfdPayload;
+    const pdt = prior.discussions!.find((d) => d.office === "PDT")!;
+    pdt.issuedAt = "2026-11-01T00:00:00.000Z";
+    const partial = await collectSource(
+      nwsAfdSource,
+      ok,
+      {},
+      new Date(+now + 3_600_000),
+      createFixtureFetch([[/locations\/PDT/, down]]).fetchImpl,
+    );
+    expect(partial.status).toBe("ok");
+    const payload = partial.payload as AfdPayload;
+    expect(payload.discussions!.find((d) => d.office === "PDT")?.lastError).toMatch(/PDT/);
+    expect(payload.discussions!.filter((d) => d.office !== "PDT").every((d) => !d.lastError)).toBe(true);
+    expect(partial.sourceUpdatedAt).not.toBe(pdt.issuedAt);
+  });
+  it("dates a region's plumes and discussions from that region's own entries", () => {
+    const s = structuredClone(base);
+    const plumes = s.sources.plumes!.payload as PlumePayload;
+    plumes.charts.find((c) => c.stationCode === "MBB")!.initTime = "2026-10-01T00:00:00.000Z";
+    s.sources.plumes!.sourceUpdatedAt = "2026-10-01T00:00:00.000Z";
+    const afd = s.sources.nwsafd!.payload as AfdPayload;
+    afd.discussions!.find((d) => d.office === "PDT")!.issuedAt = "2026-10-01T00:00:00.000Z";
+    s.sources.nwsafd!.sourceUpdatedAt = "2026-10-01T00:00:00.000Z";
+    const utah = regionalSnapshot(s, "utah");
+    const oregon = regionalSnapshot(s, "oregon");
+    expect(utah.sources.plumes!.sourceUpdatedAt).not.toBe("2026-10-01T00:00:00.000Z");
+    expect(utah.sources.nwsafd!.sourceUpdatedAt).not.toBe("2026-10-01T00:00:00.000Z");
+    expect(oregon.sources.plumes!.sourceUpdatedAt).toBe("2026-10-01T00:00:00.000Z");
+    expect(oregon.sources.nwsafd!.sourceUpdatedAt).toBe("2026-10-01T00:00:00.000Z");
+  });
+  it("keeps the previous day's link when a Western edition is rewritten the same day", async () => {
+    const kv = new MemoryKV();
+    const western = {
+      title: "Western Outlook",
+      summary: "Patterns vary across the tracked regions.",
+      overview: "Read each regional outlook below.",
+      regions: [{ region: "tahoe", text: "A quiet period for the tracked resort." }],
+    };
+    const env = {
+      SNOW_KV: kv,
+      AI: {
+        async run(_model: string, input: unknown) {
+          const isWestern = JSON.stringify(input).includes("western_daily_snow");
+          return { response: JSON.stringify(isWestern ? western : reply()) };
+        },
+      },
+    };
+    await runChannels(env, base, now, { channel: "tahoe", force: true });
+    const tahoe = (await readChannelStates(kv)).tahoe!.current!;
+    const yesterday = historyEntry({ ...tahoe, channel: "western-us", date: "2026-11-04", title: "Yesterday" });
+    await kv.put(channelStateKey("western-us"), JSON.stringify({ ...emptyDailySnowState(), history: [yesterday] }));
+    await runChannels(env, base, now, { channel: "western-us", force: true });
+    await runChannels(env, base, new Date(+now + 20 * 60000), { channel: "western-us", force: true });
+    const state = (await readChannelStates(kv))["western-us"]!;
+    expect(state.attempts.count).toBe(2);
+    expect(state.current?.older).toEqual({ date: "2026-11-04", title: "Yesterday" });
+    const archived = JSON.parse((await channelKV(kv, "western-us").get(dailySnowKey(state.current!.date), "text"))!);
+    expect(archived.older).toEqual({ date: "2026-11-04", title: "Yesterday" });
   });
 });

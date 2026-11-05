@@ -147,6 +147,7 @@ export async function writeWestern(
     label: "western-daily-snow",
   });
   const date = localDate(now, "America/Los_Angeles");
+  const older = base.history.find((h) => h.date < date);
   const post: DailySnowPost = {
     channel: "western-us",
     timeZone: "America/Los_Angeles",
@@ -185,9 +186,8 @@ export async function writeWestern(
     model,
     trigger: "morning",
     ...(fallbackReason ? { fallbackReason } : {}),
-    ...(base.current && base.current.date < date
-      ? { older: { date: base.current.date, title: base.current.title } }
-      : {}),
+    // Same as regional editions: a same-day rewrite still links the previous day's edition.
+    ...(older ? { older: { date: older.date, title: older.title } } : {}),
   };
   await env.beforePublish?.();
   await env.SNOW_KV.put(dailySnowKey(date), JSON.stringify(post), { expirationTtl: dailySnowArchiveTtlS(date, now) });

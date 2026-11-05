@@ -159,9 +159,12 @@ export const plumesSource: SourceDefinition<PlumePayload> = {
       const prior=previous?.charts.find(c=>c.stationCode===station.code);
       return prior?[{chart:{...prior,lastError:message},runCode:prior.runCode,product:previous!.product}]:[];
     });
-    assertValid(results.length,"No ensemble station available");
-    // Stations can briefly straddle cycles; report the oldest run shown.
-    const runCode = results.map((r) => r.runCode).sort()[0];
+    // A total outage is a failed collection, not a success built from retained charts.
+    const fresh=settled.filter(r=>r.status==="fulfilled").length;
+    assertValid(fresh,`No ensemble station collected this run (${failures.join("; ")})`);
+    // Stations can briefly straddle cycles; report the oldest run fetched this run.
+    // A failing station's retained chart keeps its own run and lastError.
+    const runCode = results.filter((r) => !r.chart.lastError).map((r) => r.runCode).sort()[0];
     const initTime = runCodeToIso(runCode);
     assertValid(initTime, `Bad run code ${runCode}`);
     return {
