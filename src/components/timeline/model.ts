@@ -1,5 +1,5 @@
 import { addDays, forecastForDay, snowDayEnd, snowDayOf } from "@/lib/snowlog/days";
-import { formatDenver } from "@/lib/time";
+import { cachedDateFormat, formatLocal } from "@/lib/time";
 import type { MorningReading, SnowLogState } from "@/lib/snowlog/types";
 import type { CanyonId, Metric, PointForecast, PrimaryResortId, ResortReport } from "@/lib/types";
 
@@ -35,21 +35,19 @@ export interface SnowTimelineModel {
   future: TimelineDay[];
   last24: { metric: Metric | null; reportTime: string | null; detail: string };
   canyon: CanyonId;
+  /** The resort's IANA zone; report times display in it. */
+  timeZone?: string;
 }
 
 const tz = "America/Denver";
-const weekdayFmt = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" });
-const dayFmt = new Intl.DateTimeFormat("en-US", { timeZone: tz, day: "numeric" });
-const dateFmt = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric" });
-const timeFmt = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" });
-const ymdFmt = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
 
 /** A report time within a day's description: the clock time, plus the date when it falls on another day. */
-function reportAt(iso: string, key: string): string {
+function reportAt(iso: string, key: string, zone = tz): string {
   const t = new Date(iso);
-  return ymdFmt.format(t) === key ? timeFmt.format(t) : `${dateFmt.format(t)}, ${timeFmt.format(t)}`;
+  const time = cachedDateFormat("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit" }).format(t);
+  const ymd = cachedDateFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(t);
+  return ymd === key ? time : `${cachedDateFormat("en-US", { timeZone: zone, month: "short", day: "numeric" }).format(t)}, ${time}`;
 }
-const hourFmt = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric" });
 
 /** Whole inches for bar labels: "<1" keeps a trace distinct from a reported zero. */
 export function barLabel(v: number): string {
@@ -60,20 +58,27 @@ export function barLabel(v: number): string {
 
 const inches = (v: number) => `${Number.isInteger(v) ? v : v.toFixed(1)}″`;
 /** "5 AM" in winter, "6 AM" in summer: the local time a snow day ends. */
-const endsAt = (key: string) => hourFmt.format(snowDayEnd(key)).replace(":00", "");
+const endsAt = (key: string, zone?: string) =>
+  cachedDateFormat("en-US", { timeZone: zone ?? tz, hour: "numeric" }).format(snowDayEnd(key, zone)).replace(":00", "");
 
-function dayLabels(key: string) {
-  const t = new Date(snowDayEnd(key));
-  const weekday = weekdayFmt.format(t);
-  return { weekday, dayOfMonth: dayFmt.format(t), weekend: weekday === "Sat" || weekday === "Sun", date: dateFmt.format(t) };
+function dayLabels(key: string, zone?:string) {
+  const t = new Date(snowDayEnd(key,zone));
+  const timeZone = zone ?? tz;
+  const weekday = cachedDateFormat("en-US", { timeZone, weekday: "short" }).format(t);
+  return {
+    weekday,
+    dayOfMonth: cachedDateFormat("en-US", { timeZone, day: "numeric" }).format(t),
+    weekend: weekday === "Sat" || weekday === "Sun",
+    date: cachedDateFormat("en-US", { timeZone, weekday: "short", month: "short", day: "numeric" }).format(t),
+  };
 }
 
-function pastDay(key: string, name: string, reading: MorningReading | undefined, forecastIn: number | null): TimelineDay {
-  const { date, ...labels } = dayLabels(key);
+function pastDay(key: string, name: string, reading: MorningReading | undefined, forecastIn: number | null, zone?:string): TimelineDay {
+  const { date, ...labels } = dayLabels(key,zone);
   const ghost = forecastIn === null ? "" : ` · NWS forecast ${inches(forecastIn)}`;
   const base = { key, kind: "past" as const, ...labels, forecastIn, partial: false };
   if (!reading) return { ...base, state: "not_recorded", amountIn: null, detail: `${date} · Not recorded${ghost}` };
-  const report = reading.windowEnd ? ` at ${reportAt(reading.windowEnd, key)}` : "";
+  const report = reading.windowEnd ? ` at ${reportAt(reading.windowEnd, key,zone)}` : "";
   switch (reading.state) {
     case "reported":
       return { ...base, state: "reported", amountIn: reading.valueIn!, detail: `${date} · ${inches(reading.valueIn!)} reported by ${name} (“${reading.label}”${report})${ghost}` };
@@ -86,11 +91,11 @@ function pastDay(key: string, name: string, reading: MorningReading | undefined,
   }
 }
 
-function futureDay(key: string, canyon: CanyonId, hourly: PointForecast["hourlySnow"], now: Date): TimelineDay {
-  const { date, ...labels } = dayLabels(key);
-  const partial = snowDayOf(now.getTime()) === key;
-  const amountIn = hourly ? forecastForDay(hourly, key, partial ? now.getTime() : -Infinity) : null;
-  const span = partial ? `now to ${endsAt(key)}` : `24 h to ${endsAt(key)}`;
+function futureDay(key: string, canyon: CanyonId, hourly: PointForecast["hourlySnow"], now: Date, zone?:string): TimelineDay {
+  const { date, ...labels } = dayLabels(key,zone);
+  const partial = snowDayOf(now.getTime(),zone) === key;
+  const amountIn = hourly ? forecastForDay(hourly, key, partial ? now.getTime() : -Infinity,zone) : null;
+  const span = partial ? `now to ${endsAt(key,zone)}` : `24 h to ${endsAt(key,zone)}`;
   const base = { key, kind: "forecast" as const, ...labels, forecastIn: null, partial };
   return amountIn === null
     ? { ...base, state: "no_forecast", amountIn: null, detail: `${date} · No NWS forecast for this day` }
@@ -110,19 +115,20 @@ export function buildSnowTimeline(input: {
   log: SnowLogState | null | undefined;
   forecast: PointForecast | null;
   now: Date;
+  timeZone?: string;
 }): SnowTimelineModel {
-  const { resort, name, canyon, report, log, forecast, now } = input;
-  const current = snowDayOf(now.getTime());
+  const { resort, name, canyon, report, log, forecast, now, timeZone } = input;
+  const current = snowDayOf(now.getTime(),timeZone);
   const readings = log?.resorts[resort] ?? {};
   const ghosts = log?.forecasts[canyon] ?? {};
   const past = Array.from({ length: TIMELINE_DAYS }, (_, i) => {
     const key = addDays(current, i - TIMELINE_DAYS);
-    return pastDay(key, name, readings[key], ghosts[key]?.snowIn ?? null);
+    return pastDay(key, name, readings[key], ghosts[key]?.snowIn ?? null,timeZone);
   });
-  const future = Array.from({ length: TIMELINE_DAYS }, (_, i) => futureDay(addDays(current, i), canyon, forecast?.hourlySnow, now));
+  const future = Array.from({ length: TIMELINE_DAYS }, (_, i) => futureDay(addDays(current, i), canyon, forecast?.hourlySnow, now,timeZone));
   const metric = report?.snowfall.h24 ?? null;
   // The date matters here: an old report would otherwise read like today's.
-  const at = report?.reportTime ? `, report ${formatDenver(report.reportTime, now)}` : "";
+  const at = report?.reportTime ? `, report ${formatLocal(report.reportTime, now,timeZone)}` : "";
   const detail = !metric
     ? `Last 24 h · No report from ${name}`
     : metric.state === "reported"
@@ -130,7 +136,7 @@ export function buildSnowTimeline(input: {
       : metric.state === "not_reported"
         ? `Last 24 h · ${name} left its 24 h total empty${at}`
         : `Last 24 h · ${name} doesn’t publish a 24 h total`;
-  return { past, future, last24: { metric, reportTime: report?.reportTime ?? null, detail }, canyon };
+  return { past, future, last24: { metric, reportTime: report?.reportTime ?? null, detail }, canyon, timeZone };
 }
 
 /** One scale for timelines shown together, so equal amounts draw equal bars. */

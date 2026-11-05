@@ -93,7 +93,7 @@ describe("plume collection", () => {
     const first = calls.filter((u) => u.endsWith(".png")).length;
     await runCollection({ SNOW_KV: kv }, { now: FIXTURE_NOW, fetchImpl, only: ["plumes"] });
     const second = calls.filter((u) => u.endsWith(".png")).length - first;
-    expect(second).toBe(2); // one HEAD per station, no re-download
+    expect(second).toBe(12); // one HEAD per station, no re-download
     const p = (await readSnapshot(kv))!.sources.plumes!.payload as PlumePayload;
     expect(p.charts.every((c) => c.panels?.length === 2)).toBe(true);
   });
@@ -126,11 +126,11 @@ describe("plume panel recovery", () => {
     let before = pngCalls(calls);
     const notYet = new Date(FIXTURE_NOW.getTime() + PLUME_PANEL_REFRESH_MS - H);
     await runCollection({ SNOW_KV: kv }, { now: notYet, fetchImpl, only: ["plumes"] });
-    expect(pngCalls(calls) - before).toBe(2); // HEAD only
+    expect(pngCalls(calls) - before).toBe(12); // HEAD only
     before = pngCalls(calls);
     const due = new Date(FIXTURE_NOW.getTime() + PLUME_PANEL_REFRESH_MS);
     await runCollection({ SNOW_KV: kv }, { now: due, fetchImpl, only: ["plumes"] });
-    expect(pngCalls(calls) - before).toBe(4); // HEAD and download per station
+    expect(pngCalls(calls) - before).toBe(24); // HEAD and download per station
     expect((await charts(kv)).every((c) => c.panelsStoredAt === due.toISOString() && c.panels?.length === 2)).toBe(true);
   });
 
@@ -144,7 +144,7 @@ describe("plume panel recovery", () => {
     const init = Date.parse((await charts(kv))[0].initTime);
     const before = pngCalls(calls);
     await runCollection({ SNOW_KV: kv }, { now: new Date(init + PLUME_PANEL_REFRESH_MS), fetchImpl, only: ["plumes"] });
-    expect(pngCalls(calls) - before).toBe(4);
+    expect(pngCalls(calls) - before).toBe(24);
   });
 
   it("retries a failed crop hourly, three times per run, then keeps the full chart", async () => {
@@ -158,13 +158,13 @@ describe("plume panel recovery", () => {
     expect((await charts(kv)).every((c) => c.cropAttempts === 1 && c.panels === null)).toBe(true);
     let before = pngCalls(calls);
     await runCollection({ SNOW_KV: kv }, { now: at(0.5), fetchImpl, only: ["plumes"] });
-    expect(pngCalls(calls) - before).toBe(2); // within the hour: no retry
+    expect(pngCalls(calls) - before).toBe(12); // within the hour: no retry
     for (const h of [1, 2]) await runCollection({ SNOW_KV: kv }, { now: at(h), fetchImpl, only: ["plumes"] });
     expect((await charts(kv)).every((c) => c.cropAttempts === PLUME_MAX_CROP_ATTEMPTS && c.cropError)).toBe(true);
     broken = false;
     before = pngCalls(calls);
     await runCollection({ SNOW_KV: kv }, { now: at(5), fetchImpl, only: ["plumes"] });
-    expect(pngCalls(calls) - before).toBe(2); // attempts exhausted for this run
+    expect(pngCalls(calls) - before).toBe(12); // attempts exhausted for this run
     expect((await charts(kv)).every((c) => c.panels === null)).toBe(true);
   });
 

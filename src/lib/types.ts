@@ -1,3 +1,4 @@
+import type { ChannelId, ForecastAreaId, RegionId, ResortId, TimeZone } from "./catalog";
 import type { StormRecord, StormTrackingState } from "./dailysnow/storm-types";
 import type { SnowLogState } from "./snowlog/types";
 
@@ -30,8 +31,6 @@ export type SourceCategory =
   | "resort"
   | "plume"
   | "weather"
-  | "roads"
-  | "travel-times"
   | "webcams";
 
 export type CollectionStatus = "ok" | "error" | "never";
@@ -64,14 +63,15 @@ export interface Snapshot {
   /** Time the collector last wrote the snapshot, ISO UTC. */
   writtenAt: string;
   sources: Partial<Record<SourceId, SourceRecord>>;
-  /** AI resort pick and its scheduling state. Absent until the AI binding is configured. */
-  recommendation?: RecommendationState;
   /** AI Daily Snow post and its scheduling state. Absent until the AI binding is configured. */
   dailySnow?: DailySnowState;
   /** Observation-based storm memory, updated by collection even without AI. */
   stormTracking?: StormTrackingState;
   /** Recent snow days: each resort's morning 24 h report and the NWS forecast each day began with. */
   snowLog?: SnowLogState;
+  resortLastOperatingAt?: Partial<Record<ResortId, string>>;
+  areaStorms?: Partial<Record<ForecastAreaId, StormTrackingState>>;
+  region?: RegionId;
 }
 
 export type SourceId =
@@ -79,11 +79,10 @@ export type SourceId =
   | "snowbird"
   | "solitude"
   | "brighton"
+  | "snowbasin" | "palisades-tahoe" | "mammoth-mountain" | "jackson-hole" | "big-sky"
+  | "winter-park" | "steamboat" | "telluride" | "crystal-mountain" | "mt-bachelor"
   | "plumes"
   | "nws"
-  | "roads"
-  | "traveltimes"
-  | "webcams"
   | "resortcams"
   | "nwsafd"
   | "ensemble";
@@ -160,6 +159,9 @@ export interface ResortReport {
   narrative: string | null;
   /** Optional sub-feeds that failed during an otherwise successful collection. */
   missingSections?: string[];
+  reportingLocation?: { name: string; elevationFt: number | null; note?: string };
+  operationsUpdatedAt?: string | null;
+  mountainBaseRange?: { minIn: number; maxIn: number };
 }
 
 // ---------- Plumes ----------
@@ -180,6 +182,10 @@ export interface PlumePanel {
 }
 
 export interface PlumeChart {
+  region?: RegionId;
+  note?: string;
+  lastCheckedAt?: string;
+  lastError?: string | null;
   stationCode: string;
   stationName: string;
   /** Full original chart (fallback when cropping fails). */
@@ -205,6 +211,7 @@ export interface PlumePayload {
   runCode: string;
   initTime: string;
   charts: PlumeChart[];
+  failures?: string[];
 }
 
 // ---------- NWS mountain weather ----------
@@ -239,6 +246,12 @@ export interface NextStorm {
 }
 
 export interface PointForecast {
+  resolvedCoordinates?: { latitude:number;longitude:number };
+  id?: ForecastAreaId;
+  timeZone?: TimeZone;
+  resolvedAt?: string;
+  lastCheckedAt?: string;
+  lastError?: string | null;
   name: string;
   gridId: string;
   gridX: number;
@@ -261,57 +274,10 @@ export interface PointForecast {
 
 export interface NwsPayload {
   points: PointForecast[];
+  failures?: string[];
 }
 
-// ---------- Roads / traffic ----------
-
-export interface RoadNotice extends Notice {
-  canyon: "LCC" | "BCC" | "both" | "other";
-  source: string;
-}
-
-export interface RoadsPayload {
-  notices: RoadNotice[];
-  signs: Array<{ name: string; roadway: string; direction: string | null; messages: string[]; source: string }>;
-  /** Which sub-feeds contributed, for attribution. */
-  contributors: string[];
-  /** Sub-feeds that failed during the last (otherwise successful) roads collection. */
-  partialFailures: string[];
-}
-
-export interface TravelSegment {
-  canyon: "LCC" | "BCC";
-  name: string;
-  from: string;
-  to: string;
-  direction: "Up" | "Down" | string;
-  currentMin: number | null;
-  freeFlowMin: number | null;
-  distanceMi: number | null;
-  measuredAt: string | null;
-}
-
-export interface TravelTimesPayload {
-  segments: TravelSegment[];
-  /** Newest per-segment measurement time. */
-  newestMeasurementAt: string | null;
-  layerEditedAt: string | null;
-}
-
-export interface Webcam {
-  id: string;
-  canyon: "LCC" | "BCC";
-  title: string;
-  description: string;
-  imageUrl: string;
-  available: boolean;
-}
-
-export interface WebcamsPayload {
-  cameras: Webcam[];
-}
-
-export type PrimaryResortId = "alta" | "snowbird" | "solitude" | "brighton";
+export type PrimaryResortId = ResortId;
 
 /** A resort-operated camera shown on that resort's page. */
 export type ResortCam = {
@@ -332,6 +298,7 @@ export type ResortCam = {
       kind: "youtube";
       videoId: string;
     }
+  | { kind:"embed";embedUrl:string }
 );
 
 export interface ResortCamsPayload {
@@ -342,73 +309,8 @@ export interface ResortCamsPayload {
   streamTitles: Record<string, string>;
 }
 
-// ---------- AI recommendation ----------
-
-export type CanyonId = "LCC" | "BCC";
-
-/**
- * Road state of one canyon, derived in code from road notices and signs.
- * "closed-expected-open" = closed now with a published (re)opening time.
- */
-export type CanyonState = "open" | "closed-expected-open" | "closed" | "interlodge" | "unknown";
-
-export interface CanyonStatus {
-  canyon: CanyonId;
-  state: CanyonState;
-  /** Published (re)opening time while closed, ISO UTC. */
-  expectedOpenAt: string | null;
-  /** Announced upcoming closure (e.g. "will close at 10 PM"), ISO UTC when a time is given. */
-  closureAnnounced: { text: string; at: string | null } | null;
-  /** Traction / chain restrictions currently posted. */
-  restrictions: string[];
-  /** Road texts the state was derived from (seasonal gate notices excluded). */
-  evidence: string[];
-}
-
-export type RecommendationMode = "storm" | "fair";
-
-export interface Recommendation {
-  /** Denver calendar date (YYYY-MM-DD) the pick is for: today before 2 PM, tomorrow after. */
-  targetDate: string;
-  mode: RecommendationMode;
-  /** null = explicit "no pick". */
-  pick: PrimaryResortId | null;
-  /** One-line strategy, e.g. "Line up at the LCC mouth by 8:00 for the 9:30 opening". */
-  plan: string;
-  headline: string;
-  /** 2–3 sentences on why this pick; empty for a rule-based "no pick". Absent on picks stored before it existed. */
-  summary?: string;
-  caveats: string[];
-  runnerUp: PrimaryResortId | null;
-  generatedAt: string;
-  /** Model id, or null for a rule-based "no pick" (no LLM call). */
-  model: string | null;
-  /** Why this update ran (scheduling trigger). */
-  trigger: string;
-}
-
-export interface RecommendationState {
-  current: Recommendation | null;
-  /** Completion of the last attempt; absent in legacy snapshots. */
-  lastFinishedAt?: string | null;
-  lastAttemptAt: string | null;
-  lastError: string | null;
-  consecutiveFailures: number;
-  /** Inputs of the current recommendation, for change detection (see recommend/schedule.ts). */
-  fingerprint: string | null;
-  criticalKey: string | null;
-  /** Reserved model requests per Denver day (two per attempt), for the daily cap. */
-  calls: { date: string; count: number };
-  /** Last time each resort was seen with lifts running (season detection). */
-  resortLastOperatingAt: Partial<Record<PrimaryResortId, string>>;
-}
-
-export interface ApiRecommendation extends Recommendation {
-  /** The pick is for a past day, or has not been refreshed for too long. */
-  outdated: boolean;
-  /** Recent update attempts are failing (the last good pick is still shown). */
-  failing: boolean;
-}
+/** Explicit mountain forecast identity, shared by historical readings and figures. */
+export type CanyonId = ForecastAreaId;
 
 // ---------- API response ----------
 
@@ -425,6 +327,8 @@ export type Freshness =
   | "unavailable";
 
 export interface ApiSource<P = unknown> extends SourceRecord<P> {
+  reportMaxAgeMs?:number|null;
+  intervalMs?:number;
   label: string;
   category: SourceCategory;
   required: boolean;
@@ -441,17 +345,25 @@ export interface ReportResponse {
   sources: Record<SourceId, ApiSource>;
   /** Missing required sources — a v1 release blocker if persistently non-empty. */
   requiredMissing: SourceId[];
-  /** AI resort pick; null until one has been generated. */
-  recommendation: ApiRecommendation | null;
+  dailySnows?: Partial<Record<ChannelId, ApiDailySnow | null>>;
+  publicationStatus?: Partial<Record<ChannelId, DailySnowPublicationStatus>>;
   /** AI Daily Snow post; null until one has been generated. */
   dailySnow?: ApiDailySnow | null;
   /** Recent snow days for the snowfall timeline; null until collection has recorded one. */
   snowLog?: SnowLogState | null;
+  /** Working per-forecast-area storm memory, as regional publications receive it. */
+  areaStorms?: Snapshot["areaStorms"];
+  /** Last time each resort was seen operating; feeds in-season eligibility. */
+  resortLastOperatingAt?: Snapshot["resortLastOperatingAt"];
 }
 
 // ---------- NWS Area Forecast Discussion ----------
 
 export interface AfdPayload {
+  discussions?: AfdPayload[];
+  failures?: string[];
+  /** Set on a retained product whose office failed this run. */
+  lastError?: string | null;
   productId: string;
   office: string;
   issuedAt: string;
@@ -488,7 +400,7 @@ export type DailySnowFigure = { id: string; caption: string } & (
        * like the plumes page (Mountain Time labels replace the cropped UTC ones).
        * Optional for compatibility with posts written before axis metadata was stored.
        */
-      axis?: { plot: PlumePanel["plot"]; initTime: string; forecastHours: number };
+      axis?: { plot: PlumePanel["plot"]; initTime: string; forecastHours: number; timeZone?: TimeZone };
     }
 );
 
@@ -509,11 +421,16 @@ export interface DailySnowNumbers {
     nextStorm: NextStorm | null;
     forecastUpdatedAt: string | null;
   }>;
-  resorts: Array<{ id: PrimaryResortId; name: string; h24: number | null; storm: number | null; reportTime: string | null; h48?: number | null; seasonIn?: number | null }>;
+  resorts: Array<{ id: PrimaryResortId; name: string; h24: number | null; storm: number | null; reportTime: string | null; h48?: number | null; seasonIn?: number | null; snowfall?: SnowfallSet; reportingLocation?:ResortReport["reportingLocation"] }>;
 }
 
 export interface DailySnowPost {
-  /** Denver calendar date of the post (YYYY-MM-DD). */
+  channel?: ChannelId;
+  timeZone?: TimeZone;
+  coverage?: Array<{ region: RegionId; name: string; date: string | null; status: "current" | "missing" | "paused" }>;
+  areaStormRecaps?: StormRecord[];
+  regionalHighlights?:Array<{region:RegionId;text:string}>;
+  /** Channel-local calendar date of the post (YYYY-MM-DD). */
   date: string;
   phase: DailySnowPhase;
   title: string;
@@ -564,7 +481,7 @@ export interface DailySnowState {
   lastFinishedAt: string | null;
   lastError: string | null;
   consecutiveFailures: number;
-  /** Scheduled attempts and reserved model requests per Denver day. */
+  /** Scheduled attempts and reserved model requests per channel-local day. */
   attempts: { date: string; count: number; calls: number };
   /** Most recent posts first (at most DAILY_SNOW_ARCHIVE_POSTS). */
   history: DailySnowHistoryEntry[];

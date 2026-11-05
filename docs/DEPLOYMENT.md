@@ -2,38 +2,40 @@
 
 [← README](../README.md)
 
-Production configuration, PR previews, credentials and usage.
+Mitchell's deployment uses Cloudflare account **Huang Inc.**. Production starts on merge and accumulates its own history; preview seeding does not write production KV.
 
-Live at **https://cottonwoods-snow-report.huang.mx**. It runs as the Worker `cottonwoods-snow-report` on the Cloudflare account "Huang Inc." (Workers Paid).
-
-| Piece | Where |
+| Resource | Configuration |
 | --- | --- |
-| Worker + cron (`*/5 * * * *`) | `wrangler.jsonc` |
-| KV namespace `SNOW_KV` | id `25451aae36fb40b68f530ee747940440` (in `wrangler.jsonc`) |
-| Workers AI | binding `AI`; AI Gateway `snow-report` (`AI_GATEWAY_ID`) with logging, no caching and a daily request limit |
-| Domain | Workers custom domain `cottonwoods-snow-report.huang.mx` (DNS record and certificate managed by Cloudflare). `workers.dev` is disabled; per-PR preview URLs are enabled. |
-| Logs | Workers Logs (`observability.enabled`). Each cron logs one `{"event":"collection",…}` line, including the `recommendation` and `dailySnow` outcomes. Live tail: `npx wrangler tail cottonwoods-snow-report` |
-| Plain vars | `AI_GATEWAY_ID`, `COLLECTOR_CONTACT` (site URL, sent in the User-Agent) |
+| Production Worker/domain | `mitchells-snow-report` / `mitchells-snow-report.huang.mx` |
+| Production KV | `5fb1857843374e8ea427c2117b5f3955` |
+| Preview parent Worker | `mitchells-snow-report-preview`, no production routes or cron |
+| Preview KV | `f9e542e8a1d0405f8624beade1bba09b` |
+| Workers AI Gateway | `mitchells-snow-report`, logging, no cache, sliding 64 requests/day |
+| Production cron | `*/5 * * * *`; local publication hours evaluated in code |
 
-**Deploys are automatic** (`.github/workflows/deploy.yml`):
+## GitHub Actions
 
-- In this fork, production and preview uploads require the repository Actions
-  variable `DEPLOYMENT_ENABLED` to be exactly `true`. It is `false` until isolated
-  Mitchell's resources are configured; the test job runs independently. Follow
-  [repository setup](REPOSITORY_SETUP.md) before enabling uploads.
-- Every push to `main` typechecks, tests, builds, and smoke-checks the local Worker, then runs `npm run deploy` (static export + `wrangler deploy`).
-- Every pull request from this repository passes the same checks, then is uploaded with `wrangler versions upload` as a non-deployed Worker version with a stable preview URL (`pr-<number>-cottonwoods-snow-report.huang-inc.workers.dev`), linked in a PR comment. Previews share production bindings, so they read the live KV snapshot; crons stay on the deployed version.
+CI typechecks, tests, builds and smoke-checks. Deployment requires `MITCHELLS_DEPLOYMENT_ENABLED=true`. The inherited `DEPLOYMENT_ENABLED` stays false so an older main workflow cannot deploy Cottonwoods while this feature PR is open.
 
-The workflow uses two repository secrets:
+On main, `npm run deploy` uploads assets and deploys the Worker, custom domain and cron. Cloudflare manages DNS/certificate for the custom domain. No production seeding or historical import is required.
 
-- `CLOUDFLARE_API_TOKEN`: the user API token "cottonwoods-snow-report deploy (GitHub Actions)". It is limited to this account (Workers Scripts, Workers KV, Workers Tail, Account Settings read) and the `huang.mx` zone (Workers Routes, Zone read). To rotate it, roll the token in the dashboard (My Profile → API Tokens), then run `gh secret set CLOUDFLARE_API_TOKEN`.
-- `CLOUDFLARE_ACCOUNT_ID`.
+Same-repository PRs deploy through **Worker Previews**:
+`wrangler preview --worker-name mitchells-snow-report-preview --name pr-<number> --ignore-base-config`.
+The workflow reads its machine-output URL and comments it on the PR. Each PR gets an isolated preview and shares the seeded preview-only KV. Previews run no crons. Fork and Dependabot PRs receive no deployment secrets.
 
-Optional secrets (`npx wrangler secret put …`):
+See [Cloudflare's preview isolation documentation](https://developers.cloudflare.com/workers/previews/resources/). Keep preview vars, bindings and the image renderer's defines in the `previews` block.
 
-- `UDOT_API_KEY`: enables UDOT Traffic API events (closures, avalanche control). Requires a free UDOT Traffic developer key.
-- `ADMIN_TOKEN`: enables `POST /api/admin/collect`. Unset in production, so the route returns 404.
+Encrypted Actions secrets are `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `OPENROUTER_API_KEY`. The deployment token is scoped to this account's Workers/KV/AI/Gateway and the huang.mx zone's routes/read access. No token value belongs in files or logs. An authenticated `cf` session can create/configure resources; use a dedicated API token for CI, not a short-lived OAuth token.
 
-To deploy by hand, set `CLOUDFLARE_API_TOKEN` (or run `npx wrangler login`), then run `npm run deploy`.
+## Manual collection or publication
 
-**Plan and usage:** Workers **Paid** is required. Cropping a new plume run costs roughly 100–130 ms CPU per station (PNG decode and encode), a few times a day, and an ordinary collection is close to the free plan's 10 ms CPU limit for cron invocations. Static frontend requests and asset storage are free with asset-first routing. KV: one snapshot write per run (288/day) plus one read per write (~290/day), one more write after each AI attempt, four panel writes per new plume run, one archive write, up to six figure writes, and one read plus one write to link the previous post per Daily Snow post, and one read per dashboard poll (1,440/day per open screen). Workers AI requests are capped in code (resort pick: 40/day reserved; Daily Snow: 12/day reserved) and by the gateway limit.
+The admin endpoint returns 404 unless a temporary `ADMIN_TOKEN` is configured and requires its bearer token. Use the production procedure only for an owner-requested operation.
+
+1. Set a random temporary secret using `wrangler secret put ADMIN_TOKEN` for production, or `wrangler preview secret put ADMIN_TOKEN --worker-name mitchells-snow-report-preview --name seed-<date>` for a disposable seed Preview. Supply it privately via stdin.
+2. POST `/api/admin/collect`. Optional repeated `source=<id>` selects sources. Forced publication requires `?dailysnow=force&channel=<id>`; force one channel at a time, regions before Western.
+3. Inspect the summary and `/api/report`: source results, article model/date/error, frozen figures and coverage.
+4. Delete the secret with the matching secret-delete command, remove the local temporary file, then verify the same admin POST returns 404. For preview seeding, delete the entire disposable seed Preview afterward and verify its immutable deployment URLs close too. Deleting only its current secret does not revoke old immutable deployments; keep admin secrets off PR previews.
+
+Model calls are paid and can take up to ten minutes including fallback. Manual publication counts toward the channel and global caps. No request parameter bypasses them. `AI_ENABLED=false` suppresses generation for local collection.
+
+Production reads are safe for investigation. Ask before production KV writes not requested by the owner. Tail with `npx wrangler tail mitchells-snow-report`; collection logs include source and channel outcomes.

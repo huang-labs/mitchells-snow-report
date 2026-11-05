@@ -1,5 +1,6 @@
+import { CAM_PAGES,resortById,resortTimeZone } from "@/lib/catalog";
 import type { ApiSource, ResortCam, ResortCamsPayload } from "@/lib/types";
-import { formatAge, formatDenver } from "@/lib/time";
+import { formatAge, formatLocal } from "@/lib/time";
 
 const CAM_STALE_MS = 3 * 3_600_000;
 
@@ -31,6 +32,7 @@ function Cam({ cam, now, bust }: { cam: ResortCam; now: Date; bust: number }) {
       </figure>
     );
   }
+  if(cam.kind==="embed")return <figure className="rcam"><div className="rcam__frame"><iframe src={cam.embedUrl} title={cam.title} loading="lazy" allow="autoplay; encrypted-media"/></div><figcaption>{cam.title} · live player</figcaption></figure>;
   const age = cam.capturedAt
     ? now.getTime() - new Date(cam.capturedAt).getTime()
     : null;
@@ -46,7 +48,7 @@ function Cam({ cam, now, bust }: { cam: ResortCam; now: Date; bust: number }) {
           <span className="rcam__time">· capture time not published</span>
         ) : age !== null && age > CAM_STALE_MS ? (
           <span className="rcam__time rcam__time--stale">
-            · not updating — last image {formatDenver(cam.capturedAt, now)}
+            · not updating — last image {formatLocal(cam.capturedAt, now,resortTimeZone(cam.resort))}
           </span>
         ) : (
           <span className="rcam__time">
@@ -75,9 +77,10 @@ export function ResortCams({
   return (
     <div className="resort-cams">
       <h2>Webcams</h2>
+      {CAM_PAGES[resortId as keyof typeof CAM_PAGES]&&<p><a href={CAM_PAGES[resortId as keyof typeof CAM_PAGES]} target="_blank" rel="noreferrer">All {resortById(resortId)?.name} webcams ↗</a></p>}
       {mine.length ? (
         mine.map((c) => (
-          <Cam key={c.kind === "youtube" ? c.videoId : c.imageUrl} cam={c} now={now} bust={bust} />
+          <Cam key={c.kind === "youtube" ? c.videoId : c.kind==="image"?c.imageUrl:c.embedUrl} cam={c} now={now} bust={bust} />
         ))
       ) : (
         <p className="muted">

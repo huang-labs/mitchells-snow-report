@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, expect, it } from "vitest";
+import { RESORTS } from "@/lib/catalog";
 import { renderSection } from "@/components/SectionView";
 import { ResortReportPage } from "@/components/sections/ResortReportPage";
 import { runCollection } from "@/lib/collect";
@@ -19,6 +20,11 @@ beforeAll(async () => {
   report = buildReport(await readSnapshot(kv), FIXTURE_NOW);
 });
 afterEach(cleanup);
+
+it("opens a resort's own forecast region regardless of the saved regional preference",()=>{
+  render(renderSection("mammoth-mountain",report,FIXTURE_NOW,null));
+  expect(screen.getByRole("link",{name:"Forecast ↗"}).getAttribute("href")).toBe("/weather/mammoth");
+});
 
 it.each(["alta", "snowbird", "solitude", "brighton"])(
   "renders %s as a long-form report page",
@@ -251,7 +257,7 @@ it("keeps a resort's wording only where its window differs, and lists shared sou
 it("shows each resort as a snowfall timeline: 7 recorded days, the last 24 h, 7 NWS forecast days", () => {
   const { container } = render(renderSection("regional", report, FIXTURE_NOW, null));
   const blocks = [...container.querySelectorAll(".resort-timeline")];
-  expect(blocks.map((b) => b.querySelector(".resort-name")?.textContent)).toEqual(["Alta", "Snowbird", "Solitude", "Brighton"]);
+  expect(blocks.map((b) => b.querySelector(".resort-name")?.textContent)).toEqual(["Alta", "Snowbird", "Solitude", "Brighton", "Snowbasin", "Palisades Tahoe", "Mammoth Mountain", "Jackson Hole", "Big Sky", "Winter Park", "Steamboat", "Telluride", "Crystal Mountain", "Mt. Bachelor"]);
   const alta = blocks[0];
   expect(alta.querySelectorAll(".snowtl__day--past")).toHaveLength(7);
   expect(alta.querySelectorAll(".snowtl__day--today")).toHaveLength(1);
@@ -280,7 +286,7 @@ it("makes each resort's timeline one link to its page, named by the resort", () 
     const links = block.querySelectorAll(".snowtl a");
     expect(links).toHaveLength(1);
     expect(links[0].classList.contains("resort-name__link")).toBe(true);
-    expect(links[0].getAttribute("href")).toBe(`/${links[0].textContent!.toLowerCase()}`);
+    expect(links[0].getAttribute("href")).toBe(`/${RESORTS.find(r=>r.name===links[0].textContent)!.id}`);
     // "View more" is a visible cue inside the block's link area, not a second link.
     const more = block.querySelector(".snowtl__footer .resort-timeline__more")!;
     expect(more.textContent).toBe("View more →");
@@ -314,16 +320,4 @@ it("describes every day for screen readers, with no interactive controls", () =>
   expect(days[0].querySelector(".snowtl__sr")!.textContent).toMatch(/Not recorded$/);
   expect(alta.querySelectorAll("button, [tabindex]")).toHaveLength(0);
   expect(alta.querySelector(".snowtl__detail")).toBeNull();
-});
-
-it("shows main travel routes per canyon and reveals every segment on request", () => {
-  const { container } = render(renderSection("traffic", report, FIXTURE_NOW, null));
-  const lcc = container.querySelector('[aria-labelledby="canyon-LCC"]') as HTMLElement;
-  const rows = () => lcc.querySelectorAll(".travel-table tbody tr").length;
-  const toggle = lcc.querySelector<HTMLButtonElement>(".travel__toggle");
-  expect(toggle).toBeTruthy();
-  const main = rows();
-  fireEvent.click(toggle!);
-  expect(rows()).toBeGreaterThan(main);
-  expect(toggle!.getAttribute("aria-expanded")).toBe("true");
 });

@@ -69,10 +69,11 @@ export interface MtnPowderOptions {
   sourceUrl: string;
   /** Mountain areas whose trails are listed individually as named terrain. */
   namedTerrainAreas?: string[];
+  reportingArea?: "mid" | "base" | "summit";
 }
 
-function preferredArea(r: MtnPowderResort): { area: AreaSnow | undefined; label: string } {
-  const pref = (r.SnowReport.PreferredBaseReporting ?? "").toLowerCase();
+function preferredArea(r: MtnPowderResort, selected?: string): { area: AreaSnow | undefined; label: string } {
+  const pref = (selected ?? r.SnowReport.PreferredBaseReporting ?? "").toLowerCase();
   const map: Record<string, [AreaSnow | undefined, string]> = {
     base: [r.SnowReport.BaseArea, "Base"],
     mid: [r.SnowReport.MidMountainArea, "Mid-Mountain"],
@@ -108,7 +109,7 @@ export function parseMtnPowder(
   const r = feed.Resorts?.[0];
   assertValid(r && r.SnowReport, `${opts.resort}: mtnpowder feed has no resort/snow report`);
   const reportTime = parseOffsetIso(r.SnowReport.LastUpdate);
-  const { area, label } = preferredArea(r);
+  const { area, label } = preferredArea(r, opts.reportingArea);
   assertValid(area, `${opts.resort}: no snow area for preferred reporting location`);
 
   const where = `${label} measurement location`;
@@ -159,6 +160,7 @@ export function parseMtnPowder(
   const news = textField(r.SnowReport.News);
   if (news) notices.push({ title: "News", text: news, severity: "info", updatedAt: reportTime });
 
+  const range=/^(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)$/.exec(String(r.SnowReport.SnowBaseRangeIn??"").trim());
   const report: ResortReport = {
     resort: opts.resort,
     sourceName: `${r.Name} snow report (Mountain Powder feed)`,
@@ -167,7 +169,9 @@ export function parseMtnPowder(
     reportTime,
     operatingStatus: r.OperatingStatus ?? null,
     snowfall,
-    base: fromField(r.SnowReport.SnowBaseRangeIn, "in", "Base depth", `${r.SnowReport.PreferredBaseReporting ?? "mid"} reporting location`),
+    base: fromField(opts.reportingArea || range ? area.BaseIn : r.SnowReport.SnowBaseRangeIn, "in", "Base depth", where),
+    reportingLocation: { name: label, elevationFt: null },
+    ...(range?{mountainBaseRange:{minIn:+range[1],maxIn:+range[2]}}:{}),
     observations,
     liftsOpen: r.SnowReport.TotalOpenLifts ?? null,
     liftsTotal: r.SnowReport.TotalLifts ?? null,

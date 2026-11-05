@@ -1,12 +1,13 @@
 import type { StormRecord } from "@/lib/dailysnow/storm-types";
-import { TZ } from "@/lib/time";
+import { cachedDateFormat, TZ } from "@/lib/time";
 
 const reportTimeFormat = new Intl.DateTimeFormat("en-US", {
   timeZone: TZ, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
 });
 
 /** The same retained observations supplied to the model, frozen with this edition. */
-export function StormRecap({ storm }: { storm: StormRecord }) {
+export function StormRecap({ storm,timeZone=TZ }: { storm: StormRecord;timeZone?:string }) {
+  const reportTimeFormat=cachedDateFormat("en-US",{timeZone,weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",timeZoneName:"short"});
   return (
     <table className="dailysnow-totals dailysnow-storm" aria-label="Observations for this storm">
       <thead><tr><th scope="col">Resort</th><th scope="col">Storm observations</th><th scope="col" className="dailysnow-storm__report-time">Report time</th></tr></thead>

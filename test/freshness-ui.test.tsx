@@ -30,7 +30,7 @@ it("shows a confirmed failed check separately while recently collected informati
 });
 
 it("presents an unknown publication time as neutral rather than a failed update", () => {
-  const source = { ...buildReport(null, now).sources.roads, freshness: "time-unknown" as const };
+  const source = { ...buildReport(null, now).sources.nws, freshness: "time-unknown" as const };
   render(<SourceLine source={source} now={now} />);
   expect(screen.getByText("Time unknown").className).toContain("badge--neutral");
 });

@@ -2,38 +2,42 @@
 
 [← README](../README.md)
 
-Local collection, commands, model evaluation and troubleshooting.
-
-Requires Node 20+ (tested with Node 24.12).
+Requires Node 20+; Node 24 is used in CI.
 
 ```sh
-npm install
-cp .dev.vars.example .dev.vars        # local-only vars; never commit
-npm run dev                           # build static frontend, then workerd at http://localhost:8787
-# Seed local KV from the real sources (local cron does not run automatically):
-curl -X POST -H "Authorization: Bearer change-me-local-only" http://localhost:8787/api/admin/collect
+npm ci
+cp .dev.vars.example .dev.vars
+npm run dev -- --port 8793
+curl -X POST -H "Authorization: Bearer change-me-local-only" http://localhost:8793/api/admin/collect
 ```
 
-`dev`, `start`, and `preview` use `wrangler dev --local`: KV is persisted in `.wrangler/state` and remote bindings (including paid AI) are disabled. Worker edits reload automatically. Frontend edits require `npm run build` in another terminal or restarting `npm run dev`; this workflow uses the exported frontend rather than Next.js HMR. `npm start` serves an existing export. To use paid remote AI locally, build, authenticate with Wrangler, and run `npx wrangler dev` without `--local`; KV stays local unless configured remote. Builds and type generation need no credentials.
+Use a free port per worktree. KV persists in `.wrangler/state`; worktrees do not share local state. Worker changes reload; frontend changes require `npm run build` and refresh. `npm start -- --port <port>` serves an existing export.
 
-| Command | What it does |
+**Workers AI remains remote even with local workerd.** The example sets `AI_ENABLED=false` so local collection makes no inference requests. Set it to true only for deliberate paid AI testing with authenticated remote bindings. Local scheduled events do not run automatically.
+
+| Command | Behavior |
 | --- | --- |
-| `npm test` | Vitest: parsers, timestamp semantics, partial failures, API output, AI scheduling and validation, app shell/navigation UI (jsdom) |
-| `npm run typecheck` | `next typegen` (route types), then `tsc --noEmit` |
-| `npm run collect:once` | Runs one real collection in Node with in-memory KV and prints per-source status (`-- --json` prints the full API shape) |
-| `npm run recommend:once` | Prints the resort-pick model request built from production data (`-- --digest` prints the facts instead) |
-| `npm run dailysnow:once` | Prints the Daily Snow model request built from production data and its post archive (`-- --digest` prints the facts; `-- --save-digest <file>` also saves them for replay; `-- --validate <response.json>` checks a saved model response) |
-| `npm run dailysnow:replay -- <digests…>` | Runs saved digests through the current prompt and validator on the real model and prints one line each (valid, words, sections, figures, tokens, time). Needs `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`; `--model <id>`, `--out <dir>` |
-| `npm run build` | Next.js static export into `out/` |
-| `npm run cf:build` | Static export plus Wrangler dry-run of the Worker bundle |
-| `npm run smoke` | Credential-free workerd checks of all pages, navigation payloads, API routing, KV, and both share PNGs (run after build) |
-| `npm run preview` | Static build, then serve assets and APIs locally in workerd |
-| `npm run preview:scheduled` | Same as `preview`, with `wrangler dev --local --test-scheduled`. Trigger the cron with `curl "http://localhost:8787/__scheduled?cron=*/5+*+*+*+*"` |
+| `npm test` | Source, calendar, publication, API and UI regression tests |
+| `npm run typecheck` | Generate Next route types and typecheck |
+| `npm run collect:once` | Real source collection in memory; `-- --json` prints the report; no AI binding |
+| `npm run build` | Static export |
+| `npm run cf:build` | Static export and Wrangler bundle dry run |
+| `npm run smoke` | Credential-free workerd routing, assets, APIs, images and metadata checks |
+| `npm run share:render` | Regenerate the checked-in branded PNG |
+| `npm run preview:scheduled` | Local build/runtime with scheduled-event testing |
 
-To try a prompt against the real model: `npm run -s recommend:once > /tmp/body.json`, then `cf ai run @cf/zai-org/glm-5.3-flash --body @/tmp/body.json` (requires `cf auth login`). Daily Snow generations take longer than `cf ai run`'s 30 s client timeout. Save digests with `npm run -s dailysnow:once -- --now <6 AM time> --save-digest digests/<date>.json > /dev/null`, then replay them all with `npm run dailysnow:replay -- digests/`, which calls the Workers AI REST endpoint with the production 5-minute timeout. Keep saved digests out of the repository: they contain third-party report text.
+## Model evaluation
 
-Both prompt scripts accept `--live-ensemble` to collect the new numerical source directly for read-only pre-deployment tuning (no KV writes). Example: `npm run -s dailysnow:once -- --live-ensemble > /tmp/body.json`. Use the same flag and `--now` time when validating that response. `recommend:once -- --assume-in-season` explicitly overrides preseason eligibility for model evaluation; it is not a report of actual operations.
+`dailysnow:once` is read-only: it prints a real model request or digest, without inference or storage writes. It defaults to Mitchell's production report and Western; specify a local/preview report for unreleased features. Regional digests are rebuilt from the report's sources, per-area storm memory (`areaStorms`) and operating history (`resortLastOperatingAt`), the same inputs the collection cron passes to publication.
 
-URL options: old `?slide=<id>` links redirect to that section's page.
+```sh
+npm run -s dailysnow:once -- --url http://localhost:8793/api/report --channel utah --digest
+npm run -s dailysnow:once -- --channel tahoe --save-digest /tmp/tahoe-digest.json > /tmp/tahoe-body.json
+npm run -s dailysnow:once -- --channel tahoe --validate /tmp/tahoe-response.json
+```
 
-> **Local dev caveat (macOS 27 / wrangler 4.156):** the local `workerd` runtime sometimes opens tens of thousands of loopback connections to itself. Once the ephemeral ports run out, any local request can briefly fail with `EADDRNOTAVAIL`. This was observed with the former OpenNext development setup and a minimal KV-only `getPlatformProxy()` config; development now uses Wrangler directly. It clears on its own; restart `npm run dev` if it persists.
+Options: `--url`, `--channel`, `--now`, `--model`, `--digest`, `--save-digest`, `--validate`. Utah optionally supports `--live-ensemble`. Keep saved third-party source text and raw model output out of commits.
+
+For paid development replay, `dailysnow:replay -- <regional-digest.json> --model <id> --out <dir>` uses the Workers AI REST endpoint with the production five-minute timeout. It needs account/token environment variables and does not publish. The `cf ai run` client times out after 30 seconds, so it is unsuitable for longer articles. Inspect both schemas and semantic attribution. Publishing through the admin endpoint is separately coordinated/capped; see [operations](DEPLOYMENT.md).
+
+Legacy `?slide=<id>` links still redirect to their page. Current regional links use explicit paths and article dates use `?date=`. A missing local report usually needs seeding; an empty Daily Snow additionally needs deliberate generation. Do not solve an empty local page by writing production KV.

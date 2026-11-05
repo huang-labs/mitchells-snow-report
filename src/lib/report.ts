@@ -1,55 +1,13 @@
 import { dailySnowActivity } from "./dailysnow/digest";
 import { dailySnowPublicationStatus } from "./dailysnow/publication";
 import { SOURCES } from "./sources";
-import { CRON_INTERVAL_MS, type SourceDefinition } from "./sources/types";
-import { denverDate, targetFor } from "./recommend/digest";
-import type { ApiDailySnow, ApiRecommendation, ApiSource, DailySnowPost, DailySnowState, Freshness, RecommendationState, ReportResponse, Snapshot, SourceId, SourceRecord } from "./types";
+import type { SourceDefinition } from "./sources/types";
+import { denverDate } from "./dailysnow/facts";
+import type { ApiDailySnow, ApiSource, DailySnowPost, DailySnowState, Freshness, ReportResponse, Snapshot, SourceId, SourceRecord } from "./types";
 
 export const COLLECTION_INTERVAL_MIN = 5;
-/**
- * A source is stale when its last successful fetch is older than this. Four
- * missed five-minute runs plus KV propagation (up to ~60 s) and slack.
- */
-export const STALE_AFTER_MS = 22 * 60_000;
-
-/**
- * Stale threshold for a source: four missed runs plus KV propagation at the
- * 5-minute cadence, extended by a slower source's own collection interval.
- */
-export function staleAfterMs(def: Pick<SourceDefinition, "intervalMs">): number {
-  return STALE_AFTER_MS + Math.max(0, (def.intervalMs ?? CRON_INTERVAL_MS) - CRON_INTERVAL_MS);
-}
-
-export function classify(
-  def: Pick<SourceDefinition, "reportMaxAgeMs" | "intervalMs">,
-  rec: SourceRecord | undefined,
-  now: Date,
-): { freshness: Freshness; note: string } {
-  if (!rec || !rec.lastSuccessfulFetchAt || rec.payload === null) {
-    return {
-      freshness: "unavailable",
-      note: rec?.lastError ? `Never collected successfully (${rec.lastError})` : "Not collected yet",
-    };
-  }
-  const sinceSuccess = now.getTime() - Date.parse(rec.lastSuccessfulFetchAt);
-  if (sinceSuccess > staleAfterMs(def)) {
-    return {
-      freshness: "stale",
-      note: "No successful check within the expected collection window; showing last successful data",
-    };
-  }
-  if (def.reportMaxAgeMs === null) {
-    return { freshness: "time-unknown", note: "Source does not publish an update time" };
-  }
-  if (!rec.sourceUpdatedAt) {
-    return { freshness: "time-unknown", note: "Source report time unknown" };
-  }
-  const age = now.getTime() - Date.parse(rec.sourceUpdatedAt);
-  if (age > def.reportMaxAgeMs) {
-    return { freshness: "old-report", note: "Fetched recently, but the upstream report itself is old" };
-  }
-  return { freshness: "current", note: "Collected on schedule; report within its normal update window" };
-}
+export { classify, staleAfterMs, STALE_AFTER_MS } from "./freshness";
+import { classify } from "./freshness";
 
 /** Strip operational detail that should not be public (e.g. upstream URLs with tokens are already redacted). */
 function publicRecord(rec: SourceRecord): SourceRecord {
@@ -61,21 +19,6 @@ function publicRecord(rec: SourceRecord): SourceRecord {
           upstream: rec.diagnostics.upstream.map((u) => ({ url: u.url.split("?")[0], status: u.status, ms: u.ms })),
         }
       : null,
-  };
-}
-
-/** A pick not refreshed for this long (outside quiet hours' natural gap) is shown as outdated. */
-export const RECOMMENDATION_MAX_AGE_MS = 12 * 3_600_000;
-/** Consecutive failed model calls before the Resorts page says updates are failing. */
-export const RECOMMENDATION_FAILING_AFTER = 3;
-
-export function publicRecommendation(state: RecommendationState | undefined, now: Date): ApiRecommendation | null {
-  const cur = state?.current;
-  if (!cur) return null;
-  return {
-    ...cur,
-    outdated: cur.targetDate !== targetFor(now).date || now.getTime() - Date.parse(cur.generatedAt) > RECOMMENDATION_MAX_AGE_MS,
-    failing: (state?.consecutiveFailures ?? 0) >= RECOMMENDATION_FAILING_AFTER,
   };
 }
 
@@ -101,14 +44,14 @@ export function dailySnowArchiveTtlS(date: string, now: Date): number {
 export function publicDailySnow(post: DailySnowPost | null | undefined, state: DailySnowState | undefined, now: Date, expected?: boolean): ApiDailySnow | null {
   // Past retention its figure stills are gone too; an off-season gap shows no post rather than a broken one.
   if (!post || dailySnowExpiresAt(post.date) <= now.getTime()) return null;
-  const today = denverDate(now);
+  const today = denverDate(now,post.timeZone??"America/Denver");
   // Don't link back to a post that has already expired from the archive.
   const { older, ...rest } = post;
   return {
     ...rest,
     ...(older && dailySnowExpiresAt(older.date) > now.getTime() ? { older } : {}),
     outdated: post.date !== today,
-    publicationStatus: expected !== undefined && state?.current?.date === post.date ? dailySnowPublicationStatus(post.date, state, now, expected) : undefined,
+    publicationStatus: expected !== undefined && state?.current?.date === post.date ? dailySnowPublicationStatus(post.date, state, now, expected,post.channel) : undefined,
     failing: post.date !== today && (state?.consecutiveFailures ?? 0) >= DAILY_SNOW_FAILING_AFTER,
     archive: (state?.history ?? []).slice(0, DAILY_SNOW_ARCHIVE_POSTS).filter((h) => dailySnowExpiresAt(h.date) > now.getTime()).map((h) => ({ date: h.date, title: h.title })),
   };
@@ -136,6 +79,7 @@ export function buildReport(snapshot: Snapshot | null, now: Date = new Date(), d
       ...base,
       label: def.label,
       category: def.category,
+      reportMaxAgeMs:def.reportMaxAgeMs, intervalMs:def.intervalMs,
       required: def.required,
       attribution: def.attribution,
       sourceUrl: def.sourceUrl,
@@ -150,8 +94,10 @@ export function buildReport(snapshot: Snapshot | null, now: Date = new Date(), d
     collectionIntervalMinutes: COLLECTION_INTERVAL_MIN,
     sources,
     requiredMissing,
-    recommendation: publicRecommendation(snapshot?.recommendation, now),
     snowLog: snapshot?.snowLog ?? null,
+    // Exposed so read-only prompt tuning rebuilds the exact regional digest inputs.
+    areaStorms: snapshot?.areaStorms ?? {},
+    resortLastOperatingAt: snapshot?.resortLastOperatingAt ?? {},
     dailySnow: publicDailySnow(snapshot?.dailySnow?.current, snapshot?.dailySnow, now, snapshot?.dailySnow?.current ? dailySnowActivity(snapshot, now).publicationExpected : false),
   };
 }

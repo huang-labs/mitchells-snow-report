@@ -1,3 +1,5 @@
+import { FORECAST_AREAS, regionById } from "../catalog";
+import { zonedParts, zonedToUtc } from "../time";
 import { denverParts, denverToUtc } from "../time";
 import type { ForecastBlock, NextStorm, NwsPayload, PointForecast, SixHourSnow } from "../types";
 import { assertValid, HOUR, MINUTE, type SourceDefinition } from "./types";
@@ -103,15 +105,15 @@ const max = (a: number[]) => (a.length ? Math.max(...a) : null);
 const blockFmt = new Intl.DateTimeFormat("en-US", { timeZone: "America/Denver", weekday: "short" });
 
 /** Start of the Denver 6 AM / 6 PM block containing `now`. */
-export function currentBlockStart(now: Date): Date {
-  const p = denverParts(now);
-  if (p.hour >= 18) return denverToUtc(p.year, p.month, p.day, 18);
-  if (p.hour >= 6) return denverToUtc(p.year, p.month, p.day, 6);
-  const prev = denverParts(new Date(now.getTime() - 12 * HOUR));
-  return denverToUtc(prev.year, prev.month, prev.day, 18);
+export function currentBlockStart(now: Date, timeZone = "America/Denver"): Date {
+  const p = zonedParts(now,timeZone);
+  if (p.hour >= 18) return zonedToUtc(p.year, p.month, p.day, 18,0,0,timeZone);
+  if (p.hour >= 6) return zonedToUtc(p.year, p.month, p.day, 6,0,0,timeZone);
+  const prev = zonedParts(new Date(now.getTime() - 12 * HOUR),timeZone);
+  return zonedToUtc(prev.year, prev.month, prev.day, 18,0,0,timeZone);
 }
 
-export function summarizeGrid(grid: GridData, now: Date, blockCount = 6): Omit<PointForecast, "name" | "gridId" | "gridX" | "gridY" | "periods"> {
+export function summarizeGrid(grid: GridData, now: Date, blockCount = 6, timeZone = "America/Denver"): Omit<PointForecast, "name" | "gridId" | "gridX" | "gridY" | "periods"> {
   const p = grid.properties;
   assertValid(p && p.snowfallAmount && p.temperature, "NWS gridpoint data missing snowfall/temperature");
   const snow = expandHourly(p.snowfallAmount, "accum", convertWith(p.snowfallAmount.uom, mmToIn));
@@ -124,13 +126,14 @@ export function summarizeGrid(grid: GridData, now: Date, blockCount = 6): Omit<P
 
   // Day/night blocks (6 AM–6 PM, 6 PM–6 AM Denver). DST-safe: compute each boundary.
   const blocks: ForecastBlock[] = [];
-  let start = currentBlockStart(now);
+  const blockFmt = new Intl.DateTimeFormat("en-US", { timeZone, weekday:"short" });
+  let start = currentBlockStart(now,timeZone);
   for (let i = 0; i < blockCount; i++) {
-    const sp = denverParts(start);
+    const sp = zonedParts(start,timeZone);
     const day = sp.hour === 6;
     const next = new Date(start.getTime() + 12 * HOUR);
-    const np = denverParts(next);
-    const end = denverToUtc(np.year, np.month, np.day, day ? 18 : 6);
+    const np = zonedParts(next,timeZone);
+    const end = zonedToUtc(np.year, np.month, np.day, day ? 18 : 6,0,0,timeZone);
     const s = start.getTime();
     const e = end.getTime();
     const snowVals = hoursIn(snow, s, e);
@@ -213,30 +216,39 @@ export const nwsSource: SourceDefinition<NwsPayload> = {
   label: "NWS mountain forecast",
   category: "weather",
   required: false,
-  attribution: "National Weather Service Salt Lake City — api.weather.gov gridpoint forecasts",
-  sourceUrl: "https://www.weather.gov/slc/",
+  attribution: "National Weather Service — api.weather.gov mountain gridpoint forecasts",
+  sourceUrl: "https://www.weather.gov/",
   reportMaxAgeMs: 12 * HOUR,
   async collect(ctx) {
-    const points = await Promise.all(
-      NWS_POINTS.map(async (pt) => {
-        const [grid, text] = await Promise.all([
-          ctx.fetchJson<GridData>(gridUrl(pt), { headers: { Accept: "application/geo+json" } }),
-          ctx.fetchJson<TextForecast>(`${gridUrl(pt)}/forecast`, { headers: { Accept: "application/geo+json" } }).catch(() => null),
+    const previous = ctx.previous as NwsPayload | null;
+    const failures:string[]=[];
+    const results=await Promise.all(FORECAST_AREAS.map(async area=>{
+      const prior=previous?.points.find(p=>p.id===area.id);
+      try {
+        const timeZone=regionById(area.region)!.timeZone;
+        let gridId=prior?.gridId, gridX=prior?.gridX, gridY=prior?.gridY;
+        let resolvedAt=prior?.resolvedAt;
+        if(!gridId || !resolvedAt || ctx.now.getTime()-Date.parse(resolvedAt)>24*HOUR || prior?.resolvedCoordinates?.latitude!==area.latitude || prior?.resolvedCoordinates?.longitude!==area.longitude){
+          const lookup=await ctx.fetchJson<{properties:{gridId:string;gridX:number;gridY:number}}>(`https://api.weather.gov/points/${area.latitude},${area.longitude}`,{headers:{Accept:"application/geo+json"}});
+          ({gridId,gridX,gridY}=lookup.properties);
+          assertValid(gridId && Number.isInteger(gridX) && Number.isInteger(gridY),`NWS point mapping unavailable for ${area.name}`);
+          resolvedAt=ctx.now.toISOString();
+        }
+        const url=gridUrl({gridId:gridId!,gridX:gridX!,gridY:gridY!});
+        const [grid,text]=await Promise.all([
+          ctx.fetchJson<GridData>(url,{headers:{Accept:"application/geo+json"}}),
+          ctx.fetchJson<TextForecast>(`${url}/forecast`,{headers:{Accept:"application/geo+json"}}).catch(()=>null)
         ]);
-        const summary = summarizeGrid(grid, ctx.now);
-        const point: PointForecast = {
-          ...pt,
-          ...summary,
-          periods: (text?.properties.periods ?? []).slice(0, 4).map((p) => ({
-            name: p.name,
-            detailedForecast: p.detailedForecast,
-            start: new Date(p.startTime).toISOString(),
-          })),
-        };
-        return point;
-      }),
-    );
-    const updated = points.map((p) => p.gridUpdatedAt).filter((x): x is string => !!x).sort()[0] ?? null;
-    return { payload: { points }, sourceUpdatedAt: updated };
+        return {id:area.id,name:area.name,gridId:gridId!,gridX:gridX!,gridY:gridY!,timeZone,resolvedAt,resolvedCoordinates:{latitude:area.latitude,longitude:area.longitude},lastCheckedAt:ctx.now.toISOString(),lastError:null,...summarizeGrid(grid,ctx.now,6,timeZone),periods:(text?.properties.periods??[]).slice(0,4).map(p=>({name:p.name,detailedForecast:p.detailedForecast,start:new Date(p.startTime).toISOString()}))} satisfies PointForecast;
+      } catch(e) {
+        const message=`${area.name}: ${e instanceof Error?e.message:String(e)}`;failures.push(message);
+        return prior?{...prior,lastError:message}:null;
+      }
+    }));
+    const points=results.filter((p):p is NonNullable<typeof p>=>p!==null);
+    const fresh=points.filter(p=>!p.lastError);
+    // A total outage is a failed collection, not a success built from retained points.
+    assertValid(fresh.length,`No NWS mountain point collected this run (${failures.join("; ")})`);
+    return {payload:{points,failures},sourceUpdatedAt:fresh.map(p=>p.gridUpdatedAt).filter((x):x is string=>!!x).sort()[0]??null};
   },
 };

@@ -1,6 +1,7 @@
+import { resortTimeZone, resortById } from "@/lib/catalog";
 import Link from "next/link";
 import type { ApiSource, Metric, ResortReport, SnowfallSet } from "@/lib/types";
-import { formatDenver } from "@/lib/time";
+import { formatLocal } from "@/lib/time";
 import {
   FreshnessBadge,
   MetricValue,
@@ -93,11 +94,12 @@ export function ResortReportPage({
           <h1>{source.label}</h1>
         </header>
         <Unavailable source={source} what={`${source.label} report`} />
-        <SourceLine source={source} now={now} />
+        <SourceLine source={source} now={now} timeZone={resortTimeZone(source.id)} />
       </section>
     );
 
   const snow = snowSlots(r.snowfall);
+  const location=r.reportingLocation??{name:resortById(source.id)?.station,elevationFt:resortById(source.id)?.elevationFt,note:undefined};
   const observations = r.observations.filter(
     (observation) =>
       source.id !== "alta" || observation.temperature.state !== "unavailable",
@@ -113,9 +115,11 @@ export function ResortReportPage({
         <div>
           <p className="eyebrow">Mountain report</p>
           <h1>{r.resort}</h1>
+          {location.name && <p className="muted">Snow reporting: {location.name}{location.elevationFt?` · ${location.elevationFt.toLocaleString()} ft`:""}{location.note?` · ${location.note}`:""}</p>}
+          {r.mountainBaseRange && <p className="muted">Mountain-wide base: {r.mountainBaseRange.minIn}–{r.mountainBaseRange.maxIn}″</p>}
           <p className="resort-report__time">
             Updated{" "}
-            <strong>{formatDenver(r.reportTime, now)}</strong>
+            <strong>{formatLocal(r.reportTime,now,resortTimeZone(source.id))}</strong>
           </p>
         </div>
         <div className="resort-report__state">
@@ -145,7 +149,7 @@ export function ResortReportPage({
 
       {notices.length > 0 && (
         <section className="resort-alerts" aria-label="Resort notices">
-          <NoticeList notices={notices} now={now} />
+          <NoticeList notices={notices} now={now} timeZone={resortTimeZone(source.id)} />
         </section>
       )}
       {!!r.missingSections?.length && (
@@ -191,7 +195,7 @@ export function ResortReportPage({
       >
         <div className="resort-section-heading">
           <h2 id="resort-weather-heading">On the mountain</h2>
-          <Link href="/weather">Forecast ↗</Link>
+          <Link href={`/weather/${resortById(source.id)?.region??"utah"}`}>Forecast ↗</Link>
         </div>
         {observations.length === 0 ? (
           <p className="muted">
@@ -205,7 +209,7 @@ export function ResortReportPage({
                 <div className="resort-observation__heading">
                   <h3>{observation.location}</h3>
                   <span className="resort-observation__time">
-                    Observed {formatDenver(observation.observedAt, now)}
+                    Observed {formatLocal(observation.observedAt, now,resortTimeZone(source.id))}
                   </span>
                 </div>
                 {observation.sky && <p className="muted">{observation.sky}</p>}
@@ -281,6 +285,7 @@ export function ResortReportPage({
             </span>
           )}
         </div>
+        {r.operationsUpdatedAt&&<p className="muted">Lift status updated {formatLocal(r.operationsUpdatedAt,now,resortTimeZone(source.id))}</p>}
         <p className="resort-status-key">
           <StatusDot status="open" /> Open <StatusDot status="hold" /> Hold{" "}
           <StatusDot status="scheduled" /> Scheduled{" "}
@@ -352,7 +357,7 @@ export function ResortReportPage({
         />
       </div>
 
-      <SourceLine source={source} now={now} reportLabel={r.reportTimeLabel} />
+      <SourceLine source={source} now={now} timeZone={resortTimeZone(source.id)} reportLabel={r.reportTimeLabel} />
     </article>
   );
 }

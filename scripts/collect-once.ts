@@ -12,7 +12,6 @@ import { formatDenver } from "../src/lib/time";
 const kv = new MemoryKV();
 const summary = await runCollection({
   SNOW_KV: kv,
-  UDOT_API_KEY: process.env.UDOT_API_KEY,
   COLLECTOR_CONTACT: process.env.COLLECTOR_CONTACT,
 });
 const report = buildReport(await readSnapshot(kv));

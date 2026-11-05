@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   // Embed the public deployment origin in the static share metadata.
-  env: { SITE_URL: process.env.SITE_URL || "https://cottonwoods-snow-report.huang.mx" },
+  env: { SITE_URL: process.env.SITE_URL || "https://mitchells-snow-report.huang.mx" },
 };
 
 export default nextConfig;

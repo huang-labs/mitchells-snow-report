@@ -1,5 +1,6 @@
 import type { DailySnowFigure } from "@/lib/types";
-import { SnowLevel } from "../charts";
+import { resortById } from "@/lib/catalog";
+import { SnowLevel,SNOW_LEVEL_COLORS } from "../charts";
 import { SnowfallChart } from "../snowfall/SnowfallChart";
 import { PlumePanelSvg } from "../PlumePanelSvg";
 import { StormRecap } from "./StormRecap";
@@ -39,20 +40,20 @@ function Totals({ rows, label }: { rows: Extract<DailySnowFigure, { kind: "total
  * One figure in a post. Code-drawn charts sit on a pale panel; images (plumes,
  * stake cams) stand on their own white ground with no panel around them.
  */
-export function Figure({ figure: f, postedAt }: { figure: DailySnowFigure; postedAt: string }) {
+export function Figure({ figure: f, postedAt,timeZone="America/Denver" }: { figure: DailySnowFigure; postedAt: string;timeZone?:string }) {
   let body;
   switch (f.kind) {
     case "storm-recap":
-      body = <StormRecap storm={f.storm} />;
+      body = <StormRecap storm={f.storm} timeZone={timeZone} />;
       break;
     case "snow-bars": {
       // Posts written before 2026-11-03 stored the NWS grid time in the caption.
       const title = f.caption.replace(/ · updated .*$/, "");
-      body = <SnowfallChart bars={f.bars} label={title} title={title} />;
+      body = <SnowfallChart bars={f.bars} label={title} title={title} timeZone={timeZone} />;
       break;
     }
     case "snow-level":
-      body = <SnowLevel series={f.series} label={f.caption} />;
+      body = <SnowLevel series={f.series} label={f.caption} timeZone={timeZone} />;
       break;
     case "totals":
       body = <Totals rows={f.rows} label={f.caption} />;
@@ -62,6 +63,7 @@ export function Figure({ figure: f, postedAt }: { figure: DailySnowFigure; poste
       // before the axis was stored fall back to the bare image.
       body = f.axis && f.width && f.height ? (
         <PlumePanelSvg
+          timeZone={f.axis.timeZone??timeZone}
           src={f.url}
           width={f.width}
           height={f.height}
@@ -69,7 +71,7 @@ export function Figure({ figure: f, postedAt }: { figure: DailySnowFigure; poste
           initTime={f.axis.initTime}
           forecastHours={f.axis.forecastHours}
           marker={{ time: new Date(postedAt), label: "posted" }}
-          label={`${f.caption}, times in Mountain Time`}
+          label={`${f.caption}, times in ${f.axis.timeZone??timeZone}`}
         />
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
@@ -85,7 +87,7 @@ export function Figure({ figure: f, postedAt }: { figure: DailySnowFigure; poste
           {f.caption}
           {f.kind === "snow-level" && (
             <span className="snow-level__legend">
-              {f.series.map((s) => <span key={s.canyon} className={`snow-level__key snow-level__key--${s.canyon.toLowerCase()}`}>{s.canyon}</span>)}
+              {f.series.map((s,i) => <span style={{color:SNOW_LEVEL_COLORS[i%SNOW_LEVEL_COLORS.length]}} key={s.canyon} className={`snow-level__key snow-level__key--${s.canyon.toLowerCase()}`}>{resortById(s.canyon)?.name??s.canyon}</span>)}
             </span>
           )}
         </figcaption>

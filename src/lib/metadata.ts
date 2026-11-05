@@ -1,11 +1,12 @@
+import { regionById } from "./catalog";
 import type { Metadata } from "next";
 import { sectionHref, type SectionDef } from "./sections";
 
-export const SITE_TITLE = "Cottonwoods Snow Report";
+export const SITE_TITLE = "Mitchell’s Snow Report";
 // Set at build time for PR previews; production keeps its custom domain.
-export const metadataBase = new URL(process.env.SITE_URL || "https://cottonwoods-snow-report.huang.mx");
-export const SITE_DESCRIPTION = "Live snowfall, forecast, plumes and canyon roads for Alta, Snowbird, Solitude and Brighton.";
-export const DAILY_SNOW_DESCRIPTION = "A daily snow forecast for Little and Big Cottonwood Canyons, with storm updates, snowfall outlooks and mountain weather.";
+export const metadataBase = new URL(process.env.SITE_URL || "https://mitchells-snow-report.huang.mx");
+export const SITE_DESCRIPTION = "Snowfall, mountain forecasts and ensemble plumes for 14 Western US favorites.";
+export const DAILY_SNOW_DESCRIPTION = "Regional Daily Snow forecasts and a Western United States overview, with storm updates and mountain weather.";
 
 export const siteOpenGraph = {
   type: "website" as const,
@@ -26,8 +27,8 @@ export function sectionMetadata(section: SectionDef): Metadata {
     width: 1200,
     height: 630,
     alt: section.id === "daily-snow"
-      ? "Daily Snow — the latest Cottonwoods snow forecast"
-      : "Cottonwoods Snow Report — Little & Big Cottonwood Canyons",
+      ? "Daily Snow — Mitchell's regional snow forecasts"
+      : "Mitchell’s Snow Report — Western United States",
   }];
   return {
     title: section.title,
@@ -35,4 +36,12 @@ export function sectionMetadata(section: SectionDef): Metadata {
     openGraph: { ...siteOpenGraph, title, description, url: sectionHref(section.id), images },
     twitter: { card: "summary_large_image", title, description, images },
   };
+}
+
+export function regionalMetadata(section:string,region:string):Metadata{
+ const r=regionById(region);if(!r)return {};
+ const label=section==="daily-snow"?"Daily Snow":section==="weather"?"Mountain weather":"Ensemble plumes";
+ const title=`${r.name} ${label}`;const url=`/${section}/${r.id}`;
+ const images=[{url:section==="daily-snow"?`/daily-snow/${r.id}/opengraph-image`:"/share-brand-v2.png",width:1200,height:630,alt:title}];
+ return {title,description:`${label} for ${r.name}'s tracked resorts.`,openGraph:{...siteOpenGraph,title:`${title} · ${SITE_TITLE}`,url,images},twitter:{card:"summary_large_image",title,images}};
 }

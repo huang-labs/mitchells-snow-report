@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import worker from "../worker";
+import { handleFetch } from "@/worker/fetch";
+import { scheduled } from "@/worker/scheduled";
+const worker={fetch:handleFetch,scheduled};
 import type { CollectSummary } from "@/lib/collect";
 import type { WorkerEnv } from "@/worker/env";
 import { MemoryKV, readSnapshot, writeSnapshot } from "@/lib/store";
 import { dailySnowFigureKey, dailySnowKey, emptyDailySnowState } from "@/lib/dailysnow";
+import { channelKV, channelStateKey } from "@/lib/dailysnow/regions";
 import { DAILY_SNOW_ARCHIVE_POSTS } from "@/lib/report";
 import type { ApiDailySnow, DailySnowHistoryEntry, DailySnowPost } from "@/lib/types";
 import { createFixtureFetch, FIXTURE_NOW } from "./fixtureFetch";
@@ -63,18 +66,18 @@ describe("Worker request routing", () => {
     };
     expect((await call("/api/daily-snow")).status).toBe(400);
     expect((await call("/api/daily-snow?date=2026-11-01")).status).toBe(404);
-    await env.SNOW_KV.put(dailySnowKey(post.date), JSON.stringify(post));
+    await channelKV(env.SNOW_KV,"western-us").put(dailySnowKey(post.date), JSON.stringify(post));
     const res = await call("/api/daily-snow?date=2026-11-01");
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ title: post.title, date: post.date });
     const key = dailySnowFigureKey(post.date, "stake-alta");
-    await env.SNOW_KV.put(key, new Uint8Array([0xff, 0xd8, 0xff]).buffer);
+    await channelKV(env.SNOW_KV,"western-us").put(key, new Uint8Array([0xff, 0xd8, 0xff]).buffer);
     const figure = await call("/api/daily-snow/figure/2026-11-01/stake-alta");
     expect(figure.status).toBe(200);
     expect(figure.headers.get("content-type")).toBe("image/jpeg");
     expect(figure.headers.get("cache-control")).toBe("public, max-age=300, must-revalidate");
     const revision = "a".repeat(64);
-    await env.SNOW_KV.put(dailySnowFigureKey(post.date, "stake-alta", revision), new Uint8Array([0xff, 0xd8, 0xff, 1]).buffer);
+    await channelKV(env.SNOW_KV,"western-us").put(dailySnowFigureKey(post.date, "stake-alta", revision), new Uint8Array([0xff, 0xd8, 0xff, 1]).buffer);
     const revisedPath = `/api/daily-snow/figure/${post.date}/stake-alta?v=${revision}`;
     const revised = await call(revisedPath);
     expect(revised.headers.get("cache-control")).toContain("immutable");
@@ -83,7 +86,7 @@ describe("Worker request routing", () => {
     expect((await call(revisedPath.replace(revision, "invalid"))).status).toBe(404);
     expect((await call(revisedPath.replace(revision, "b".repeat(64)))).status).toBe(404);
     expect((await figure.arrayBuffer()).byteLength).toBe(3);
-    await env.SNOW_KV.put(key, new Uint8Array([0, 1, 2]).buffer);
+    await channelKV(env.SNOW_KV,"western-us").put(key, new Uint8Array([0, 1, 2]).buffer);
     expect((await call("/api/daily-snow/figure/2026-11-01/stake-alta")).status).toBe(404);
     expect((await call("/api/daily-snow/figure/not-a-date/stake-alta")).status).toBe(404);
     expect(env.ASSETS.fetch).not.toHaveBeenCalled();
@@ -99,9 +102,9 @@ describe("Worker request routing", () => {
         numbers: { canyons: [], resorts: [] }, generatedAt: FIXTURE_NOW.toISOString(), model: "test-model", trigger: "morning",
       };
     });
-    for (const p of posts) await env.SNOW_KV.put(dailySnowKey(p.date), JSON.stringify(p));
+    for (const p of posts) await channelKV(env.SNOW_KV,"western-us").put(dailySnowKey(p.date), JSON.stringify(p));
     const history: DailySnowHistoryEntry[] = posts.map((p) => ({ date: p.date, title: p.title, phase: "quiet", forecast: [] }));
-    await writeSnapshot(env.SNOW_KV, { schemaVersion: 1, writtenAt: FIXTURE_NOW.toISOString(), sources: {}, dailySnow: { ...emptyDailySnowState(), current: posts[0], history } });
+    await env.SNOW_KV.put(channelStateKey("western-us"), JSON.stringify({ ...emptyDailySnowState(), current: posts[0], history }));
 
     const report = (await (await call("/api/report")).json()) as { dailySnow: ApiDailySnow };
     expect(report.dailySnow.archive.map((a) => a.date)).toEqual(posts.slice(0, DAILY_SNOW_ARCHIVE_POSTS).map((p) => p.date));

@@ -1,5 +1,5 @@
 {
-  "name": "cottonwoods-snow-report",
+  "name": "mitchells-snow-report",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,10 +14,9 @@
     "preview": "npm run build && wrangler dev --local",
     "preview:scheduled": "npm run build && wrangler dev --local --test-scheduled",
     "deploy": "npm run build && wrangler deploy",
-    "upload": "npm run build && wrangler versions upload",
+    "upload": "npm run build && wrangler preview --worker-name mitchells-snow-report-preview --ignore-base-config",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "collect:once": "tsx scripts/collect-once.ts",
-    "recommend:once": "tsx scripts/recommend-once.ts",
     "dailysnow:once": "tsx scripts/dailysnow-once.ts",
     "dailysnow:replay": "tsx scripts/dailysnow-replay.ts",
     "share:render": "tsx scripts/render-share-image.ts",

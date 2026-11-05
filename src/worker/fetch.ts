@@ -22,14 +22,16 @@ export async function handleFetch(request: Request, env: WorkerEnv, ctx: Executi
     return request.method === "POST" ? adminCollect(request, env) : methodNotAllowed("POST");
   }
 
+  const share=/^\/daily-snow\/([^/]+)\/opengraph-image$/.exec(path);
   const panel = /^\/api\/plume\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(path);
   const figure = /^\/api\/daily-snow\/figure\/([^/]+)\/([^/]+)$/.exec(path);
   let route: (() => Promise<Response>) | undefined;
   if (path === "/api/report") route = () => report(env);
   else if (path === "/api/daily-snow") route = () => dailySnow(request, env);
   else if (path === "/daily-snow/opengraph-image") route = () => dailySnowShareImage(request, env, ctx);
+  else if(share)route=()=>dailySnowShareImage(request,env,ctx,share[1]);
   else if (panel) route = () => plumePanel(env, panel[1], panel[2], panel[3]);
-  else if (figure) route = () => dailySnowFigure(env, figure[1], figure[2], url.searchParams.get("v") ?? undefined);
+  else if (figure) route = () => dailySnowFigure(env, figure[1], figure[2], url.searchParams.get("v") ?? undefined,url.searchParams.get("channel")??"western-us");
   if (route) {
     if (request.method !== "GET" && request.method !== "HEAD") return methodNotAllowed("GET, HEAD");
     const response = await route();

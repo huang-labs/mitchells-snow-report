@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { denverToUtc, formatAge, formatDenver, inferYearDenver, parseDenverDateTime, parseOffsetIso } from "@/lib/time";
+import { cachedDateFormat, denverToUtc, formatAge, formatDenver, inferYearDenver, parseDenverDateTime, parseOffsetIso } from "@/lib/time";
 import { currentBlockStart } from "@/lib/sources/nws";
 
 describe("America/Denver conversions", () => {
@@ -46,5 +46,16 @@ describe("display formatting", () => {
     expect(currentBlockStart(now).toISOString()).toBe("2026-10-31T00:00:00.000Z"); // 6 PM MDT
     expect(currentBlockStart(new Date("2026-10-30T14:00:00Z")).toISOString()).toBe("2026-10-30T12:00:00.000Z"); // 6 AM
     expect(currentBlockStart(new Date("2026-10-30T10:00:00Z")).toISOString()).toBe("2026-10-30T00:00:00.000Z"); // 4 AM -> prev 6 PM
+  });
+});
+
+describe("cachedDateFormat", () => {
+  it("shares one formatter per locale and options, keyed by zone", () => {
+    const a = cachedDateFormat("en-US", { timeZone: "America/Los_Angeles", hour: "numeric" });
+    expect(cachedDateFormat("en-US", { timeZone: "America/Los_Angeles", hour: "numeric" })).toBe(a);
+    const b = cachedDateFormat("en-US", { timeZone: "America/Denver", hour: "numeric" });
+    expect(b).not.toBe(a);
+    const t = new Date("2026-11-05T15:00:00Z");
+    expect([a.format(t), b.format(t)]).toEqual(["7 AM", "8 AM"]);
   });
 });

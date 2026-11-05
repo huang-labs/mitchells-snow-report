@@ -1,4 +1,4 @@
-import type { AfdPayload } from "../types";
+import type { AfdPayload, NwsPayload } from "../types";
 import { assertValid, HOUR, MINUTE, type SourceDefinition } from "./types";
 
 /**
@@ -56,24 +56,34 @@ export const nwsAfdSource: SourceDefinition<AfdPayload> = {
   label: "NWS forecast discussion",
   category: "weather",
   required: false,
-  attribution: "National Weather Service Salt Lake City — Area Forecast Discussion",
-  sourceUrl: "https://forecast.weather.gov/product.php?site=SLC&issuedby=SLC&product=AFD",
+  attribution: "National Weather Service — regional Area Forecast Discussions",
+  sourceUrl: "https://www.weather.gov/",
   reportMaxAgeMs: 18 * HOUR,
   async collect(ctx) {
-    const headers = { Accept: "application/ld+json" };
-    const list = await ctx.fetchJson<ProductList>(AFD_LIST_URL, { headers });
-    const latest = list["@graph"]?.[0];
-    assertValid(latest?.id, "AFD list is empty");
-    const prev = ctx.previous as AfdPayload | null;
-    if (prev?.productId === latest.id) return { payload: prev, sourceUpdatedAt: prev.issuedAt };
-    const product = await ctx.fetchJson<Product>(productUrl(latest.id), { headers });
-    assertValid(typeof product.productText === "string", "AFD product has no text");
-    const sections = parseAfd(product.productText);
-    assertValid(sections.some((s) => /DISCUSSION|SHORT TERM|LONG TERM|KEY MESSAGES|SYNOPSIS/.test(s.name)), "AFD has no discussion section");
-    const issuedAt = new Date(product.issuanceTime).toISOString();
-    return {
-      payload: { productId: product.id, office: product.issuingOffice ?? "KSLC", issuedAt, sections },
-      sourceUpdatedAt: issuedAt,
-    };
+    // Offices verified against the catalog mountain points; shared offices fetch once.
+    const offices=["SLC","STO","REV","RIW","TFX","BOU","GJT","SEW","PDT"];
+    const previous=ctx.previous as AfdPayload|null;
+    const failures:string[]=[];
+    const results=await Promise.all(offices.map(async (office):Promise<AfdPayload|null>=>{
+      const prior=(previous?.discussions??(previous?[previous]:[])).find(p=>p.office.replace(/^K/,"")===office);
+      try {
+        const headers={Accept:"application/ld+json"};
+        const list=await ctx.fetchJson<ProductList>(`https://api.weather.gov/products/types/AFD/locations/${office}`,{headers});
+        const latest=list["@graph"]?.[0];assertValid(latest?.id,`${office} AFD list empty`);
+        if(prior?.productId===latest.id)return {...prior,lastError:null};
+        const product=await ctx.fetchJson<Product>(productUrl(latest.id),{headers});
+        const sections=parseAfd(product.productText);assertValid(sections.length,`${office} AFD has no usable sections`);
+        return {productId:product.id,office,issuedAt:new Date(product.issuanceTime).toISOString(),sections,lastError:null} satisfies AfdPayload;
+      }catch(e){
+        const message=`${office}: ${e instanceof Error?e.message:String(e)}`;failures.push(message);
+        // A retained product is marked so its office's failure stays visible.
+        return prior?{...prior,lastError:message}:null;
+      }
+    }));
+    const discussions=results.filter((p):p is AfdPayload=>p!==null);
+    const fresh=discussions.filter(d=>!d.lastError);
+    // A total outage is a failed collection, not a success built from retained products.
+    assertValid(fresh.length,`No forecast discussion collected this run (${failures.join("; ")})`);
+    return {payload:{...fresh[0],discussions,failures},sourceUpdatedAt:fresh.map(d=>d.issuedAt).sort()[0]};
   },
 };

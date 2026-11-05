@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { planDailySnow } from "@/lib/dailysnow";
 import { runCollection } from "@/lib/collect";
 import { buildDailyDigest } from "@/lib/dailysnow/digest";
 import { archiveStorms, trackStorms } from "@/lib/dailysnow/storm-store";
@@ -37,7 +38,7 @@ function snapshot(hours: number, snow: Partial<Record<PrimaryResortId, Snow>> = 
   const nws = structuredClone(base.sources.nws!);
   nws.lastSuccessfulFetchAt = nws.lastAttemptAt = at(hours).toISOString();
   for (const p of (nws.payload as NwsPayload).points) {
-    p.gridUpdatedAt = at(hours).toISOString();
+    p.gridUpdatedAt = p.lastCheckedAt = at(hours).toISOString();
     p.nextStorm = null;
     p.sixHourSnow = Array.from({ length: 8 }, (_, i) => ({ start: at(hours + 6 * i).toISOString(), snowIn: forecastIn, snowLevelFt: 6000 }));
   }
@@ -45,7 +46,7 @@ function snapshot(hours: number, snow: Partial<Record<PrimaryResortId, Snow>> = 
   return { schemaVersion: 1, writtenAt: at(hours).toISOString(), sources };
 }
 const run = (s: Snapshot, state?: Snapshot["stormTracking"]) => advanceStormTracking(state, s, new Date(s.writtenAt));
-const resort = (s: NonNullable<Snapshot["stormTracking"]>, id: PrimaryResortId) => s.events[0].resorts.find((r) => r.id === id)!;
+const resort = (s: NonNullable<Snapshot["stormTracking"]>, id: PrimaryResortId) => s.events[0].resorts.find((r) => r.id === id)??{id,name:id,total:null,rolling:null};
 
 describe("persistent storm observations", () => {
   it("keeps 15 inches when the 48-hour window shrinks to 12 and Alta resets to zero", () => {
@@ -247,9 +248,9 @@ describe("persistent storm observations", () => {
     await writeSnapshot(kv, snapshot(0, { alta: { storm: 15 } }));
     await runCollection({ SNOW_KV: kv }, { now: at(0), sources: [] });
     const stored = (await readSnapshot(kv))!;
-    expect(stored.stormTracking?.events[0].resorts[0].total?.amountIn).toBe(15);
+    expect(stored.areaStorms?.LCC?.events[0].resorts[0].total?.amountIn).toBe(15);
     expect(stored.dailySnow).toBeUndefined();
-    expect(await kv.get(stormKey(stored.stormTracking!.events[0].id), "text")).not.toBeNull();
+    expect(await kv.get(stormKey(stored.areaStorms!.LCC!.events[0].id), "text")).not.toBeNull();
   });
 
   it("publishes the retained facts and figure together, survives a rewrite, and freezes the archive", async () => {
@@ -261,13 +262,13 @@ describe("persistent storm observations", () => {
       if (!messages[1].content.includes("Write today's Daily Snow")) throw new Error("pick is not under test");
       return { response: JSON.stringify({ title: "A Dry Break", summary: "Alta reported 15″ for the storm. Dry weather follows.", sections: [{ id: "update", paragraphs: [{ text: "Alta's reported storm total remains 15″. The discussion expects dry weather.", figure: "none" }] }] }) };
     } };
-    await runCollection({ SNOW_KV: kv, AI: ai }, { now: at(48), sources: [] });
-    const post = (await readSnapshot(kv))!.dailySnow!.current!;
+    let state=await planDailySnow(undefined,{...snapshot(48,{alta:{storm:0,h24:3,season:20},snowbird:{h48:12,season:30}}),stormTracking:monday},{SNOW_KV:kv,AI:ai},at(48),{force:true})!.run!();
+    const post=state.current!;
     expect(post.stormRecap?.resorts[0].total?.amountIn).toBe(15);
     expect(post.figures["storm-recap"]).toMatchObject({ kind: "storm-recap", storm: post.stormRecap });
     expect(post.sections[0].paragraphs[0].text).toContain("The NWS expects");
-    await runCollection({ SNOW_KV: kv, AI: ai }, { now: at(48), sources: [], forceDailySnow: true });
-    expect((await readSnapshot(kv))!.stormTracking!.events).toHaveLength(1);
+    state=await planDailySnow(state,{...snapshot(48,{alta:{storm:0,h24:3}}),stormTracking:monday},{SNOW_KV:kv,AI:ai},at(48),{force:true})!.run!();
+    expect(state.current?.stormRecap?.id).toBe(post.stormRecap?.id);
     const archived = await kv.get(`dailysnow:v1:${post.date}`, "text");
     expect(JSON.parse(archived!).stormRecap).toEqual(post.stormRecap);
     await runCollection({ SNOW_KV: kv }, { now: at(49), sources: [] });
@@ -320,8 +321,7 @@ describe("persistent storm observations", () => {
     await writeSnapshot(kv, s);
     const ids = ["nws-snow-lcc", "nws-snow-bcc", "nws-snow-level", "plume-slr-cln", "plume-slr-pkcu1", "stake-alta"];
     const ai = { async run() { return { response: JSON.stringify({ title: "Storm Recap", summary: "Alta reported 15″ for the storm.", sections: [{ id: "update", paragraphs: ids.map((figure) => ({ text: "Forecast guidance:", figure })) }] }) }; } };
-    await runCollection({ SNOW_KV: kv, AI: ai }, { now: START, sources: [], forceDailySnow: true });
-    const p = (await readSnapshot(kv))!.dailySnow!.current!;
+    const p=(await planDailySnow(undefined,s,{SNOW_KV:kv,AI:ai},START,{force:true})!.run!()).current!;
     expect(Object.keys(p.figures)).toHaveLength(6);
     expect(p.figures["storm-recap"]).toBeDefined();
     expect(p.figures["plume-snow-cln"]).toBeDefined();
@@ -332,7 +332,7 @@ describe("persistent storm observations", () => {
     event.resorts[0].total!.reportTime = iso;
     event.resorts[0].total!.collectedAt = iso;
     const digest = stormDigest(event, new Date(iso));
-    expect(digest.resorts[0].total).toMatchObject({ reportLocal: "Today 6:00 AM", checkedLocal: "Today 6:00 AM", amountIn: 15 });
+    expect(digest.resorts[0].total).toMatchObject({ reportLocal: expect.stringMatching(/6:00 AM (MST|MDT)/), checkedLocal: expect.stringMatching(/6:00 AM (MST|MDT)/), amountIn: 15 });
     expect(JSON.stringify(digest)).not.toContain(iso);
   });
 });

@@ -2,7 +2,7 @@
 
 [← README](../README.md)
 
-Status: design approved on November 5, 2026; feature implementation has not started.
+Status: design approved on November 5, 2026; implementation delivered in the expansion PR. This document retains the approved scope; current operations and source findings live in the linked guides.
 
 Expand the Cottonwoods dashboard into Mitchell's Snow Report at
 `mitchells-snow-report.huang.mx`. Launch with a fixed list of 14 United States
@@ -211,15 +211,20 @@ totals, figure captions, and availability. Use strict schemas and validation.
 
 Allow up to **three attempts per channel per local day**, with at most one
 fallback per attempt. Manual attempts count toward the limits. Reserve fallback
-capacity before starting an attempt and cap total reservations at **64 model
-requests per rolling 24 hours** across channels.
+capacity before starting an attempt. A dedicated AI Gateway caps total model
+requests at **64 per sliding day** across channels.
 
-Use a small Durable Object coordinator for atomic reservations and duplicate-job
-prevention. The collection cron continues to execute inference after fresh
-sources are stored; API reads never generate. Keep generation concurrency bounded
-and store channel editions independently so overlapping completions cannot erase
-another region's publication. A dedicated AI Gateway provides an additional
-request ceiling.
+Record attempts, in-flight status and request counts in each channel's KV state,
+following the original single-edition pattern; no separate lock or coordinator.
+Forced manual runs pass the same checks. The collection cron continues to execute
+inference after fresh sources are stored; API reads never generate. Keep
+generation concurrency bounded and store channel editions independently so
+overlapping completions cannot erase another region's publication.
+
+*Revised during review:* the approved design specified a Durable Object
+coordinator for atomic reservations. It duplicated limits already held in
+channel state, the Gateway enforces the global ceiling, and the races it closed
+are narrow, so it was removed before production deployment.
 
 ### 6. UI, branding, and deployment
 
@@ -231,7 +236,7 @@ Update the masthead, metadata, share assets, package identity, theme-storage
 prefix, collector contact, deployment configuration, and documentation to
 Mitchell's branding.
 
-Create separate Mitchell's Worker, KV, publication coordinator, and AI Gateway
+Create separate Mitchell's Worker, KV, and AI Gateway
 resources. Configure `mitchells-snow-report.huang.mx`. Use isolated preview
 storage seeded through the real collection path so the PR preview can demonstrate
 the feature before production begins collecting.
@@ -246,7 +251,7 @@ The implementation PR must list its exact final existing-file changes and reason
 | --- | --- |
 | Contracts and navigation | `src/lib/types.ts`, `sections.ts`: explicit catalog identities, regional publications, navigation |
 | Sources | `src/lib/sources/index.ts`, `mtnpowder.ts`, `nws.ts`, `nwsafd.ts`, `plumes.ts`, `resortcams.ts`: expanded registration, reporting selection, collection and failure isolation |
-| Collection and storage | `src/lib/collect.ts`, `store.ts`, `report.ts`, `worker.ts`: channel scheduling, persistence and coordinator wiring |
+| Collection and storage | `src/lib/collect.ts`, `store.ts`, `report.ts`, `worker.ts`: channel scheduling, persistence and channel state |
 | Worker APIs | `src/worker/admin.ts`, `fetch.ts`, `env.ts`, `report.ts`, `plume.ts`, `daily-snow.ts`, `daily-snow-figure.ts`, `daily-snow-share-image.tsx`: channel-aware routes, bindings and images |
 | Calendars and history | `src/lib/time.ts`, `snowlog/days.ts`, `record.ts`, `types.ts`; timeline, snowfall, chart and plume-axis components: local dates and forecast mappings |
 | Daily Snow | `src/lib/dailysnow/`, `src/components/dailysnow/`: scoped facts, continuity, storms, publication states, archives and rendering |

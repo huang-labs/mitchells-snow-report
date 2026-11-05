@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "cottonwoods-snow-report",
+  "name": "mitchells-snow-report",
   // Direct Worker API and cron; static page requests bypass Worker code.
   "main": "./worker.ts",
   // Satori's font shaper needs a precompiled WASM module in workerd.
@@ -9,27 +9,27 @@
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   // Served only on the custom domain (Cloudflare manages its DNS record and certificate).
-  "routes": [{ "pattern": "cottonwoods-snow-report.huang.mx", "custom_domain": true }],
+  "routes": [{ "pattern": "mitchells-snow-report.huang.mx", "custom_domain": true }],
   "workers_dev": false,
   "preview_urls": true,
   "ai": { "binding": "AI" },
   "vars": {
-    "AI_GATEWAY_ID": "snow-report",
+    "AI_GATEWAY_ID": "mitchells-snow-report",
     // Contact appended to the collector's User-Agent (api.weather.gov asks clients to identify themselves).
-    "COLLECTOR_CONTACT": "https://cottonwoods-snow-report.huang.mx"
+    "COLLECTOR_CONTACT": "https://mitchells-snow-report.huang.mx"
   },
   "assets": {
     "directory": "./out",
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/api/*", "/daily-snow/opengraph-image"]
+    "run_worker_first": ["/api/*", "/daily-snow/opengraph-image", "/daily-snow/*/opengraph-image"]
   },
   "kv_namespaces": [
     {
       "binding": "SNOW_KV",
       // Production namespace (account "Huang Inc."). Not a secret.
-      "id": "25451aae36fb40b68f530ee747940440"
+      "id": "5fb1857843374e8ea427c2117b5f3955"
     }
   ],
   // One global collection cron for every source category.
@@ -38,5 +38,24 @@
   },
   "observability": {
     "enabled": true
+  },
+  // Each PR gets an isolated Worker Preview with these bindings.
+  "previews": {
+    "define": { "__filename":"\"/worker.js\"", "__dirname":"\"/\"" },
+    "vars": { "AI_GATEWAY_ID":"mitchells-snow-report", "COLLECTOR_CONTACT":"https://mitchells-snow-report.huang.mx" },
+    "kv_namespaces":[{"binding":"SNOW_KV","id":"f9e542e8a1d0405f8624beade1bba09b"}],
+    "ai":{"binding":"AI"}
+  },
+  "env": {
+    "preview": {
+      "name":"mitchells-snow-report-preview",
+      "define": { "__filename":"\"/worker.js\"", "__dirname":"\"/\"" },
+      "routes":[], "workers_dev":false, "preview_urls":true,
+      "vars": { "AI_GATEWAY_ID":"mitchells-snow-report", "COLLECTOR_CONTACT":"https://mitchells-snow-report.huang.mx" },
+      "kv_namespaces":[{"binding":"SNOW_KV","id":"f9e542e8a1d0405f8624beade1bba09b"}],
+      "ai":{"binding":"AI"},
+      "triggers":{"crons":[]}
+    }
   }
+
 }

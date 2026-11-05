@@ -22,7 +22,6 @@ export interface FetchContext {
 }
 
 export interface CollectorSecrets {
-  UDOT_API_KEY?: string;
   COLLECTOR_CONTACT?: string;
 }
 
@@ -65,7 +64,7 @@ export function createFetchContext(
   extra: { kv?: KVLike; previous?: unknown } = {},
 ): FetchContext {
   const calls: UpstreamCall[] = [];
-  const ua = `cottonwoods-snow-report/0.1${env.COLLECTOR_CONTACT ? ` (${env.COLLECTOR_CONTACT})` : ""}`;
+  const ua = `mitchells-snow-report/0.1${env.COLLECTOR_CONTACT ? ` (${env.COLLECTOR_CONTACT})` : ""}`;
 
   // Cancellation is best effort: a broken producer must not keep our promise pending.
   const cancel = (body: ReadableStream<Uint8Array> | null) => {

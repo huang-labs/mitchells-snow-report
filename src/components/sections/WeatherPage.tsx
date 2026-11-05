@@ -1,5 +1,7 @@
+import type { ReactNode } from "react";
+import { regionById, type RegionId } from "@/lib/catalog";
 import type { ApiSource, NwsPayload, PointForecast } from "@/lib/types";
-import { formatDenver } from "@/lib/time";
+import { formatLocal } from "@/lib/time";
 import { SNOWFALL_UNITS, SnowfallChart } from "../snowfall/SnowfallChart";
 import { SourceLine, Unavailable } from "../ui";
 
@@ -15,18 +17,20 @@ function Point({ p, now }: { p: PointForecast; now: Date }) {
         <h2>{p.name}</h2>
         <p className="weather-point__grid">NWS grid {p.gridId} {p.gridX},{p.gridY}{p.elevationFt ? ` · grid elev ${p.elevationFt.toLocaleString()} ft` : ""}</p>
       </header>
+      <p className="muted">Grid updated {formatLocal(p.gridUpdatedAt,now,p.timeZone)}</p>
+      {p.lastError && <p className="source-line__error">Forecast updates failing; showing last successful data. {p.lastError}</p>}
       <div className="next-storm">
         {p.nextStorm ? (
           <>
             <span className="eyebrow">Next storm (≥1″ in NWS grid)</span>
             <span className="next-storm__value">{p.nextStorm.totalSnowIn.toFixed(1)}″</span>
             <span>
-              {formatDenver(p.nextStorm.start, now)} → {formatDenver(p.nextStorm.end, now)}
+              {formatLocal(p.nextStorm.start,now,p.timeZone)} → {formatLocal(p.nextStorm.end,now,p.timeZone)}
               {p.nextStorm.minSnowLevelFt !== null && <> · snow level down to {p.nextStorm.minSnowLevelFt.toLocaleString()} ft</>}
             </span>
           </>
         ) : (
-          <span className="muted">No ≥1″ snow episode in the NWS 7-day grid.</span>
+          <span className="muted">{p.sixHourSnow.length ? "No ≥1″ snow episode in the available NWS grid." : "Snowfall forecast unavailable."}</span>
         )}
       </div>
       <div className="table-scroll">
@@ -73,7 +77,7 @@ function Point({ p, now }: { p: PointForecast; now: Date }) {
             <span>Snowfall forecast, next 7 days</span>
             <span>{SNOWFALL_UNITS}</span>
           </figcaption>
-          <SnowfallChart bars={p.sixHourSnow} label={`NWS snowfall, ${p.name}`} units={false} />
+          <SnowfallChart bars={p.sixHourSnow} label={`NWS snowfall, ${p.name}`} units={false} timeZone={p.timeZone} />
         </figure>
       )}
       <dl className="periods">
@@ -88,15 +92,17 @@ function Point({ p, now }: { p: PointForecast; now: Date }) {
   );
 }
 
-export function WeatherPage({ source, now }: { source: ApiSource; now: Date }) {
+export function WeatherPage({ source, now,region="utah",selector }: { source: ApiSource; now: Date;region?:RegionId;selector?:ReactNode }) {
   const payload = source.payload as NwsPayload | null;
   return (
     <section className="page page--weather">
       <header className="page__header">
-        <h1>Cottonwoods mountain weather</h1>
-        <p className="page__sub">NWS Salt Lake City gridpoint forecast. Day = 6 AM–6 PM, night = 6 PM–6 AM Mountain Time; maxima/minima within each block.</p>
+        <h1>{regionById(region)!.name} mountain weather</h1>
+        <p className="page__sub">NWS mountain gridpoint forecasts. Day = 6 AM–6 PM, night = 6 PM–6 AM destination local time; maxima/minima within each block.</p>
       </header>
-      {payload ? (
+      {selector}
+      {payload?.failures?.filter(f=>!payload.points.some(p=>p.lastError===f)).map(f=><p key={f} className="source-line__error">Forecast unavailable · {f}</p>)}
+      {payload?.points.length ? (
         <div className="weather-grid">
           {payload.points.map((p) => (
             <Point key={p.name} p={p} now={now} />
@@ -105,7 +111,7 @@ export function WeatherPage({ source, now }: { source: ApiSource; now: Date }) {
       ) : (
         <Unavailable source={source} what="Mountain forecast" />
       )}
-      <SourceLine source={source} now={now} reportLabel="Forecast grid updated" />
+      <SourceLine source={source} now={now} reportLabel="Forecast grid updated" timeZone={regionById(region)!.timeZone} />
     </section>
   );
 }

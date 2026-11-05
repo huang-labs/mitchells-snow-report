@@ -1,6 +1,7 @@
 # Enables POST /api/admin/collect locally (Authorization: Bearer <token>). Leave unset in production unless needed.
 ADMIN_TOKEN=change-me-local-only
-# Optional: UDOT Traffic developer API key (https://www.udottraffic.utah.gov/developers/doc)
-# UDOT_API_KEY=
 # Optional contact appended to the outbound User-Agent (NWS asks for one). Not exposed by the API.
-# COLLECTOR_CONTACT=
+# COLLECTOR_CONTACT=https://mitchells-snow-report.huang.mx
+
+# Workers AI is remote even in local workerd. Keep generation off for local seeding.
+AI_ENABLED=false

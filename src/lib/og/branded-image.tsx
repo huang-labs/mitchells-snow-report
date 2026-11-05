@@ -6,9 +6,9 @@ export function BrandedShareCard() {
     <div style={{ ...SHARE_FRAME }}>
       <div style={{ display: "flex", flex: 1, flexDirection: "column", justifyContent: "center" }}>
         <ShareBrand large />
-        <div style={{ fontSize: 30, color: C.muted, marginTop: 32 }}>Little &amp; Big Cottonwood Canyons</div>
+        <div style={{ fontSize: 30, color: C.muted, marginTop: 32 }}>Western United States</div>
       </div>
-      <ShareFooter>Snowfall · Forecasts · Plumes · Canyon roads</ShareFooter>
+      <ShareFooter>Snowfall · Forecasts · Plumes · Mountain weather</ShareFooter>
     </div>
   );
 }

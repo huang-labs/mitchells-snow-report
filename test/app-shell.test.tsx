@@ -78,9 +78,9 @@ describe("useReport polling", () => {
 
 describe("sections", () => {
   it("maps sections to routes and back", () => {
-    expect(SECTIONS.map((s) => sectionHref(s.id))).toEqual(["/", "/daily-snow", "/weather", "/plumes", "/traffic", "/alta", "/snowbird", "/solitude", "/brighton"]);
+    expect(SECTIONS.map((s) => sectionHref(s.id))).toEqual(["/", "/daily-snow", "/weather", "/plumes", "/alta", "/snowbird", "/solitude", "/brighton", "/snowbasin", "/palisades-tahoe", "/mammoth-mountain", "/jackson-hole", "/big-sky", "/winter-park", "/steamboat", "/telluride", "/crystal-mountain", "/mt-bachelor"]);
     for (const [i, s] of SECTIONS.entries()) expect(sectionIndexFromPath(sectionHref(s.id))).toBe(i);
-    expect(sectionIndexFromPath("/alta/")).toBe(5);
+    expect(sectionIndexFromPath("/alta/")).toBe(4);
     expect(sectionIndexFromPath("/nope")).toBe(-1);
   });
 });
@@ -194,9 +194,9 @@ describe("app shell", () => {
     const view = renderAt("/alta");
     await loadedHeading("Alta");
     expect(fireEvent.click(screen.getByRole("link", { name: "Forecast ↗" }))).toBe(false);
-    expect(nav.pathname).toBe("/weather");
+    expect(nav.pathname).toBe("/weather/utah");
     view.rerender(<AppShell><SectionView id="weather" /></AppShell>);
-    expect(screen.getByRole("heading", { level: 1, name: "Cottonwoods mountain weather" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Utah mountain weather" })).toBeTruthy();
     expect(document.querySelector("[aria-busy=true]")).toBeNull();
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
@@ -207,8 +207,8 @@ describe("app shell", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(FIXTURE_NOW);
     mockApi(REPORT);
-    const expected = ["Resorts", "Waiting for the first post", "Cottonwoods mountain weather", "Utah ensemble snow plumes", "Canyon roads", "Alta", "Snowbird", "Solitude", "Brighton"];
-    expect(SECTIONS).toHaveLength(9);
+    const expected = ["Resorts", "Waiting for the first post", "Utah mountain weather", "Utah ensemble snow plumes", "Alta", "Snowbird", "Solitude", "Brighton", "Snowbasin", "Palisades Tahoe", "Mammoth Mountain", "Jackson Hole", "Big Sky", "Winter Park", "Steamboat", "Telluride", "Crystal Mountain", "Mt. Bachelor"];
+    expect(SECTIONS).toHaveLength(18);
     for (const [i, title] of expected.entries()) {
       const view = renderAt(sectionHref(SECTIONS[i].id));
       expect(await loadedHeading(title)).toBeTruthy();
@@ -217,18 +217,14 @@ describe("app shell", () => {
       if (SECTIONS[i].group) {
         const resorts = screen.getByRole("navigation", { name: "Resorts" });
         const links = within(resorts).getAllByRole("link");
-        expect(links.map((a) => a.getAttribute("href"))).toEqual(["/alta", "/snowbird", "/solitude", "/brighton"]);
+        expect(links.map((a) => a.getAttribute("href"))).toEqual(["/alta", "/snowbird", "/solitude", "/brighton", "/snowbasin", "/palisades-tahoe", "/mammoth-mountain", "/jackson-hole", "/big-sky", "/winter-park", "/steamboat", "/telluride", "/crystal-mountain", "/mt-bachelor"]);
         expect(links.filter((a) => a.getAttribute("aria-current") === "page").map((a) => a.textContent)).toEqual([SECTIONS[i].label]);
       } else {
         expect(screen.queryByRole("navigation", { name: "Resorts" })).toBeNull();
       }
       if (SECTIONS[i].id === "plumes") {
         // Four cropped panels, each with a Mountain Time axis.
-        expect(await screen.findAllByRole("img", { name: /times in Mountain Time/ })).toHaveLength(4);
-      }
-      if (SECTIONS[i].id === "traffic") {
-        // Year-old UDOT travel times are labelled as not live.
-        expect(screen.getAllByText(/Not live — UDOT’s latest measurement/, { selector: "p" })).toHaveLength(2);
+        expect(await screen.findAllByRole("img", { name: /times in America\/Denver/ })).toHaveLength(6);
       }
       view.unmount();
     }
@@ -257,11 +253,11 @@ describe("app shell", () => {
     await loadedHeading("Resorts");
     fireEvent.click(screen.getByRole("button", { name: "Dark appearance" }));
     expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(window.localStorage.getItem("cottonwoods-snow-report.appearance")).toBe("dark");
+    expect(window.localStorage.getItem("mitchells-snow-report.appearance")).toBe("dark");
     // Clicking the active choice again restores the system default.
     fireEvent.click(screen.getByRole("button", { name: "Dark appearance" }));
     expect(document.documentElement.dataset.theme).toBeUndefined();
-    expect(window.localStorage.getItem("cottonwoods-snow-report.appearance")).toBeNull();
+    expect(window.localStorage.getItem("mitchells-snow-report.appearance")).toBeNull();
   });
 });
 

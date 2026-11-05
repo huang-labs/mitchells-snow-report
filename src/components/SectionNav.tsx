@@ -93,7 +93,7 @@ export function SectionNav({ pathname }: { pathname: string | null }) {
       <NavRow label="Sections" pathname={pathname}>
         {SECTIONS.filter((s) => !s.group).map((s) => (
           <Link key={s.id} href={sectionHref(s.id)}
-            aria-current={sectionHref(s.id) === pathname ? "page" : undefined}
+            aria-current={(sectionHref(s.id) === pathname || pathname?.startsWith(`${sectionHref(s.id)}/`)) ? "page" : undefined}
             data-current={sectionHref(s.id) === home && resort ? "" : undefined}>{s.label}</Link>
         ))}
       </NavRow>
@@ -102,7 +102,7 @@ export function SectionNav({ pathname }: { pathname: string | null }) {
         <div className="section-nav__reveal">
           <NavRow label="Resorts" pathname={pathname}>
             {SECTIONS.filter((s) => s.group).map((s) => (
-              <Link key={s.id} href={sectionHref(s.id)} aria-current={sectionHref(s.id) === pathname ? "page" : undefined}>{s.label}</Link>
+              <Link key={s.id} href={sectionHref(s.id)} aria-current={(sectionHref(s.id) === pathname || pathname?.startsWith(`${sectionHref(s.id)}/`)) ? "page" : undefined}>{s.label}</Link>
             ))}
           </NavRow>
         </div>
