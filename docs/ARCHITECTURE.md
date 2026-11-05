@@ -7,7 +7,7 @@ Next.js exports 42 fixed dashboard pages into `out/`. Cloudflare Static Assets s
 ```text
 Browser → static pages → /api/report → source snapshot + nine publication states
 Cron → due sources → source snapshot / local snow log / per-area storm memory
-     → atomic publication reservation → Workers AI → channel archive + state
+     → per-channel attempt record → Workers AI → channel archive + state
 Link crawler → /daily-snow[/region]/opengraph-image → channel-specific PNG
 ```
 
@@ -25,7 +25,7 @@ Each source independently retains its last good payload through failures. Resort
 
 NWS resolves catalog coordinates through `/points`, caching the grid/office mapping for 24 hours and invalidating it when coordinates change. Point failures retain that point with its own error and check time. Discussions deduplicate the nine verified issuing offices. Plumes isolate failures per station. Regional rendering recalculates source age from the selected points/stations.
 
-All sources live at `snapshot:v1`, with a 14-day snow log and per-forecast-area storm memory. Source writes merge newer attempts against the latest snapshot. This is best effort: KV propagation and the read/put gap can still lose overlapping source updates. Publication reservations use a Durable Object instead of a KV lock.
+All sources live at `snapshot:v1`, with a 14-day snow log and per-forecast-area storm memory. Source writes merge newer attempts against the latest snapshot. This is best effort: KV propagation and the read/put gap can still lose overlapping source updates. Publication attempts are recorded in separate per-channel state keys, so a late source write cannot erase them.
 
 Snow days end at **6 AM destination local time**, including 23/25-hour DST days. A morning capture accepts a resort's published 24-hour window only when its timestamp is recent enough for that morning. Rolling windows are never added. Each forecast area retains the NWS forecast a day began with. History starts with collection; there is no imported or fabricated backfill.
 
@@ -33,7 +33,7 @@ Snow days end at **6 AM destination local time**, including 23/25-hour DST days.
 
 Nine independent states use `daily-state:v2:<channel>`. Archives and stills live under `channel:v1:<channel>:`, with the existing date/revision keys below that prefix. Cropped live plume panels remain shared keys `plume-panel:v1:<station>:<run>:<panel>`.
 
-`PublicationCoordinator` serializes short storage operations: one active lease per channel, at most four running channels, three attempts per channel/local date, two reserved requests per attempt, and 64 reservations per rolling 24 hours. Inference remains in the collection job. The cron runs up to four regional attempts together. A due Western edition gets a separate cron once today's regional editions exist, keeping even two model timeouts inside the cron deadline. Subsequent crons pick up remaining regions. Channel states are written separately from source snapshots.
+Each channel's state records its attempt before the model call: start time, attempts and model requests per local date. The cron skips a channel whose attempt is in flight (twelve minutes), allows three attempts and two requests per attempt per local date, and starts at most four regional channels, counting attempts still running from an earlier cron. Manual forced runs pass the same checks. Before publishing, a run re-reads its state and stops if a newer attempt has started, so an attempt that outlived its window cannot overwrite a newer one. KV has no compare-and-swap; the five-minute cron spacing, the in-flight window and the AI Gateway's 64-request sliding-day limit bound what a race could cost. Inference remains in the collection job. The cron runs up to four regional attempts together. A due Western edition gets a separate cron once today's regional editions exist, keeping even two model timeouts inside the cron deadline. Subsequent crons pick up remaining regions. Channel states are written separately from source snapshots.
 
 `GET /api/daily-snow?channel=<id>&date=YYYY-MM-DD` serves a retained edition. Figure URLs include the channel and a SHA-256 revision. Same-day rewrites preserve earlier referenced stills. Articles, stills and storm archives have 30-day retention; neighboring-edition links retain their original expiry.
 

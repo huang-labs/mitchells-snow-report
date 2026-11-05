@@ -5,13 +5,12 @@ import type { KVLike } from "../store";
 import { emptyDailySnowState, planDailySnow, type DailySnowEnv } from ".";
 import { dailySnowActivity } from "./digest";
 import { channelKV, channelStateKey, regionalSnapshot } from "./regions";
-import { shouldRunDailySnow } from "./schedule";
-import type { CoordinatorClient } from "./reservations";
+import { attemptsToday, DAILY_CALL_CAP, inFlight, MAX_ATTEMPTS, shouldRunDailySnow } from "./schedule";
 import { writeWestern } from "./western";
 
-export interface ChannelsEnv extends DailySnowEnv {
-  PUBLICATIONS?: { getByName(name: string): CoordinatorClient };
-}
+export type ChannelsEnv = DailySnowEnv;
+/** Regional generations allowed at once, across overlapping cron runs. */
+export const MAX_CONCURRENT_CHANNELS = 4;
 export async function readChannelStates(kv: KVLike): Promise<Partial<Record<ChannelId, DailySnowState>>> {
   return Object.fromEntries(
     (
@@ -31,9 +30,6 @@ export async function runChannels(
   opts: { force?: boolean; channel?: ChannelId; fetchImpl?: typeof fetch } = {},
 ) {
   if (!env.AI || env.AI_ENABLED === "false") return [];
-  if (!env.PUBLICATIONS)
-    return [{ channel: "western-us", error: "Publication coordinator binding missing; generation disabled" }];
-  const coordinator = env.PUBLICATIONS.getByName("daily-snow-v1");
   const states = await readChannelStates(env.SNOW_KV);
   const outcomes: Array<{ channel: ChannelId; error?: string; published?: string; skipped?: string }> = [];
   async function run(channel: ChannelId) {
@@ -41,6 +37,16 @@ export async function runChannels(
     const definition = CHANNELS.find((c) => c.id === channel)!;
     const base = states[channel] ?? emptyDailySnowState();
     if (!opts.force && !shouldRunDailySnow(base, now, channel)) return;
+    // Scheduled runs pass these checks in shouldRunDailySnow; forced runs must too.
+    if (opts.force && inFlight(base, now)) {
+      outcomes.push({ channel, skipped: "in-flight" });
+      return;
+    }
+    const used = attemptsToday(base, now, channel);
+    if (opts.force && (used.count >= MAX_ATTEMPTS || used.calls + 2 > DAILY_CALL_CAP)) {
+      outcomes.push({ channel, skipped: "channel daily cap" });
+      return;
+    }
     const scoped = channel === "western-us" ? snapshot : regionalSnapshot(snapshot, channel);
     const editions = Object.fromEntries(
       REGIONS.flatMap((r) => {
@@ -56,14 +62,18 @@ export async function runChannels(
       outcomes.push({ channel, skipped: "off-season or inputs unavailable" });
       return;
     }
-    const claim = await coordinator.reserve({ channel, date: localDate(now, definition.timeZone), now: now.getTime() });
-    if (!claim.ok || !claim.token) {
-      outcomes.push({ channel, skipped: claim.reason });
-      return;
-    }
-    const token = claim.token;
+    let attemptAt: string | null = null;
+    // A run that outlived IN_FLIGHT_MS may have been superseded by a newer
+    // attempt; it must not overwrite that attempt's state or edition. Only a
+    // strictly newer attempt counts: a stale KV read of our own write is ours.
+    const ours = async () => {
+      if (!attemptAt) return true;
+      const raw = await env.SNOW_KV.get(channelStateKey(channel), "text");
+      const latest = raw ? (JSON.parse(raw) as DailySnowState).lastAttemptAt : null;
+      return !latest || latest <= attemptAt;
+    };
     const beforePublish = async () => {
-      if (!(await coordinator.valid(channel, token))) throw new Error("Publication lease superseded");
+      if (!(await ours())) throw new Error("Publication attempt superseded");
     };
     const scopedEnv: DailySnowEnv = {
       ...env,
@@ -83,6 +93,7 @@ export async function runChannels(
             calls: base.attempts.date === localDate(now, definition.timeZone) ? base.attempts.calls + 2 : 2,
           },
         };
+        attemptAt = state.lastAttemptAt;
         await env.SNOW_KV.put(channelStateKey(channel), JSON.stringify(state));
         state = await writeWestern(state, snapshot, editions, scopedEnv, now);
       } else {
@@ -92,6 +103,7 @@ export async function runChannels(
           return;
         }
         state = plan.state;
+        attemptAt = state.lastAttemptAt;
         await env.SNOW_KV.put(channelStateKey(channel), JSON.stringify(state));
         state = await plan.run();
       }
@@ -104,7 +116,7 @@ export async function runChannels(
       });
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
-      if (await coordinator.valid(channel, token)) {
+      if (await ours()) {
         state = {
           ...state,
           lastError: error.slice(0, 500),
@@ -115,8 +127,6 @@ export async function runChannels(
         states[channel] = state;
       }
       outcomes.push({ channel, error });
-    } finally {
-      await coordinator.finish(channel, token);
     }
   }
   // Western gets its own cron once regional editions exist. Two back-to-back
@@ -128,11 +138,21 @@ export async function runChannels(
     await run("western-us");
     return outcomes;
   }
-  // Up to four regional attempts run together; later crons pick up the rest.
+  // Up to four regional attempts run at once, counting attempts still running
+  // from an earlier cron; later crons pick up the rest.
+  const running = REGIONS.filter((r) => inFlight(states[r.id], now));
   const due = REGIONS.filter(
-    (r) => (!opts.channel || opts.channel === r.id) && (opts.force || shouldRunDailySnow(states[r.id], now, r.id)),
+    (r) =>
+      (!opts.channel || opts.channel === r.id) &&
+      !running.includes(r) &&
+      (opts.force || shouldRunDailySnow(states[r.id], now, r.id)),
   );
-  await Promise.all(due.slice(0, 4).map((r) => run(r.id)));
+  if (opts.force)
+    for (const r of running)
+      if (!opts.channel || opts.channel === r.id) outcomes.push({ channel: r.id, skipped: "in-flight" });
+  const slots = Math.max(0, MAX_CONCURRENT_CHANNELS - running.length);
+  for (const r of due.slice(slots)) outcomes.push({ channel: r.id, skipped: "generation concurrency limit" });
+  await Promise.all(due.slice(0, slots).map((r) => run(r.id)));
   if (!due.length) await run("western-us");
   return outcomes;
 }

@@ -10,7 +10,6 @@ Mitchell's deployment uses Cloudflare account **Huang Inc.**. Production starts 
 | Production KV | `5fb1857843374e8ea427c2117b5f3955` |
 | Preview parent Worker | `mitchells-snow-report-preview`, no production routes or cron |
 | Preview KV | `f9e542e8a1d0405f8624beade1bba09b` |
-| Publication coordinator | `PUBLICATIONS` / `PublicationCoordinator`, SQLite migration `v1` |
 | Workers AI Gateway | `mitchells-snow-report`, logging, no cache, sliding 64 requests/day |
 | Production cron | `*/5 * * * *`; local publication hours evaluated in code |
 
@@ -18,13 +17,13 @@ Mitchell's deployment uses Cloudflare account **Huang Inc.**. Production starts 
 
 CI typechecks, tests, builds and smoke-checks. Deployment requires `MITCHELLS_DEPLOYMENT_ENABLED=true`. The inherited `DEPLOYMENT_ENABLED` stays false so an older main workflow cannot deploy Cottonwoods while this feature PR is open.
 
-On main, `npm run deploy` uploads assets and deploys the Worker, custom domain and cron. Cloudflare manages DNS/certificate for the custom domain. The first deploy creates the production coordinator. No production seeding or historical import is required.
+On main, `npm run deploy` uploads assets and deploys the Worker, custom domain and cron. Cloudflare manages DNS/certificate for the custom domain. No production seeding or historical import is required.
 
 Same-repository PRs deploy through **Worker Previews**:
 `wrangler preview --worker-name mitchells-snow-report-preview --name pr-<number> --ignore-base-config`.
-The workflow reads its machine-output URL and comments it on the PR. Each PR gets an isolated Durable Object and shares the seeded preview-only KV. Previews run no crons. Fork and Dependabot PRs receive no deployment secrets.
+The workflow reads its machine-output URL and comments it on the PR. Each PR gets an isolated preview and shares the seeded preview-only KV. Previews run no crons. Fork and Dependabot PRs receive no deployment secrets.
 
-Version URLs do not support a Worker implementing Durable Objects; modern Worker Previews do. See [Cloudflare's isolation documentation](https://developers.cloudflare.com/workers/previews/resources/). Keep preview vars, bindings and the image renderer's defines in the `previews` block.
+See [Cloudflare's preview isolation documentation](https://developers.cloudflare.com/workers/previews/resources/). Keep preview vars, bindings and the image renderer's defines in the `previews` block.
 
 Encrypted Actions secrets are `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `OPENROUTER_API_KEY`. The deployment token is scoped to this account's Workers/KV/AI/Gateway and the huang.mx zone's routes/read access. No token value belongs in files or logs. An authenticated `cf` session can create/configure resources; use a dedicated API token for CI, not a short-lived OAuth token.
 

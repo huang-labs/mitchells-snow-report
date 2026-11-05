@@ -39,15 +39,12 @@
   "observability": {
     "enabled": true
   },
-  "durable_objects": { "bindings": [{ "name":"PUBLICATIONS", "class_name":"PublicationCoordinator" }] },
-  "migrations": [{ "tag":"v1", "new_sqlite_classes":["PublicationCoordinator"] }],
-  // Modern Worker Previews support an isolated Durable Object per PR.
+  // Each PR gets an isolated Worker Preview with these bindings.
   "previews": {
     "define": { "__filename":"\"/worker.js\"", "__dirname":"\"/\"" },
     "vars": { "AI_GATEWAY_ID":"mitchells-snow-report", "COLLECTOR_CONTACT":"https://mitchells-snow-report.huang.mx" },
     "kv_namespaces":[{"binding":"SNOW_KV","id":"f9e542e8a1d0405f8624beade1bba09b"}],
-    "ai":{"binding":"AI"},
-    "durable_objects":{"bindings":[{"name":"PUBLICATIONS","class_name":"PublicationCoordinator"}]}
+    "ai":{"binding":"AI"}
   },
   "env": {
     "preview": {
@@ -57,7 +54,6 @@
       "vars": { "AI_GATEWAY_ID":"mitchells-snow-report", "COLLECTOR_CONTACT":"https://mitchells-snow-report.huang.mx" },
       "kv_namespaces":[{"binding":"SNOW_KV","id":"f9e542e8a1d0405f8624beade1bba09b"}],
       "ai":{"binding":"AI"},
-      "durable_objects":{"bindings":[{"name":"PUBLICATIONS","class_name":"PublicationCoordinator"}]},
       "triggers":{"crons":[]}
     }
   }
