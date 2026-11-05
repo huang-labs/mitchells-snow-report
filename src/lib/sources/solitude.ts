@@ -6,6 +6,7 @@ export const SOLITUDE_URL = "https://www.solitudemountain.com/mountain-and-villa
 export const SOLITUDE_OPTIONS = {
   resort: "Solitude",
   sourceUrl: SOLITUDE_URL,
+  reportingArea: "mid" as const,
   namedTerrainAreas: ["Honeycomb Canyon", "Evergreen Peak", "Highway to Heaven", "Fantasy Ridge", "Terrain Areas"],
 };
 

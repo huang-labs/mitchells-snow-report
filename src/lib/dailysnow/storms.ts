@@ -1,5 +1,7 @@
+import { RESORTS } from "../catalog";
+import { forecastPointFresh } from "../forecastFreshness";
 import { HOUR } from "../sources/types";
-import { formatDenver } from "../time";
+import { formatLocal } from "../time";
 import type { DailySnowPost, Metric, NwsPayload, PrimaryResortId, ResortReport, Snapshot } from "../types";
 import type { StormCursor, StormObservation, StormRecord, StormResort, StormTrackingState } from "./storm-types";
 
@@ -10,10 +12,7 @@ export const STORM_RECAP_MS = 36 * HOUR;
 const REPORT_MAX_AGE = 26 * HOUR;
 const FETCH_MAX_AGE = 20 * 60_000;
 const WORKING_EVENTS = 3;
-const RESORTS: Array<{ id: PrimaryResortId; name: string }> = [
-  { id: "alta", name: "Alta" }, { id: "snowbird", name: "Snowbird" },
-  { id: "solitude", name: "Solitude" }, { id: "brighton", name: "Brighton" },
-];
+
 const ms = (s: string | null | undefined) => s ? Date.parse(s) : -Infinity;
 const value = (m: Metric | undefined) => m?.state === "reported" && Number.isFinite(m.value) && m.value >= 0 ? m.value : null;
 const newer = <T extends { collectedAt: string }>(a: T | null | undefined, b: T | null | undefined): T | null =>
@@ -39,7 +38,7 @@ export function mergeStormRecord(a: StormRecord, b: StormRecord): StormRecord {
     firstObservedAt: ms(a.firstObservedAt) < ms(b.firstObservedAt) ? a.firstObservedAt : b.firstObservedAt,
     lastSnowAt,
     ...(invalidClosure ? { status: "active", closedAt: null, closureReason: null } as const : {}),
-    resorts: RESORTS.map(({ id, name }) => {
+    resorts: RESORTS.filter(r=>a.resorts.some(x=>x.id===r.id)||b.resorts.some(x=>x.id===r.id)).map(({ id, name }) => {
       const ar = a.resorts.find((r) => r.id === id);
       const br = b.resorts.find((r) => r.id === id);
       const counterResetAt = [ar?.counterResetAt, br?.counterResetAt].filter((x): x is string => !!x).sort()[0];
@@ -83,11 +82,11 @@ export function mergeStormTracking(a: StormTrackingState | undefined, b: StormTr
   };
 }
 
-function blankEvent(at: string): StormRecord {
+function blankEvent(at: string, ids:PrimaryResortId[]): StormRecord {
   return {
     id: at, firstObservedAt: at, lastSnowAt: at, updatedAt: at,
     status: "active", closedAt: null, closureReason: null,
-    resorts: RESORTS.map(({ id, name }) => ({ id, name, total: null, rolling: null })),
+    resorts: RESORTS.filter(r=>ids.includes(r.id)).map(({ id, name }) => ({ id, name, total: null, rolling: null })),
   };
 }
 
@@ -115,9 +114,9 @@ function dryAhead(snapshot: Snapshot, now: Date): boolean {
   const s = snapshot.sources.nws;
   if (s?.status !== "ok" || now.getTime() - ms(s.lastSuccessfulFetchAt) > 47 * 60_000) return false;
   const points = (s.payload as NwsPayload | null)?.points ?? [];
-  if (points.length < 2) return false;
+  if (!points.length) return false;
   return points.every((p) => {
-    if (now.getTime() - ms(p.gridUpdatedAt) > 18 * HOUR) return false;
+    if (!forecastPointFresh(p,now)) return false;
     const bars = p.sixHourSnow.filter((b) => ms(b.start) + 6 * HOUR > now.getTime() && ms(b.start) < now.getTime() + 18 * HOUR);
     const coverage = [...bars].sort((a, b) => ms(a.start) - ms(b.start));
     let end = now.getTime();
@@ -169,13 +168,14 @@ export function advanceStormTracking(previous: StormTrackingState | undefined, s
   const newSnow = observations.filter((o) => !o.lateReport && (o.increased || (o.first && Math.max(o.cursor.stormIn ?? 0, o.cursor.h24In ?? 0, o.cursor.h48In ?? 0) > 0
     && (!lastClosed || ms(o.cursor.reportTime) > ms(lastClosed)))));
   if (!event && newSnow.length) {
-    event = blankEvent(now.toISOString());
+    event = blankEvent(now.toISOString(),RESORTS.filter(r=>snapshot.sources[r.id]).map(r=>r.id));
     state.events.unshift(event);
     state.events = state.events.slice(0, WORKING_EVENTS);
   }
   if (!event) {
     const closed = state.events[0];
     if (closed) for (const o of observations.filter((o) => o.lateReport)) {
+      if (!closed.resorts.some(r => r.id === o.id)) closed.resorts.push({ id: o.id, name: RESORTS.find(r => r.id === o.id)!.name, total: null, rolling: null });
       closed.resorts = closed.resorts.map((r) => r.id === o.id ? capture(r, o.cursor, o.sourceUrl) : r);
       closed.updatedAt = now.toISOString();
     }
@@ -191,6 +191,7 @@ export function advanceStormTracking(previous: StormTrackingState | undefined, s
     if (lastClosed && ms(o.cursor.reportTime) <= ms(lastClosed) && !o.increased) continue;
     const member = event.resorts.find((r) => r.id === o.id);
     if (lastClosed && !member?.total && !member?.rolling && !newSnow.includes(o)) continue;
+    if (!member) event.resorts.push({ id: o.id, name: RESORTS.find(r => r.id === o.id)!.name, total: null, rolling: null });
     event.resorts = event.resorts.map((r) => r.id === o.id ? capture(r, o.cursor, o.sourceUrl, lastClosed) : r);
   }
   const lull = now.getTime() - ms(event.lastSnowAt);
@@ -212,21 +213,21 @@ export function stormForPost(state: StormTrackingState | undefined, now: Date): 
 }
 
 /** Model-facing projection: all time conversion and observation attribution happen in code. */
-export function stormDigest(storm: StormRecord, now: Date) {
+export function stormDigest(storm: StormRecord, now: Date, zone="America/Denver") {
   const observation = (o: StormObservation | null | undefined) => o ? {
     amountIn: o.amountIn, window: o.window, sourceUrl: o.sourceUrl,
-    reportLocal: o.reportTime ? formatDenver(o.reportTime, now) : "unknown",
-    checkedLocal: formatDenver(o.collectedAt, now),
+    reportLocal: o.reportTime ? formatLocal(o.reportTime, now,zone) : "unknown",
+    checkedLocal: formatLocal(o.collectedAt, now,zone),
     ...(o.previousAmountIn !== undefined ? { previousAmountIn: o.previousAmountIn } : {}),
   } : null;
   return {
     status: storm.status, closureReason: storm.closureReason,
-    trackedSinceLocal: formatDenver(storm.firstObservedAt, now),
-    lastSnowEvidenceLocal: formatDenver(storm.lastSnowAt, now),
-    closedLocal: storm.closedAt ? formatDenver(storm.closedAt, now) : null,
+    trackedSinceLocal: formatLocal(storm.firstObservedAt, now,zone),
+    lastSnowEvidenceLocal: formatLocal(storm.lastSnowAt, now,zone),
+    closedLocal: storm.closedAt ? formatLocal(storm.closedAt, now,zone) : null,
     resorts: storm.resorts.map((r) => ({
       id: r.id, name: r.name, total: observation(r.total), rolling: observation(r.rolling),
-      ...(r.counterResetAt ? { counterResetLocal: formatDenver(r.counterResetAt, now) } : {}),
+      ...(r.counterResetAt ? { counterResetLocal: formatLocal(r.counterResetAt, now,zone) } : {}),
       ...(r.latestSegment ? { latestSegment: observation(r.latestSegment) } : {}),
     })),
   };

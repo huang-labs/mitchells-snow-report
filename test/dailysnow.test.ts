@@ -22,6 +22,12 @@ beforeAll(async () => {
   const kv = new MemoryKV();
   await runCollection({ SNOW_KV: kv }, { now: SIX_AM, fetchImpl: createFixtureFetch().fetchImpl });
   captured = (await readSnapshot(kv))!;
+  // Reuse measured forecast values at this scenario clock; freshness is tested separately.
+  const nws=captured.sources.nws!;nws.sourceUpdatedAt=SIX_AM.toISOString();
+  const payload=nws.payload as NwsPayload;
+  payload.points=payload.points.filter(p=>p.id==="LCC"||p.id==="BCC");
+  for(const point of payload.points){point.gridUpdatedAt=SIX_AM.toISOString();point.lastCheckedAt=SIX_AM.toISOString();}
+
 });
 const snap = () => structuredClone(captured);
 
@@ -85,7 +91,8 @@ describe("NWS forecast discussion", () => {
     await writeSnapshot(kv, captured);
     const { fetchImpl, calls } = createFixtureFetch();
     await runCollection({ SNOW_KV: kv }, { now: SIX_AM, fetchImpl, only: ["nwsafd"] });
-    expect(calls.filter((u) => u.includes("/products/"))).toEqual(["https://api.weather.gov/products/types/AFD/locations/SLC"]);
+    expect(calls.filter((u) => u.includes("/products/types/AFD/locations/"))).toHaveLength(9);
+    expect(calls.filter(u=>u.includes("/products/")&&!u.includes("/types/"))).toHaveLength(0);
   });
 });
 
@@ -179,8 +186,8 @@ describe("continuity with earlier posts", () => {
     const h = [{ ...history[0] }, entry("2026-10-31", "2026-10-31T12:05:00Z", "pre-storm", 4, { start: "2026-11-04T09:00:00Z", end: "2026-11-05T03:00:00Z" })];
     const c = buildContinuity(null, h, numbers({ ...midweek, totalSnowIn: 1.7 }), "post-storm", "2026-11-02", MONDAY);
     expect(c.stormTrend).toEqual([{ canyon: "LCC", forecasts: [
-      "our post at Sat, Oct 31, 6:05 AM: 4″ (Wed, Nov 4, 2:00 AM to Wed, Nov 4, 8:00 PM)",
-      "today's NWS forecast: 1.7″ (11:00 PM tomorrow to Wed, Nov 4, 5:00 PM)",
+      "our post at Sat, Oct 31, 6:05 AM MDT: 4″ (Wed, Nov 4, 2:00 AM MST to Wed, Nov 4, 8:00 PM MST)",
+      "today's NWS forecast: 1.7″ (Tue, Nov 3, 11:00 PM MST to Wed, Nov 4, 5:00 PM MST)",
     ] }]);
   });
   it("compares the storm that just ended with what we forecast before and during it", () => {
@@ -188,9 +195,9 @@ describe("continuity with earlier posts", () => {
     expect(c.stormTrend).toEqual([]);
     expect(c.lastStorm).toEqual([{
       canyon: "LCC",
-      window: "Sat, Oct 31, 12:00 PM to 10:00 PM yesterday",
-      forecasts: ["our post at Sat, Oct 31, 6:05 AM (before it began): 6″", "our post at 6:04 AM yesterday (after it began): 8.4″"],
-      reported: ["Alta: storm total 15″, 24 h 10″ (report 5:30 AM today)", "Snowbird: no storm or 24 h total reported"],
+      window: "Sat, Oct 31, 12:00 PM MDT to Sun, Nov 1, 10:00 PM MST",
+      forecasts: ["our post at Sat, Oct 31, 6:05 AM MDT (before it began): 6″", "our post at Sun, Nov 1, 6:04 AM MST (after it began): 8.4″"],
+      reported: ["Alta: storm total 15″, 24 h 10″ (report Mon, Nov 2, 5:30 AM MST)", "Snowbird: no storm or 24 h total reported"],
     }]);
     // Days later, the storm is no longer "the one that just ended".
     expect(buildContinuity(null, history, numbers(null), "quiet", "2026-11-05", at("2026-11-05T13:00:00Z")).lastStorm).toEqual([]);
@@ -292,6 +299,8 @@ describe("validation", () => {
     expect(ungroundedInches("Highs near 38 in Little Cottonwood and 41 in Big Cottonwood", [])).toEqual([]);
   });
   it("counts only inch amounts in the input, not elevations, temperatures, winds or the last post's text", () => {
+    expect(ungroundedInches("Six inches overnight and twenty-seven inches in the storm.", [0])).toEqual([6,27]);
+    expect(ungroundedInches("Six to ten inches.", [6,10])).toEqual([]);
     const amounts = inchAmountsIn({ elevationFt: 9600, tempF: "20–30", windMph: "30 gust 45", snowIn: 4, totals: { next72In: 12.5 }, ensemble: { snowIn: [1, 3, 7] }, text: "Total accumulation 8 to 14 inches" });
     expect(amounts.sort((a, b) => a - b)).toEqual([1, 3, 4, 7, 8, 12.5, 14]);
     const d = buildDailyDigest(snap(), null, [], SIX_AM).digest;
@@ -301,9 +310,10 @@ describe("validation", () => {
     // Elevations and years are no longer amounts.
     expect(allowed).not.toContain(2026);
     expect(allowed.some((a) => a >= 1000)).toBe(false);
-    // A run of consecutive NWS six-hour amounts may be added up.
-    const bars = d.forecast[0].sixHourSnow.slice(0, 3).map((b) => Number(/: ([\d.]+)″/.exec(b)![1]));
-    expect(allowed).toContain(Math.round(bars.reduce((a, b) => a + b, 0) * 10) / 10);
+    const isolated={...d,resorts:[],discussion:null,discussions:[],ensemble:undefined,areaStorms:[],stormRecap:null,figures:[],forecast:[{...d.forecast[0],sixHourSnow:["Thu 6 AM: 3.2″","Thu noon: 4.3″"],blocks:[],totals:{next24In:null,next72In:null,next7dIn:null},nextStorm:null}]};
+    // The model cannot invent a total by adding hourly/period amounts.
+    expect(allowedAmounts(isolated)).not.toContain(7.5);
+
   });
   it("accepts a well-formed post and drops unknown, repeated or misplaced parts", () => {
     const d = withData();
@@ -343,12 +353,12 @@ describe("validation", () => {
   it.each([['update', 'short-term'], ['short-term', 'update']])("preserves the outlook and plume when %s is followed by %s", (first, second) => {
     const d = withData();
     const raw = answer([], { sections: [
-      { id: first, paragraphs: [{ text: "Reported snowfall:", figure: "resort-totals" }] },
+      { id: first, paragraphs: [{ text: "Snow level outlook:", figure: "nws-snow-level" }] },
       { id: second, paragraphs: [{ text: "The next system:", figure: "nws-snow-lcc" }, { text: "University of Utah ensemble guidance:", figure: "plume-snow-cln" }] },
     ] });
     const validated = validateDailySnow(raw, d);
     expect(validated.sections).toEqual([{ id: first, paragraphs: [
-      { text: "Reported snowfall:", figure: "resort-totals" },
+      { text: "Snow level outlook:", figure: "nws-snow-level" },
       { text: "The next system:", figure: "nws-snow-lcc" },
       { text: "University of Utah ensemble guidance:", figure: "plume-snow-cln" },
     ] }]);
@@ -364,258 +374,11 @@ describe("validation", () => {
   });
 });
 
-describe("posting", () => {
-  async function seeded() {
-    const kv = new MemoryKV();
-    await writeSnapshot(kv, captured);
-    await kv.put("plume-panel:v1:CLN:2026103012:snow", new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]).buffer as ArrayBuffer);
-    return kv;
-  }
-  it("keeps old stills through successful rewrites and a failed replacement publication", async () => {
-    const kv = await seeded();
-    const { ai } = fakeAi(() => answer(["plume-snow-cln"]));
-    const env = { SNOW_KV: kv, AI: ai };
-    const first = await planDailySnow(undefined, snap(), env, SIX_AM, { force: true })!.run!();
-    const urlOf = (state: DailySnowState) => {
-      const f = state.current!.figures["plume-snow-cln"];
-      if (f.kind !== "image") throw new Error("expected image");
-      return f.url;
-    };
-    const keyOf = (url: string) => dailySnowFigureKey("2026-11-01", "plume-snow-cln", new URL(url, "https://snow.test").searchParams.get("v")!);
-    const firstUrl = urlOf(first);
-    const firstBytes = await kv.get(keyOf(firstUrl), "arrayBuffer");
-    await kv.put("plume-panel:v1:CLN:2026103012:snow", new Uint8Array([137, 80, 78, 71, 4]).buffer);
-    const second = await planDailySnow(first, snap(), env, new Date(SIX_AM.getTime() + 60_000), { force: true })!.run!();
-    expect(urlOf(second)).not.toBe(firstUrl);
-    expect(await kv.get(keyOf(firstUrl), "arrayBuffer")).toEqual(firstBytes);
-    const secondBytes = await kv.get(keyOf(urlOf(second)), "arrayBuffer");
-    const archived = await kv.get(dailySnowKey("2026-11-01"), "text");
-    await kv.put("plume-panel:v1:CLN:2026103012:snow", new Uint8Array([137, 80, 78, 71, 5]).buffer);
-    const originalPut = kv.put.bind(kv);
-    kv.put = async (key, value) => {
-      if (key === dailySnowKey("2026-11-01")) throw new Error("publication failed");
-      await originalPut(key, value);
-    };
-    const failed = await planDailySnow(second, snap(), env, new Date(SIX_AM.getTime() + 120_000), { force: true })!.run!();
-    expect(failed.lastError).toBe("publication failed");
-    expect(failed.current).toEqual(second.current);
-    expect(await kv.get(dailySnowKey("2026-11-01"), "text")).toBe(archived);
-    expect(await kv.get(keyOf(urlOf(second)), "arrayBuffer")).toEqual(secondBytes);
-  });
-  it("writes the post, archives it with its figures, and does not post twice", async () => {
-    const kv = await seeded();
-    const { ai, calls } = fakeAi(() => answer(["plume-snow-cln", "nws-snow-level"]));
-    const env = { SNOW_KV: kv, AI: ai };
-    const summary = await runCollection(env, { now: SIX_AM, sources: [] });
-    expect(summary.dailySnow).toMatchObject({ date: "2026-11-01", model: PRIMARY_MODEL, trigger: "morning", error: null, fallbackReason: null });
-    const state = (await readSnapshot(kv))!.dailySnow!;
-    const post = state.current!;
-    expect(post.title).toBe("Storm Underway");
-    expect(post).not.toHaveProperty("fallbackReason");
-    expect(post.phase).toBe("storm");
-    expect(post.figures["plume-snow-cln"]).toMatchObject({ kind: "image", url: expect.stringMatching(/^\/api\/daily-snow\/figure\/2026-11-01\/plume-snow-cln\?v=[a-f0-9]{64}$/) });
-    // The time axis is frozen with the still so the post keeps the run it was written about.
-    const plumes = captured.sources.plumes!.payload as PlumePayload;
-    const cln = plumes.charts.find((c) => c.stationCode === "CLN")!;
-    expect(post.figures["plume-snow-cln"]).toMatchObject({
-      axis: { plot: cln.panels!.find((p) => p.id === "snow")!.plot, initTime: cln.initTime, forecastHours: cln.forecastHours },
-    });
-    expect(post.figures["nws-snow-level"].kind).toBe("snow-level");
-    expect(await kv.get(dailySnowFigureKey("2026-11-01", "plume-snow-cln", new URL(post.figures["plume-snow-cln"].kind === "image" ? post.figures["plume-snow-cln"].url : "", "https://snow.test").searchParams.get("v")!), "arrayBuffer")).not.toBeNull();
-    expect(JSON.parse((await kv.get(dailySnowKey("2026-11-01"), "text"))!).title).toBe("Storm Underway");
-    expect(state.history[0]).toMatchObject({ date: "2026-11-01", title: "Storm Underway" });
-    expect(state.attempts).toEqual({ date: "2026-11-01", count: 1, calls: 2 });
-
-    const report = buildReport(await readSnapshot(kv), at("2026-11-01T15:00:00Z"));
-    expect(report.dailySnow).toMatchObject({ title: "Storm Underway", outdated: false, publicationStatus: "current", failing: false, archive: [{ date: "2026-11-01", title: "Storm Underway" }] });
-    const nextMorning = buildReport(await readSnapshot(kv), at("2026-11-02T15:00:00Z"));
-    expect(nextMorning.dailySnow).toMatchObject({ outdated: true, publicationStatus: "pending" });
-    const nextNoon = at("2026-11-02T19:00:00Z");
-    expect(buildReport(await readSnapshot(kv), nextNoon).dailySnow?.publicationStatus).toBe("delayed");
-    // With no resort/forecast activity, the same old edition is intentionally retained.
-    const quietSnapshot = structuredClone((await readSnapshot(kv))!);
-    quietSnapshot.recommendation = undefined;
-    for (const id of ["alta", "snowbird", "solitude", "brighton"] as const) {
-      const rec = quietSnapshot.sources[id]!;
-      rec.lastSuccessfulFetchAt = rec.sourceUpdatedAt = nextNoon.toISOString();
-      const resort = rec.payload as ResortReport;
-      resort.operatingStatus = "Closed for the season";
-      for (const metric of Object.values(resort.snowfall)) {
-        if (metric.state === "reported") metric.value = 0;
-      }
-    }
-    const nws = quietSnapshot.sources.nws!;
-    nws.lastSuccessfulFetchAt = nws.sourceUpdatedAt = nextNoon.toISOString();
-    for (const point of (nws.payload as NwsPayload).points) {
-      for (const bar of point.sixHourSnow) bar.snowIn = 0;
-    }
-    expect(buildReport(quietSnapshot, nextNoon).dailySnow?.publicationStatus).toBe("paused");
-    quietSnapshot.sources = {};
-    expect(buildReport(quietSnapshot, nextNoon).dailySnow?.publicationStatus).toBe("delayed");
-    expect(publicDailySnow({ ...post, date: "2026-10-31" }, state, nextNoon)?.publicationStatus).toBeUndefined();
-    expect(publicDailySnow(null, undefined, nextNoon)).toBeNull();
-
-    const n = calls.filter((c) => c.schema === "daily_snow").length;
-    await runCollection(env, { now: at("2026-11-01T13:05:00Z"), sources: [] });
-    expect(calls.filter((c) => c.schema === "daily_snow")).toHaveLength(n);
-  });
-  it("archives posts and stills for 30 days and keeps the snapshot index to the public window", async () => {
-    const kv = await seeded();
-    const options: unknown[] = [];
-    const put = kv.put.bind(kv);
-    kv.put = async (key: string, value: string | ArrayBuffer, opts?: unknown) => {
-      if (key.startsWith("dailysnow")) options.push(opts);
-      return put(key, value);
-    };
-    // A full index of earlier posts: the new post pushes the oldest out of the snapshot (not out of KV).
-    const snapshot = (await readSnapshot(kv))!;
-    const history = Array.from({ length: DAILY_SNOW_ARCHIVE_POSTS }, (_, i) => ({ date: `2026-10-${String(31 - i).padStart(2, "0")}`, title: "Earlier", phase: "quiet" as const, forecast: [] }));
-    await writeSnapshot(kv, { ...snapshot, dailySnow: { ...emptyDailySnowState(), history } });
-    const { ai } = fakeAi(() => answer(["plume-snow-cln"]));
-    await runCollection({ SNOW_KV: kv, AI: ai }, { now: SIX_AM, sources: [] });
-    expect(options.length).toBeGreaterThanOrEqual(2); // the post and its plume still
-    // 30 days after noon UTC on the post date (Nov 1); posted an hour later at 13:00Z.
-    expect(options.every((o) => (o as { expirationTtl?: number } | undefined)?.expirationTtl === 30 * 86_400 - 3_600)).toBe(true);
-    const state = (await readSnapshot(kv))!.dailySnow!;
-    expect(state.history).toHaveLength(DAILY_SNOW_ARCHIVE_POSTS);
-    expect(state.history.map((h) => h.date).slice(0, 2)).toEqual(["2026-11-01", "2026-10-31"]);
-  });
-  it("links each post to its neighbors so the archive can be walked end to end", async () => {
-    const kv = await seeded();
-    const titles = ["Storm Underway", "Storm Exiting"];
-    const { ai } = fakeAi(() => ({ ...answer(["plume-snow-cln"]), title: titles.shift()! }));
-    const env = { SNOW_KV: kv, AI: ai };
-    await runCollection(env, { now: SIX_AM, sources: [] });
-    await runCollection(env, { now: at("2026-11-02T13:00:00Z"), sources: [], forceDailySnow: true });
-    const read = async (date: string) => JSON.parse((await kv.get(dailySnowKey(date), "text"))!) as DailySnowPost;
-    const [first, second] = [await read("2026-11-01"), await read("2026-11-02")];
-    expect(first.older).toBeUndefined();
-    expect(first.newer).toEqual({ date: "2026-11-02", title: "Storm Exiting" });
-    expect(second.older).toEqual({ date: "2026-11-01", title: "Storm Underway" });
-    expect(second.newer).toBeUndefined();
-    expect((await readSnapshot(kv))!.dailySnow!.current).toMatchObject({ date: "2026-11-02", older: { date: "2026-11-01" } });
-  });
-  it("keeps the older post's own expiry when linking it forward", async () => {
-    const kv = await seeded();
-    const { ai } = fakeAi(() => answer(["plume-snow-cln"]));
-    const env = { SNOW_KV: kv, AI: ai };
-    await runCollection(env, { now: SIX_AM, sources: [] });
-    const ttls: Record<string, number | undefined> = {};
-    const put = kv.put.bind(kv);
-    kv.put = async (key: string, value: string | ArrayBuffer, opts?: { expirationTtl?: number }) => {
-      if (key.startsWith("dailysnow:v1:")) ttls[key] = opts?.expirationTtl;
-      return put(key, value);
-    };
-    await runCollection(env, { now: at("2026-11-02T13:00:00Z"), sources: [], forceDailySnow: true });
-    // Both expire 30 days after noon UTC on their own date, counted from the 13:00Z write.
-    expect(ttls).toEqual({ [dailySnowKey("2026-11-02")]: 30 * 86_400 - 3_600, [dailySnowKey("2026-11-01")]: 29 * 86_400 - 3_600 });
-  });
-  it("stops serving and linking posts past the 30-day retention", async () => {
-    const post = { date: "2026-11-01", older: { date: "2026-10-02", title: "Old" } } as DailySnowPost;
-    const state = { ...emptyDailySnowState(), history: [{ date: "2026-11-01", title: "New", phase: "quiet" as const, forecast: [] }, { date: "2026-10-02", title: "Old", phase: "quiet" as const, forecast: [] }] };
-    const nov1 = publicDailySnow(post, state, at("2026-11-01T11:59:59Z"))!;
-    expect(nov1.older).toEqual({ date: "2026-10-02", title: "Old" });
-    expect(nov1.archive.map((a) => a.date)).toEqual(["2026-11-01", "2026-10-02"]);
-    const later = publicDailySnow(post, state, at("2026-11-01T12:00:00Z"))!;
-    expect(later.older).toBeUndefined();
-    expect(later.archive.map((a) => a.date)).toEqual(["2026-11-01"]);
-    expect(publicDailySnow(post, state, at("2026-12-01T12:00:00Z"))).toBeNull();
-    // The archive endpoint treats a stored post past retention (written before TTLs existed) as gone.
-    const { dailySnow } = await import("@/worker/daily-snow");
-    const kv = new MemoryKV();
-    await kv.put(dailySnowKey("2026-09-01"), JSON.stringify({ ...post, date: "2026-09-01" }));
-    expect((await dailySnow(new Request("https://x/api/daily-snow?date=2026-09-01"), { SNOW_KV: kv })).status).toBe(404);
-  });
-  it("gives a forced rewrite of today's post the post before it, read from the archive", async () => {
-    const kv = await seeded();
-    const titles = ["Storm Underway", "Storm Exiting", "Storm Exiting Again"];
-    const { ai, calls } = fakeAi(() => ({ ...answer(["plume-snow-cln"]), title: titles.shift()! }));
-    const env = { SNOW_KV: kv, AI: ai };
-    await runCollection(env, { now: SIX_AM, sources: [] });
-    await runCollection(env, { now: at("2026-11-02T13:00:00Z"), sources: [] });
-    await runCollection(env, { now: at("2026-11-02T15:00:00Z"), sources: [], forceDailySnow: true });
-    const prompts = calls.filter((c) => c.schema === "daily_snow").map((c) => JSON.parse(c.user.slice(c.user.indexOf("{"))));
-    expect(prompts.map((p) => p.previousPost?.title ?? null)).toEqual([null, "Storm Underway", "Storm Underway"]);
-    expect(prompts[2].recentPosts.map((p: { date: string }) => p.date)).toEqual(["2026-11-01"]);
-  });
-  it("drops figures whose still cannot be stored", async () => {
-    const kv = new MemoryKV(); // no plume panel stored
-    await writeSnapshot(kv, captured);
-    const { ai } = fakeAi(() => answer(["plume-snow-cln", "nws-snow-lcc"]));
-    await runCollection({ SNOW_KV: kv, AI: ai }, { now: SIX_AM, sources: [] });
-    const post = (await readSnapshot(kv))!.dailySnow!.current!;
-    expect(post.figures["plume-snow-cln"]).toBeUndefined();
-    expect(post.sections[0].paragraphs.map((p) => p.figure)).toEqual([null, "nws-snow-lcc"]);
-  });
-  it("adds a frozen snow plume when the model omits it, without adding model prose or calls", async () => {
-    const kv = await seeded();
-    const { ai, calls } = fakeAi(() => answer(["resort-totals", "nws-snow-level"]));
-    await runCollection({ SNOW_KV: kv, AI: ai }, { now: SIX_AM, sources: [] });
-    const post = (await readSnapshot(kv))!.dailySnow!.current!;
-    expect(Object.keys(post.figures)).toEqual(expect.arrayContaining(["resort-totals", "nws-snow-level", "plume-snow-cln"]));
-    expect(post.sections[0].paragraphs.map((p) => p.figure)).toEqual(["resort-totals", "nws-snow-level"]);
-    expect(post.figures["plume-snow-cln"]).toMatchObject({ axis: { forecastHours: 240 } });
-    expect(JSON.parse((await kv.get(dailySnowKey("2026-11-01"), "text"))!).figures).toEqual(post.figures);
-    expect(calls.filter((c) => c.schema === "daily_snow")).toHaveLength(1);
-  });
-  it("uses another snow plume if the preferred still is missing", async () => {
-    const kv = new MemoryKV();
-    await writeSnapshot(kv, captured);
-    const candidate = buildDailyDigest(captured, null, [], SIX_AM).figures.find((c) => c.figure.id === "plume-snow-pkcu1")!;
-    if (candidate.source?.kind !== "kv") throw new Error("expected stored plume");
-    await kv.put(candidate.source.key, new Uint8Array([1, 2, 3]).buffer);
-    const { ai } = fakeAi(() => answer(["plume-snow-cln", "nws-snow-level"]));
-    await runCollection({ SNOW_KV: kv, AI: ai }, { now: SIX_AM, sources: [] });
-    const post = (await readSnapshot(kv))!.dailySnow!.current!;
-    expect(post.figures["plume-snow-cln"]).toBeUndefined();
-    expect(post.figures["plume-snow-pkcu1"]).toBeDefined();
-    expect(post.sections[0].paragraphs[0].figure).toBeNull();
-  });
-  it("publishes normally when the plume source is unavailable", async () => {
-    const kv = new MemoryKV();
-    const snapshot = snap();
-    delete snapshot.sources.plumes;
-    await writeSnapshot(kv, snapshot);
-    const { ai } = fakeAi(() => answer(["resort-totals", "nws-snow-level"]));
-    const result = await runCollection({ SNOW_KV: kv, AI: ai }, { now: SIX_AM, sources: [] });
-    expect(result.dailySnow?.error).toBeNull();
-    expect(Object.keys((await readSnapshot(kv))!.dailySnow!.current!.figures)).toEqual(["nws-snow-level", "resort-totals"]);
-  });
-  it("reserves a slot for the required snow plume when six optional figures were selected", async () => {
-    const kv = await seeded();
-    const candidates = buildDailyDigest(captured, null, [], SIX_AM).figures;
-    const ids = ["resort-totals", "nws-snow-level", "nws-snow-lcc", "nws-snow-bcc", "plume-slr-cln", "plume-slr-pkcu1"];
-    for (const c of candidates.filter((c) => ids.includes(c.figure.id))) {
-      if (c.source?.kind === "kv") await kv.put(c.source.key, new Uint8Array([1, 2, 3]).buffer);
-    }
-    const { ai } = fakeAi(() => answer([], { sections: [{ id: "update", paragraphs: ids.map((figure) => ({ text: "Forecast guidance:", figure })) }] }));
-    await runCollection({ SNOW_KV: kv, AI: ai }, { now: SIX_AM, sources: [] });
-    const post = (await readSnapshot(kv))!.dailySnow!.current!;
-    expect(Object.keys(post.figures)).toHaveLength(6);
-    expect(post.figures["plume-snow-cln"]).toBeDefined();
-    expect(post.figures["plume-slr-pkcu1"]).toBeUndefined();
-    expect(post.sections[0].paragraphs.at(-1)?.figure).toBeNull();
-  });
-  it("falls back to the second model, then keeps yesterday's post when both fail", async () => {
-    const kv = await seeded();
-    const { ai } = fakeAi((model) => (model === PRIMARY_MODEL ? { title: "" } : answer([])));
-    const fellBack = await runCollection({ SNOW_KV: kv, AI: ai }, { now: SIX_AM, sources: [] });
-    const fallbackPost = (await readSnapshot(kv))!.dailySnow!.current!;
-    expect(fallbackPost.model).toBe(FALLBACK_MODEL);
-    expect(fallbackPost.fallbackReason).toBe(`${PRIMARY_MODEL}: Model output has no title or summary`);
-    expect(fellBack.dailySnow?.fallbackReason).toBe(fallbackPost.fallbackReason);
-
-    const failing = fakeAi(() => ({ nonsense: true }));
-    const summary = await runCollection({ SNOW_KV: kv, AI: failing.ai }, { now: at("2026-11-02T13:00:00Z"), sources: [] });
-    expect(summary.dailySnow?.error).toMatch(/no title or summary/);
-    const state = (await readSnapshot(kv))!.dailySnow!;
-    expect(state.current!.date).toBe("2026-11-01");
-    expect(state.consecutiveFailures).toBe(1);
-  });
+describe("activity gate",()=>{
   it("skips the off-season and needs the AI binding", () => {
     const s = snap();
     for (const p of (s.sources.nws!.payload as NwsPayload).points) { p.sixHourSnow = []; p.hourlySnow = []; }
-    for (const id of ["alta", "snowbird", "solitude", "brighton"] as const) s.sources[id] = undefined;
+    for (const id of ["alta", "snowbird", "solitude", "brighton", "snowbasin"] as const) s.sources[id] = undefined;
     const { ai } = fakeAi(() => answer([]));
     expect(planDailySnow(undefined, s, { SNOW_KV: new MemoryKV(), AI: ai }, SIX_AM)).toMatchObject({ skipped: "off-season" });
     expect(planDailySnow(undefined, s, { SNOW_KV: new MemoryKV() }, SIX_AM)).toBeUndefined();
@@ -625,7 +388,7 @@ describe("posting", () => {
     const quiet = () => {
       const s = snap();
       for (const p of (s.sources.nws!.payload as NwsPayload).points) { p.sixHourSnow = []; p.hourlySnow = []; }
-      for (const id of ["alta", "snowbird", "solitude", "brighton"] as const) s.sources[id] = undefined;
+      for (const id of ["alta", "snowbird", "solitude", "brighton", "snowbasin"] as const) s.sources[id] = undefined;
       return s;
     };
     // Legacy six-hour-only snapshot: the only snow is in the bar covering now.

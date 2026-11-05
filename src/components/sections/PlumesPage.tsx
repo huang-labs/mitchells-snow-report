@@ -1,6 +1,8 @@
+import type { ReactNode, CSSProperties } from "react";
+import { regionById, type RegionId } from "@/lib/catalog";
 import type { ApiSource, PlumeChart, PlumePanel, PlumePayload } from "@/lib/types";
 import { plumePanelsLive } from "@/lib/plumePanels";
-import { formatDenver } from "@/lib/time";
+import { formatLocal } from "@/lib/time";
 import { PlumePanelSvg } from "../PlumePanelSvg";
 import { SourceLine, Unavailable } from "../ui";
 
@@ -14,8 +16,9 @@ function initLabel(iso: string) {
 function Panel({ chart, panel, now }: { chart: PlumeChart; panel: PlumePanel; now: Date }) {
   return (
     <figure className="plume">
-      <figcaption className="plume__title">{chart.stationName.replace(/, UT$/, "")}</figcaption>
+      <figcaption className="plume__title">{chart.stationName}{chart.note && <small> · {chart.note}</small>}{chart.lastError && <span className="source-line__error"> · updates failing; last successful run shown</span>}</figcaption>
       <PlumePanelSvg
+        timeZone={regionById(chart.region??"utah")!.timeZone}
         src={panel.url}
         width={panel.width}
         height={panel.height}
@@ -23,7 +26,7 @@ function Panel({ chart, panel, now }: { chart: PlumeChart; panel: PlumePanel; no
         initTime={chart.initTime}
         forecastHours={chart.forecastHours}
         marker={{ time: now, label: "now" }}
-        label={`${panel.title} plume for ${chart.stationName}, run ${chart.runCode}, times in Mountain Time`}
+        label={`${panel.title} plume for ${chart.stationName}, run ${chart.runCode}, times in ${regionById(chart.region??"utah")!.timeZone}`}
       />
     </figure>
   );
@@ -33,7 +36,7 @@ function FullChart({ chart, product }: { chart: PlumeChart; product: string }) {
   return (
     <figure className="plume plume--full">
       <figcaption className="plume__title">
-        {chart.stationName} · <span className="source-line__error">cropped panels unavailable, showing the original chart (times in UTC)</span>
+        {chart.stationName}{chart.note&&` · ${chart.note}`}{chart.lastError&&" · updates failing; last successful run shown"} · <span className="source-line__error">cropped panels unavailable, showing the original chart (times in UTC)</span>
       </figcaption>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={chart.imageUrl} alt={`${product} plume for ${chart.stationName}, run ${chart.runCode}`} />
@@ -41,21 +44,23 @@ function FullChart({ chart, product }: { chart: PlumeChart; product: string }) {
   );
 }
 
-export function PlumesPage({ source, now }: { source: ApiSource; now: Date }) {
+export function PlumesPage({ source, now,region="utah",selector }: { source: ApiSource; now: Date;region?:RegionId;selector?:ReactNode }) {
   const p = source.payload as PlumePayload | null;
   return (
     <section className="page page--plumes">
       <header className="page__header">
-        <h1>Utah ensemble snow plumes</h1>
+        <h1>{regionById(region)!.name} ensemble snow plumes</h1>
         {p && (
           <p className="page__sub">
-            Run <strong>{p.runCode}</strong> · initialized <strong>{formatDenver(p.initTime, now)} MT</strong> ({initLabel(p.initTime)}). Times in MT (source charts use UTC); dashed lines mark midnight, the orange line is now.
+            Run <strong>{p.runCode}</strong> · initialized <strong>{formatLocal(p.initTime,now,regionById(region)!.timeZone)}</strong> ({initLabel(p.initTime)}). Times follow the selected region (source charts use UTC); dashed lines mark midnight, the orange line is now.
           </p>
         )}
       </header>
-      {p ? (
+      {selector}
+      {p?.failures?.filter(f=>!p.charts.some(c=>c.lastError===f)).map(f=><p key={f} className="source-line__error">Plume unavailable · {f}</p>)}
+      {p?.charts.length ? (
         // One column per station (snow on top, SLR below): the grid flows by column.
-        <div className="plume-grid">
+        <div className="plume-grid" style={{"--plume-columns":p.charts.length} as CSSProperties}>
           {p.charts.flatMap((c) =>
             // A last-good payload can outlive its stored panels if collection stalls.
             c.panels?.length && plumePanelsLive(c, now)
@@ -66,7 +71,7 @@ export function PlumesPage({ source, now }: { source: ApiSource; now: Date }) {
       ) : (
         <Unavailable source={source} what="Plume charts" />
       )}
-      <SourceLine source={source} now={now} reportLabel="Model initialization" />
+      <SourceLine source={source} now={now} reportLabel="Model initialization" timeZone={regionById(region)!.timeZone} />
     </section>
   );
 }

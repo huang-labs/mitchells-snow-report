@@ -1,4 +1,4 @@
-import { localTime, RESORTS } from "../recommend/digest";
+import { localTime, RESORTS } from "./facts";
 import { HOUR } from "../sources/types";
 import type { CanyonId, DailySnowHistoryEntry, DailySnowNumbers, DailySnowPhase, DailySnowPost } from "../types";
 
@@ -61,19 +61,19 @@ const weekdayOf = (date: string) => weekdayFmt.format(new Date(`${date}T12:00:00
 const overlaps = (a: Window, b: Window, slack = STORM_MATCH_SLACK_MS) =>
   Date.parse(a.start) - slack < Date.parse(b.end) && Date.parse(b.start) - slack < Date.parse(a.end);
 
-function windowText(w: Window, now: Date): string {
-  return `${localTime(w.start, now)} to ${localTime(w.end, now)}`;
+function windowText(w: Window, now: Date, zone="America/Denver"): string {
+  return `${localTime(w.start, now,zone)} to ${localTime(w.end, now,zone)}`;
 }
 
 /** "our post at 6:05 AM yesterday" (or "our Sunday post" for entries stored before posting times were kept). */
-function postLabel(h: DailySnowHistoryEntry, now: Date): string {
-  return h.postedAt ? `our post at ${localTime(h.postedAt, now)}` : `our ${weekdayOf(h.date)} post`;
+function postLabel(h: DailySnowHistoryEntry, now: Date, zone="America/Denver"): string {
+  return h.postedAt ? `our post at ${localTime(h.postedAt, now,zone)}` : `our ${weekdayOf(h.date)} post`;
 }
 
-function forecastLine(h: DailySnowHistoryEntry, f: CanyonForecast, now: Date): string {
-  const from = h.postedAt ? `from ${localTime(h.postedAt, now)}` : `from ${weekdayOf(h.date)} morning`;
+function forecastLine(h: DailySnowHistoryEntry, f: CanyonForecast, now: Date, zone="America/Denver"): string {
+  const from = h.postedAt ? `from ${localTime(h.postedAt, now,zone)}` : `from ${weekdayOf(h.date)} morning`;
   const parts = [`${f.next24In ?? "?"}″ in the 24 h and ${f.next72In ?? "?"}″ in the 72 h ${from}`];
-  if (f.stormIn !== null) parts.push(`next storm ${f.stormIn}″${f.storm ? ` (${windowText(f.storm, now)})` : ""}`);
+  if (f.stormIn !== null) parts.push(`next storm ${f.stormIn}″${f.storm ? ` (${windowText(f.storm, now,zone)})` : ""}`);
   return `${f.canyon}: ${parts.join("; ")}`;
 }
 
@@ -94,6 +94,7 @@ export function buildContinuity(
   phase: DailySnowPhase,
   date: string,
   now: Date,
+  zone="America/Denver",
 ): ContinuityDigest {
   const past = history.filter((h) => h.date < date);
   const prev = previous && previous.date < date ? previous : null;
@@ -109,8 +110,8 @@ export function buildContinuity(
         stormTrend.push({
           canyon: c.canyon,
           forecasts: [
-            ...earlier.map(({ h, f }) => `${postLabel(h, now)}: ${f.stormIn}″ (${windowText(f.storm, now)})`),
-            `today's NWS forecast: ${upcoming.totalSnowIn}″ (${windowText(upcoming, now)})`,
+            ...earlier.map(({ h, f }) => `${postLabel(h, now,zone)}: ${f.stormIn}″ (${windowText(f.storm, now,zone)})`),
+            `today's NWS forecast: ${upcoming.totalSnowIn}″ (${windowText(upcoming, now,zone)})`,
           ],
         });
       }
@@ -128,12 +129,12 @@ export function buildContinuity(
         .filter((r) => RESORTS.find((x) => x.id === r.id)?.canyon === c.canyon)
         .map((r) => {
           const amounts = [r.storm !== null ? `storm total ${r.storm}″` : null, r.h24 !== null ? `24 h ${r.h24}″` : null].filter(Boolean);
-          return `${r.name}: ${amounts.length ? amounts.join(", ") : "no storm or 24 h total reported"}${r.reportTime ? ` (report ${localTime(r.reportTime, now)})` : ""}`;
+          return `${r.name}: ${amounts.length ? amounts.join(", ") : "no storm or 24 h total reported"}${r.reportTime ? ` (report ${localTime(r.reportTime, now,zone)})` : ""}`;
         });
       lastStorm.push({
         canyon: c.canyon,
-        window: windowText({ start: new Date(start).toISOString(), end: ended.end }, now),
-        forecasts: forecasts.map(({ h, f }) => `${postLabel(h, now)} (${h.postedAt && Date.parse(h.postedAt) < start ? "before it began" : "after it began"}): ${f.stormIn}″`),
+        window: windowText({ start: new Date(start).toISOString(), end: ended.end }, now,zone),
+        forecasts: forecasts.map(({ h, f }) => `${postLabel(h, now,zone)} (${h.postedAt && Date.parse(h.postedAt) < start ? "before it began" : "after it began"}): ${f.stormIn}″`),
         reported,
       });
     }
@@ -148,7 +149,7 @@ export function buildContinuity(
       date: h.date,
       title: h.title,
       phase: h.phase,
-      forecast: h.forecast.map((f) => forecastLine(h, f, now)),
+      forecast: h.forecast.map((f) => forecastLine(h, f, now,zone)),
     })),
     stormTrend,
     lastStorm,

@@ -1,13 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { collectSource, isDue, runCollection } from "@/lib/collect";
 import { ensembleGuidance } from "@/lib/ensemble";
-import { buildDigest } from "@/lib/recommend/digest";
+import { buildDigest } from "@/lib/dailysnow/facts";
 import { buildDailyDigest } from "@/lib/dailysnow/digest";
 import { buildModelInput as dailyInput, SYSTEM_PROMPT as dailyPrompt } from "@/lib/dailysnow/llm";
 import { PRIMARY_MODEL } from "@/lib/ai/model";
-import { buildModelInput as pickInput, SYSTEM_PROMPT as pickPrompt } from "@/lib/recommend/llm";
-import { criticalKeyOf, fingerprintOf, shouldRun } from "@/lib/recommend/schedule";
-import { emptyState } from "@/lib/recommend";
 import { ensembleSource, ensembleTimeLabel, parseEnsemble } from "@/lib/sources/ensemble";
 import { plumesSource } from "@/lib/sources/plumes";
 import { MemoryKV, readSnapshot, writeSnapshot } from "@/lib/store";
@@ -115,35 +112,16 @@ describe("numeric source and model boundary", () => {
     expect(e.periods[0].start).toBe("2026-11-02T00:00:00.000Z");
     expect(e.periods.at(-1)?.end).toBe("2026-11-11T12:00:00.000Z");
     expect(e.periods[0].snowIn).toHaveLength(3);
-    for (const input of [pickInput(PRIMARY_MODEL, pick, null), dailyInput(PRIMARY_MODEL, daily)]) {
+    for(const input of [dailyInput(PRIMARY_MODEL,daily)]) {
       const text = JSON.stringify(input);
       expect(text).toContain("not BCC-specific");
       expect(text).toContain("P10, P50, P90");
       expect(text).not.toContain("totalSnowIn");
       expect(text).not.toContain("image_url");
     }
-    for (const prompt of [pickPrompt, dailyPrompt]) {
+    for(const prompt of [dailyPrompt]) {
       expect(prompt).toContain("percentiles");
       expect(prompt).toContain("CLN");
     }
-  });
-  it("fingerprints cycles and availability without bypassing scheduling or daily caps", async () => {
-    const s = await snapshot();
-    const a = buildDigest(s, {}, now);
-    const b = buildDigest({ ...s, sources: {} }, {}, now);
-    expect(fingerprintOf(a)).not.toBe(fingerprintOf(b));
-    expect(criticalKeyOf(a)).toBe(criticalKeyOf(b));
-    const cycle = structuredClone(s);
-    (cycle.sources.ensemble.payload as ReturnType<typeof parseEnsemble>).initializedAt = "2026-11-01T18:00:00Z";
-    expect(fingerprintOf(buildDigest(cycle, {}, now))).not.toBe(fingerprintOf(a));
-    const state = emptyState(now);
-    state.current = { targetDate: a.target.date, mode: a.mode, pick: "alta", headline: "Alta", plan: "Ski", summary: "Ski", caveats: [], runnerUp: null, generatedAt: new Date(+now - 31 * 60_000).toISOString(), model: PRIMARY_MODEL, trigger: "test" };
-    state.fingerprint = fingerprintOf(b);
-    state.criticalKey = criticalKeyOf(a);
-    expect(shouldRun(state, a, now)).toBe("conditions-changed");
-    state.current.generatedAt = new Date(+now - 10 * 60_000).toISOString();
-    expect(shouldRun(state, a, now)).toBeNull();
-    state.calls.count = 40;
-    expect(shouldRun(state, a, now)).toBeNull();
   });
 });

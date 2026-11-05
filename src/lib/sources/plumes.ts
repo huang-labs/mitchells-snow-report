@@ -1,3 +1,4 @@
+import { PLUME_LOCATIONS } from "../catalog";
 import type { FetchContext } from "../http";
 import { cropSnowPanels } from "../plumeCrop";
 import { PLUME_PANEL_REFRESH_MS, PLUME_PANEL_TTL_S, panelsStoredAt, plumeCropRetryDue, plumePanelsLive } from "../plumePanels";
@@ -9,10 +10,7 @@ export const PLUME_BASE = "https://weather.utah.edu/";
 export const plumePageUrl = (station: string) => `${PLUME_BASE}index.php?t=ensgefsds&d=PL&r=${station}`;
 
 /** Station codes verified against the weather.utah.edu station menu (2026-10-30). */
-export const PLUME_STATIONS = [
-  { code: "CLN", name: "Alta-Collins, UT" },
-  { code: "PKCU1", name: "Silver Lake Brighton, UT" },
-] as const;
+export const PLUME_STATIONS = PLUME_LOCATIONS;
 
 /** "2026103012" → 2026-10-30T12:00Z (model runs are labelled in UTC). */
 export function runCodeToIso(runCode: string): string | null {
@@ -104,7 +102,7 @@ export const plumesSource: SourceDefinition<PlumePayload> = {
   reportMaxAgeMs: 30 * HOUR,
   async collect(ctx) {
     const previous = ctx.previous as PlumePayload | null;
-    const results = await Promise.all(
+    const settled = await Promise.allSettled(
       PLUME_STATIONS.map(async (s) => {
         const html = await ctx.fetchText(plumePageUrl(s.code), { browserLike: true });
         const parsed = parsePlumePage(html, s.code);
@@ -139,6 +137,7 @@ export const plumesSource: SourceDefinition<PlumePayload> = {
           crop = await tryCrop(ctx, s.code, parsed.runCode, imageUrl, { panels: null, panelsStoredAt: null, cropError: null, cropAttempts: 0, cropFailedAt: null });
         }
         const chart: PlumeChart = {
+          region:s.region, note:s.note, lastCheckedAt:ctx.now.toISOString(), lastError:null,
           stationCode: s.code,
           stationName: s.name,
           imageUrl,
@@ -152,12 +151,21 @@ export const plumesSource: SourceDefinition<PlumePayload> = {
         return { chart, runCode: parsed.runCode, product: parsed.product };
       }),
     );
+    const failures:string[]=[];
+    const results=settled.flatMap((r,i)=>{
+      if(r.status==="fulfilled")return [r.value];
+      const station=PLUME_STATIONS[i];const message=`${station.name}: ${r.reason instanceof Error?r.reason.message:String(r.reason)}`;
+      failures.push(message);
+      const prior=previous?.charts.find(c=>c.stationCode===station.code);
+      return prior?[{chart:{...prior,lastError:message},runCode:prior.runCode,product:previous!.product}]:[];
+    });
+    assertValid(results.length,"No ensemble station available");
     // Stations can briefly straddle cycles; report the oldest run shown.
     const runCode = results.map((r) => r.runCode).sort()[0];
     const initTime = runCodeToIso(runCode);
     assertValid(initTime, `Bad run code ${runCode}`);
     return {
-      payload: { product: results[0].product, runCode, initTime, charts: results.map((r) => r.chart) },
+      payload: { product: results[0].product, runCode, initTime, charts: results.map((r) => r.chart), failures },
       sourceUpdatedAt: initTime,
     };
   },

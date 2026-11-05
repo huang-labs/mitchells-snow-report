@@ -1,3 +1,4 @@
+import { RESORTS } from "./catalog";
 /**
  * Dashboard sections. Each is a page, routed from the navbar. The first section
  * (`/`, "Resorts") is also the parent of the resort pages: the navbar shows their
@@ -21,11 +22,7 @@ export const SECTIONS: SectionDef[] = [
   { id: "daily-snow", title: "Daily Snow", label: "Daily Snow" },
   { id: "weather", title: "Mountain weather", label: "Weather" },
   { id: "plumes", title: "Ensemble plumes", label: "Plumes" },
-  { id: "traffic", title: "Canyon roads", label: "Roads" },
-  { id: "alta", title: "Alta", label: "Alta", group: "resorts" },
-  { id: "snowbird", title: "Snowbird", label: "Snowbird", group: "resorts" },
-  { id: "solitude", title: "Solitude", label: "Solitude", group: "resorts" },
-  { id: "brighton", title: "Brighton", label: "Brighton", group: "resorts" },
+  ...RESORTS.map(r => ({ id:r.id, title:r.name, label:r.name, group:"resorts" as const })),
 ];
 
 /** The first section lives at `/`; the others at `/<id>`. */
@@ -35,7 +32,7 @@ export function sectionHref(id: string): string {
 
 /** Index of the section a pathname shows (0 for `/`), or -1 for other paths. */
 export function sectionIndexFromPath(pathname: string | null): number {
-  const id = (pathname ?? "/").replace(/^\/+|\/+$/g, "");
+  const id = (pathname ?? "/").replace(/^\/+|\/+$/g, "").split("/")[0];
   if (id === "") return 0;
   return SECTIONS.findIndex((s) => s.id === id);
 }

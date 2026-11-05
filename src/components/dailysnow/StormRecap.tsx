@@ -6,7 +6,8 @@ const reportTimeFormat = new Intl.DateTimeFormat("en-US", {
 });
 
 /** The same retained observations supplied to the model, frozen with this edition. */
-export function StormRecap({ storm }: { storm: StormRecord }) {
+export function StormRecap({ storm,timeZone=TZ }: { storm: StormRecord;timeZone?:string }) {
+  const reportTimeFormat=new Intl.DateTimeFormat("en-US",{timeZone,weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",timeZoneName:"short"});
   return (
     <table className="dailysnow-totals dailysnow-storm" aria-label="Observations for this storm">
       <thead><tr><th scope="col">Resort</th><th scope="col">Storm observations</th><th scope="col" className="dailysnow-storm__report-time">Report time</th></tr></thead>

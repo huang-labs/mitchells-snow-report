@@ -1,14 +1,18 @@
 import { planDailySnow, type DailySnowPlan } from "./dailysnow";
 import { archiveStorms, trackStorms } from "./dailysnow/storm-store";
 import { createFetchContext, type CollectorSecrets } from "./http";
-import { planRecommendation, type RecommendationPlan, type RecommendEnv } from "./recommend";
+import { runChannels, type ChannelsEnv } from "./dailysnow/channels";
+import { FORECAST_AREAS, RESORTS, type ChannelId } from "./catalog";
+import { regionalSnapshot } from "./dailysnow/regions";
+import { advanceStormTracking } from "./dailysnow/storms";
+import { buildDigest } from "./dailysnow/facts";
 import { recordSnowLog } from "./snowlog/record";
 import { SOURCES } from "./sources";
 import { MINUTE, type SourceDefinition } from "./sources/types";
 import { readSnapshot, writeSnapshot, type KVLike } from "./store";
 import type { Snapshot, SourceId, SourceRecord } from "./types";
 
-export interface CollectorEnv extends CollectorSecrets, RecommendEnv {
+export interface CollectorEnv extends CollectorSecrets, ChannelsEnv {
   SNOW_KV: KVLike;
 }
 
@@ -19,7 +23,7 @@ export interface CollectOptions {
   /** Restrict to specific sources (manual runs). */
   only?: SourceId[];
   /** Ask the model regardless of its schedule (manual runs). */
-  forceRecommendation?: boolean;
+  channel?:ChannelId;
   /** Write the Daily Snow post regardless of its schedule (manual runs). */
   forceDailySnow?: boolean;
 }
@@ -30,18 +34,8 @@ export interface CollectSummary {
   results: Array<{ id: SourceId; ok: boolean; error?: string; ms: number }>;
   /** Sources not due this run (collected recently; see SourceDefinition.intervalMs). */
   skipped: SourceId[];
-  /** Recommendation outcome this run, when the AI binding is configured. */
-  recommendation?: { generatedAt: string | null; model: string | null; trigger: string | null; error: string | null };
-  /** Daily Snow outcome this run, when the AI binding is configured and a post was due. */
-  dailySnow?: {
-    date: string | null;
-    model: string | null;
-    trigger: string | null;
-    error: string | null;
-    skipped: string | null;
-    /** Why the primary model failed, when the fallback wrote the post. */
-    fallbackReason?: string | null;
-  };
+  publications?:Awaited<ReturnType<typeof runChannels>>;
+
 }
 
 /**
@@ -145,12 +139,17 @@ export async function runCollection(env: CollectorEnv, opts: CollectOptions = {}
     if (prev) snapshot.sources[def.id] = prev;
   }
   for (const { rec } of records) snapshot.sources[rec.id] = rec;
-  try {
-    await trackStorms(env.SNOW_KV, previous, snapshot, now);
-  } catch (err) {
-    // Source collection and publication remain available if archive bootstrap fails.
-    snapshot.stormTracking = previous?.stormTracking;
-    console.error("dailysnow: storm tracking failed", err);
+  snapshot.areaStorms={};
+  snapshot.resortLastOperatingAt={...previous?.resortLastOperatingAt};
+  for(const area of FORECAST_AREAS){
+    const areaSnapshot=regionalSnapshot(snapshot,area.region,area.id);
+    const state=advanceStormTracking(previous?.areaStorms?.[area.id],areaSnapshot,now);
+    for(const event of state.events)if(!event.id.startsWith(`${area.id}:`))event.id=`${area.id}:${event.id}`;
+    snapshot.areaStorms[area.id]=state;
+    await archiveStorms(env.SNOW_KV,{...areaSnapshot,stormTracking:state},now);
+  }
+  for(const resort of buildDigest(snapshot,snapshot.resortLastOperatingAt,now).resorts){
+    if(resort.operatingNow)snapshot.resortLastOperatingAt[resort.id]=now.toISOString();
   }
   try {
     snapshot.snowLog = recordSnowLog(previous?.snowLog, snapshot, now);
@@ -159,77 +158,12 @@ export async function runCollection(env: CollectorEnv, opts: CollectOptions = {}
     snapshot.snowLog = previous?.snowLog;
     console.error("snowlog: recording failed", err);
   }
-  // The recommendation is derived from the fresh sources. Its bookkeeping goes
-  // into the same KV put; a model call (a few times an hour at most) waits until
-  // the source data is stored, then costs one more put.
-  let plan: RecommendationPlan | undefined;
-  try {
-    plan = planRecommendation(previous?.recommendation, snapshot, env, now, { force: opts.forceRecommendation });
-  } catch (err) {
-    console.error("recommendation: failed", err);
-  }
-  const carried = plan?.state ?? previous?.recommendation;
-  if (carried) snapshot.recommendation = carried;
-  // The Daily Snow post (once a morning) follows the same pattern, in parallel with the pick.
-  let daily: DailySnowPlan | undefined;
-  try {
-    daily = planDailySnow(previous?.dailySnow, snapshot, env, now, { force: opts.forceDailySnow, fetchImpl: opts.fetchImpl });
-  } catch (err) {
-    console.error("dailysnow: failed", err);
-  }
-  const carriedDaily = daily?.state ?? previous?.dailySnow;
-  if (carriedDaily) snapshot.dailySnow = carriedDaily;
-  snapshot.writtenAt = new Date().toISOString();
-  const stored = await writeSnapshot(env.SNOW_KV, snapshot);
-  snapshot.sources = stored.sources;
-  snapshot.stormTracking = stored.stormTracking;
-  snapshot.snowLog = stored.snowLog;
-  try {
-    await archiveStorms(env.SNOW_KV, stored, now);
-  } catch (err) {
-    // Working records remain in the snapshot; the next run retries the archive.
-    console.error("dailysnow: storm archive failed", err);
-  }
-  if (plan?.run || daily?.run) {
-    const [rec, post] = await Promise.all([plan?.run?.(), daily?.run?.()]);
-    if (rec) snapshot.recommendation = rec;
-    if (post) snapshot.dailySnow = post;
-    await writeSnapshot(env.SNOW_KV, snapshot);
-  }
-  const ai = snapshot.recommendation;
-  const updatedNow = ai?.current?.generatedAt === now.toISOString();
-  const posted = snapshot.dailySnow?.current?.generatedAt === now.toISOString() ? snapshot.dailySnow.current : null;
+  snapshot.writtenAt=new Date().toISOString();
+  const stored=await writeSnapshot(env.SNOW_KV,snapshot);
+  const publications=await runChannels(env,stored,now,{force:opts.forceDailySnow,channel:opts.channel,fetchImpl:opts.fetchImpl});
   return {
-    startedAt: now.toISOString(),
-    durationMs: Date.now() - started,
-    results: records.map(({ rec, ms }) => ({
-      id: rec.id,
-      ok: rec.status === "ok",
-      ...(rec.status === "error" ? { error: rec.lastError ?? "unknown" } : {}),
-      ms,
-    })),
-    skipped,
-    ...(ai
-      ? {
-          recommendation: {
-            generatedAt: ai.current?.generatedAt ?? null,
-            model: updatedNow ? (ai.current?.model ?? null) : null,
-            trigger: updatedNow ? (ai.current?.trigger ?? null) : null,
-            error: ai.lastAttemptAt === now.toISOString() ? ai.lastError : null,
-          },
-        }
-      : {}),
-    ...(daily && (daily.run || daily.skipped)
-      ? {
-          dailySnow: {
-            date: posted?.date ?? null,
-            model: posted?.model ?? null,
-            trigger: posted?.trigger ?? null,
-            error: daily.run ? (snapshot.dailySnow?.lastError ?? null) : null,
-            skipped: daily.skipped ?? null,
-            fallbackReason: posted?.fallbackReason ?? null,
-          },
-        }
-      : {}),
+    startedAt:now.toISOString(),durationMs:Date.now()-started,
+    results:records.map(({rec,ms})=>({id:rec.id,ok:rec.status==="ok",...(rec.status==="error"?{error:rec.lastError??"unknown"}:{}),ms})),
+    skipped,publications,
   };
 }

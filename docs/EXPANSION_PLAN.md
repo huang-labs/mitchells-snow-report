@@ -2,7 +2,7 @@
 
 [← README](../README.md)
 
-Status: design approved on November 5, 2026; feature implementation has not started.
+Status: design approved on November 5, 2026; implementation delivered in the expansion PR. This document retains the approved scope; current operations and source findings live in the linked guides.
 
 Expand the Cottonwoods dashboard into Mitchell's Snow Report at
 `mitchells-snow-report.huang.mx`. Launch with a fixed list of 14 United States

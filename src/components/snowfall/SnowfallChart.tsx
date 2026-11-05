@@ -8,8 +8,12 @@ export const SNOWFALL_UNITS = "6-hour snowfall · inches";
  * Pass `units={false}` when the surrounding caption already shows {@link SNOWFALL_UNITS},
  * or `title` to head the chart with that text instead.
  */
-export function SnowfallChart({ bars, label, units = true, title }: { bars: SixHourSnow[]; label: string; units?: boolean; title?: string }) {
-  const days = snowfallDays(bars);
+export function SnowfallChart({ bars, label, units = true, title, timeZone="America/Denver" }: { bars: SixHourSnow[]; label: string; units?: boolean; title?: string; timeZone?:string }) {
+  const days = snowfallDays(bars,timeZone);
+  const dayLabel=new Intl.DateTimeFormat("en-US",{timeZone,weekday:"short"});
+  const dateLabel=new Intl.DateTimeFormat("en-US",{timeZone,month:"numeric",day:"numeric"});
+  const timeLabel=new Intl.DateTimeFormat("en-US",{timeZone,hour:"numeric"});
+  const zonedTimeLabel=new Intl.DateTimeFormat("en-US",{timeZone,hour:"numeric",timeZoneName:"short"});
   const max = Math.max(1, ...bars.map(b => b.snowIn));
   const slotsPerDay = Math.max(4, ...days.map(d => d.slots.length));
   if (!days.length) return <p className="muted">Snowfall forecast unavailable.</p>;
@@ -33,6 +37,6 @@ export function SnowfallChart({ bars, label, units = true, title }: { bars: SixH
         </li>)}
       </ol>
     </div>
-    <p className="snowfall__note">Times are period starts in Mountain Time. Blank slots = unavailable. Scroll for later days →</p>
+    <p className="snowfall__note">Times are period starts in {timeZone==="America/Los_Angeles"?"Pacific Time":"Mountain Time"}. Blank slots = unavailable. Scroll for later days →</p>
   </div>;
 }

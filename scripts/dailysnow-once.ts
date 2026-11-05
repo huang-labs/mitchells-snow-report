@@ -1,62 +1,47 @@
-import { addLiveEnsemble } from "./live-ensemble";
-/**
- * Builds the Daily Snow prompt from the live production report and its post
- * archive, and prints the Workers AI request body, for prompt tuning:
- *   npm run -s dailysnow:once > /tmp/body.json
- * then POST it to the Workers AI REST endpoint (or replay saved digests with
- * `npm run dailysnow:replay`). Read-only: nothing is written anywhere.
- * Options:
- *   --url <report url>     default: production /api/report
- *   --now <ISO time>       evaluate as of this time
- *   --model <id>           request body for this model (default: primary)
- *   --live-ensemble        fetch numerical CLN guidance directly (read-only)
- *   --digest               print the digest instead of the request body
- *   --save-digest <file>   also save the digest, for `dailysnow:replay`
- *   --validate <file>      validate a saved model response against the digest
+/** Read-only prompt tuning for one regional channel or the Western overview.
+ * --channel <id> defaults to western-us; --url defaults to this fork's /api/report.
+ * --now, --model, --digest, --save-digest and --validate retain their usual meanings.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { PRIMARY_MODEL, responseJson } from "../src/lib/ai/model";
+import { channelById } from "../src/lib/catalog";
 import { historyEntry } from "../src/lib/dailysnow/continuity";
 import { buildDailyDigest } from "../src/lib/dailysnow/digest";
-import { advanceStormTracking, seedStormTracking } from "../src/lib/dailysnow/storms";
+import { regionalSnapshot } from "../src/lib/dailysnow/regions";
+import { seedStormTracking } from "../src/lib/dailysnow/storms";
 import { buildModelInput, validateDailySnow } from "../src/lib/dailysnow/llm";
-import { createFetchContext } from "../src/lib/http";
-import { nwsAfdSource } from "../src/lib/sources/nwsafd";
-import type { ApiDailySnow, ReportResponse, Snapshot, SourceRecord } from "../src/lib/types";
+import { buildWesternInput, westernModelInput, validateWestern } from "../src/lib/dailysnow/western";
+import type { ApiDailySnow, ReportResponse, Snapshot, DailySnowPost } from "../src/lib/types";
+import type { RegionId } from "../src/lib/catalog";
+import { addLiveEnsemble } from "./live-ensemble";
 
-const arg = (name: string) => {
-  const i = process.argv.indexOf(name);
-  return i > 0 ? process.argv[i + 1] : undefined;
-};
-const url = arg("--url") ?? "https://cottonwoods-snow-report.huang.mx/api/report";
-const now = arg("--now") ? new Date(arg("--now")!) : new Date();
-const report = (await (await fetch(url)).json()) as ReportResponse;
-const snapshot: Snapshot = { schemaVersion: 1, writtenAt: report.snapshotWrittenAt ?? now.toISOString(), sources: report.sources };
-await addLiveEnsemble(snapshot, now);
-// Until the forecast discussion source is deployed, fetch it directly.
-if (!snapshot.sources.nwsafd?.payload) {
-  const { payload, sourceUpdatedAt } = await nwsAfdSource.collect(createFetchContext({ COLLECTOR_CONTACT: "dailysnow-once" }, now));
-  snapshot.sources.nwsafd = { id: "nwsafd", payload, sourceUpdatedAt, status: "ok", lastAttemptAt: now.toISOString(), lastSuccessfulFetchAt: now.toISOString(), lastError: null, lastErrorAt: null, consecutiveFailures: 0, diagnostics: null } satisfies SourceRecord;
-}
-
-// The cron keeps compact history entries; rebuild them from the archived posts the API serves.
-const current = report.dailySnow ?? null;
-const posts = await Promise.all(
-  (current?.archive ?? []).map(async ({ date }) => {
-    if (date === current?.date) return current;
-    const res = await fetch(new URL(`/api/daily-snow?date=${date}`, url));
-    return res.ok ? ((await res.json()) as ApiDailySnow) : null;
-  }),
-);
-const history = posts.filter((p): p is ApiDailySnow => !!p).map(historyEntry);
-snapshot.stormTracking = advanceStormTracking(seedStormTracking(posts.filter((p): p is ApiDailySnow => !!p), now), snapshot, now);
-
-const { digest } = buildDailyDigest(snapshot, current, history, now);
-const saveTo = arg("--save-digest");
-if (saveTo) writeFileSync(saveTo, JSON.stringify(digest, null, 2));
-const saved = arg("--validate");
-if (saved) {
-  console.log(JSON.stringify(validateDailySnow(responseJson(JSON.parse(readFileSync(saved, "utf8"))), digest), null, 2));
-} else {
-  console.log(JSON.stringify(process.argv.includes("--digest") ? digest : buildModelInput(arg("--model") ?? PRIMARY_MODEL, digest), null, 2));
+const arg = (name:string) => { const i=process.argv.indexOf(name); return i>0?process.argv[i+1]:undefined; };
+const channel=channelById(arg("--channel")??"western-us");
+if(!channel)throw new Error("Unknown Daily Snow channel");
+const url=arg("--url")??"https://mitchells-snow-report.huang.mx/api/report";
+const now=arg("--now")?new Date(arg("--now")!):new Date();
+const response=await fetch(url);
+if(!response.ok)throw new Error("Report HTTP "+response.status);
+const report=await response.json() as ReportResponse;
+let snapshot:Snapshot={schemaVersion:1,writtenAt:report.snapshotWrittenAt??now.toISOString(),sources:report.sources};
+const model=arg("--model")??PRIMARY_MODEL;
+const saved=arg("--validate"),saveTo=arg("--save-digest");
+if(channel.id==="western-us"){
+  const editions=Object.fromEntries(Object.entries(report.dailySnows??{}).filter(([key,value])=>key!=="western-us"&&value)) as Partial<Record<RegionId,DailySnowPost>>;
+  const input=buildWesternInput(snapshot,editions,now);
+  if(saveTo)writeFileSync(saveTo,JSON.stringify(input,null,2));
+  console.log(JSON.stringify(saved?validateWestern(responseJson(JSON.parse(readFileSync(saved,"utf8"))),input):process.argv.includes("--digest")?input:westernModelInput(model,input),null,2));
+}else{
+  snapshot=regionalSnapshot(snapshot,channel.id);
+  if(channel.id==="utah")await addLiveEnsemble(snapshot,now);
+  const current=report.dailySnows?.[channel.id]??null;
+  const posts=(await Promise.all((current?.archive??[]).map(async({date})=>{
+    if(date===current?.date)return current;
+    const res=await fetch(new URL("/api/daily-snow?date="+date+"&channel="+channel.id,url));
+    return res.ok?await res.json() as ApiDailySnow:null;
+  }))).filter((p):p is ApiDailySnow=>!!p);
+  snapshot.stormTracking=seedStormTracking(posts,now);
+  const {digest}=buildDailyDigest(snapshot,current,posts.map(historyEntry),now);
+  if(saveTo)writeFileSync(saveTo,JSON.stringify(digest,null,2));
+  console.log(JSON.stringify(saved?validateDailySnow(responseJson(JSON.parse(readFileSync(saved,"utf8"))),digest):process.argv.includes("--digest")?digest:buildModelInput(model,digest),null,2));
 }

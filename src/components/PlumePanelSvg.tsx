@@ -1,4 +1,4 @@
-import { denverMidnightsBetween } from "@/lib/time";
+import { localMidnightsBetween } from "@/lib/time";
 import type { PlumePanel } from "@/lib/types";
 
 const HOUR = 3_600_000;
@@ -20,6 +20,7 @@ export interface PlumePanelSvgProps {
   /** Optional vertical marker, e.g. the current time on the plumes page. */
   marker?: { time: Date; label: string };
   label: string;
+  timeZone?:string;
 }
 
 /**
@@ -27,11 +28,13 @@ export interface PlumePanelSvgProps {
  * axis drawn in place of the original UTC labels (cut off by plumeCrop). The
  * plot frame spans init to init + forecastHours, so any instant maps linearly to x.
  */
-export function PlumePanelSvg({ src, width, height, plot, initTime, forecastHours, marker, label }: PlumePanelSvgProps) {
+export function PlumePanelSvg({ src, width, height, plot, initTime, forecastHours, marker, label, timeZone="America/Denver" }: PlumePanelSvgProps) {
+  const dowFmt=new Intl.DateTimeFormat("en-US",{timeZone,weekday:"short"});
+  const dateFmt=new Intl.DateTimeFormat("en-US",{timeZone,month:"numeric",day:"numeric"});
   const start = new Date(initTime);
   const end = new Date(start.getTime() + forecastHours * HOUR);
   const x = (t: Date) => plot.left + ((t.getTime() - start.getTime()) / (end.getTime() - start.getTime())) * (plot.right - plot.left);
-  const midnights = denverMidnightsBetween(start, end);
+  const midnights = localMidnightsBetween(start, end,timeZone);
   // Day labels centred in each Mountain Time day (partial days at the edges included when wide enough).
   const bounds = [start, ...midnights, end];
   const days = bounds.slice(0, -1).map((d, i) => ({ from: d, to: bounds[i + 1] }));
