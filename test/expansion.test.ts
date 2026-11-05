@@ -8,7 +8,7 @@ import { buildDailyDigest } from "@/lib/dailysnow/digest";
 import { regionalSnapshot, channelKV, channelStateKey } from "@/lib/dailysnow/regions";
 import { runChannels, readChannelStates } from "@/lib/dailysnow/channels";
 import { dailySnowKey, emptyDailySnowState, planDailySnow, dailySnowFigureKey } from "@/lib/dailysnow";
-import { buildWesternInput, validateWestern, westernFigures } from "@/lib/dailysnow/western";
+import { buildWesternInput, dayRange, validateWestern, westernFigures } from "@/lib/dailysnow/western";
 import { localDate, zonedToUtc } from "@/lib/time";
 import { snowDayEnd, snowDayStart, forecastForDay } from "@/lib/snowlog/days";
 import { shouldRunDailySnow } from "@/lib/dailysnow/schedule";
@@ -552,10 +552,22 @@ describe("independent editions and stored artifacts", () => {
     expect(validateWestern(raw, input).shortTerm).toHaveLength(2);
     raw.sections[1].paragraphs[0].text = "Read [Tahoe](/daily-snow/tahoe).";
     expect(() => validateWestern(raw, input)).toThrow(/links/);
+    // Six paragraphs of about 280 words each exceed the West ceiling.
+    const long = structuredClone(raw);
+    for (const section of long.sections) for (const p of section.paragraphs) p.text = "The mountain pattern shifts. ".repeat(70);
+    expect(() => validateWestern(long, input)).toThrow(/too long: \d+ words/);
     const figures = westernFigures(input);
     expect(Object.values(figures).every((f) => f.kind === "forecast-comparison")).toBe(true);
     const yesterday = { ...editions.tahoe, date: "2026-11-04" };
     expect(buildWesternInput(base, { tahoe: yesterday }, now).regions).toHaveLength(0);
+  });
+});
+
+describe("West date ranges", () => {
+  it("names the month once within a month and both months across one", () => {
+    expect(dayRange("2026-11-12", "2026-11-18")).toBe("Nov 12–18");
+    expect(dayRange("2026-11-28", "2026-12-04")).toBe("Nov 28–Dec 4");
+    expect(dayRange("2026-12-29", "2027-01-04")).toBe("Dec 29–Jan 4");
   });
 });
 
@@ -703,9 +715,9 @@ describe("West pattern outlook", () => {
     const map = post.figures["west-pattern"];
     if (map.kind !== "image") throw new Error("Expected image");
     expect(map.url).toMatch(/channel=western-us$/);
-    expect(map.caption).toContain("8–14-day 500-mb height outlook · Nov 12–Nov 18 · issued");
+    expect(map.caption).toContain("8–14-day 500-mb height outlook · Nov 12–18 · issued");
     const sent = JSON.parse(JSON.parse(input).messages[1].content);
-    expect(sent.patternOutlook).toMatchObject({ validLabel: "Nov 12–Nov 18" });
+    expect(sent.patternOutlook).toMatchObject({ validLabel: "Nov 12–18" });
     expect(sent.patternOutlook.discussion).toContain("trough");
     expect(sent.patternOutlook.image).toBeUndefined();
     expect(sent.figures).toEqual({ snowComparison: true, patternMap: true });
