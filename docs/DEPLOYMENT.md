@@ -11,6 +11,7 @@ Mitchell's deployment uses Cloudflare account **Huang Inc.**. Production starts 
 | Preview parent Worker | `mitchells-snow-report-preview`, no production routes or cron |
 | Preview KV | `f9e542e8a1d0405f8624beade1bba09b` |
 | Workers AI Gateway | `mitchells-snow-report`, logging, no cache, sliding 64 requests/day |
+| PR review AI Gateway | `pr-agent`, logging, sliding 100 requests/day; see [AI code review](AI_CODE_REVIEW.md) |
 | Production cron | `*/5 * * * *`; local publication hours evaluated in code |
 
 ## GitHub Actions
@@ -25,7 +26,7 @@ The workflow reads its machine-output URL and comments it on the PR. Each PR get
 
 See [Cloudflare's preview isolation documentation](https://developers.cloudflare.com/workers/previews/resources/). Keep preview vars, bindings and the image renderer's defines in the `previews` block.
 
-Encrypted Actions secrets are `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `OPENROUTER_API_KEY`. The deployment token is scoped to this account's Workers/KV/AI/Gateway and the huang.mx zone's routes/read access. No token value belongs in files or logs. An authenticated `cf` session can create/configure resources; use a dedicated API token for CI, not a short-lived OAuth token.
+Encrypted Actions secrets are `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `PR_AGENT_CLOUDFLARE_TOKEN` (Workers AI Read and AI Gateway Run only, for PR review). The deployment token is scoped to this account's Workers/KV/AI/Gateway and the huang.mx zone's routes/read access. No token value belongs in files or logs. An authenticated `cf` session can create/configure resources; use a dedicated API token for CI, not a short-lived OAuth token.
 
 ## Manual collection or publication
 
