@@ -351,6 +351,10 @@ export interface ReportResponse {
   dailySnow?: ApiDailySnow | null;
   /** Recent snow days for the snowfall timeline; null until collection has recorded one. */
   snowLog?: SnowLogState | null;
+  /** Working per-forecast-area storm memory, as regional publications receive it. */
+  areaStorms?: Snapshot["areaStorms"];
+  /** Last time each resort was seen operating; feeds in-season eligibility. */
+  resortLastOperatingAt?: Snapshot["resortLastOperatingAt"];
 }
 
 // ---------- NWS Area Forecast Discussion ----------

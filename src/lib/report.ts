@@ -95,6 +95,9 @@ export function buildReport(snapshot: Snapshot | null, now: Date = new Date(), d
     sources,
     requiredMissing,
     snowLog: snapshot?.snowLog ?? null,
+    // Exposed so read-only prompt tuning rebuilds the exact regional digest inputs.
+    areaStorms: snapshot?.areaStorms ?? {},
+    resortLastOperatingAt: snapshot?.resortLastOperatingAt ?? {},
     dailySnow: publicDailySnow(snapshot?.dailySnow?.current, snapshot?.dailySnow, now, snapshot?.dailySnow?.current ? dailySnowActivity(snapshot, now).publicationExpected : false),
   };
 }
