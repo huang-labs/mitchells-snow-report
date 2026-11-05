@@ -344,6 +344,7 @@ describe("independent editions and stored artifacts", () => {
     const state=await planDailySnow(undefined,s,{SNOW_KV:new MemoryKV(),DAILY_SNOW_CHANNEL:"colorado",AI:{async run(){return {response:JSON.stringify(reply())};}}},now,{force:true})!.run!();
     report.snowfall.overnight={state:"reported",value:0,unit:"in",label:"Snow overnight"};
     const input=buildWesternInput(base,{colorado:state.current!},now);
+    expect(input.asOfLocal).toContain("7:00 AM PST");
     const observation=input.regions[0].observations.find(r=>r.name==="Telluride")!;
     expect(observation.windows.find(w=>w.window==="overnight")).toMatchObject({amountIn:6,label:"Snow overnight"});
     const result=validateWestern({title:"Western Outlook",summary:"Weather varies.",overview:"Read the current regional forecasts.",regions:[{region:"colorado",text:"Telluride reported six inches overnight."}]},input);

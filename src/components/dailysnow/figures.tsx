@@ -1,4 +1,5 @@
 import type { DailySnowFigure } from "@/lib/types";
+import { resortById } from "@/lib/catalog";
 import { SnowLevel,SNOW_LEVEL_COLORS } from "../charts";
 import { SnowfallChart } from "../snowfall/SnowfallChart";
 import { PlumePanelSvg } from "../PlumePanelSvg";
@@ -86,7 +87,7 @@ export function Figure({ figure: f, postedAt,timeZone="America/Denver" }: { figu
           {f.caption}
           {f.kind === "snow-level" && (
             <span className="snow-level__legend">
-              {f.series.map((s,i) => <span style={{color:SNOW_LEVEL_COLORS[i%SNOW_LEVEL_COLORS.length]}} key={s.canyon} className={`snow-level__key snow-level__key--${s.canyon.toLowerCase()}`}>{s.canyon}</span>)}
+              {f.series.map((s,i) => <span style={{color:SNOW_LEVEL_COLORS[i%SNOW_LEVEL_COLORS.length]}} key={s.canyon} className={`snow-level__key snow-level__key--${s.canyon.toLowerCase()}`}>{resortById(s.canyon)?.name??s.canyon}</span>)}
             </span>
           )}
         </figcaption>
