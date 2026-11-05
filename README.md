@@ -48,7 +48,7 @@ See [Local development](docs/DEVELOPMENT.md) for the full command reference, sch
 The fork's approved scope is in the [Mitchell's expansion plan](docs/EXPANSION_PLAN.md).
 The [repository setup](docs/REPOSITORY_SETUP.md) records isolated Cloudflare resources and CI readiness.
 
-The fixed favorites are Alta, Snowbird, Solitude, Brighton, Snowbasin, Palisades Tahoe, Mammoth Mountain, Jackson Hole, Big Sky, Winter Park, Steamboat, Telluride, Crystal Mountain and Mt. Bachelor. Routes are `/`, `/<resort-id>`, `/daily-snow`, `/weather`, `/plumes`, and the eight regional children of those three forecast pages. The Daily Snow navigation tab opens United States West by default; Weather and Plumes remember the last region. Region dropdowns sit at the top of forecast pages; select a region there to read its Daily Snow. Resort details are reached from the homepage, without a second navigation row. History fills from deployment, with no imported backfill.
+The fixed favorites are Alta, Snowbird, Solitude, Brighton, Snowbasin, Palisades Tahoe, Mammoth Mountain, Jackson Hole, Big Sky, Winter Park, Steamboat, Telluride, Crystal Mountain and Mt. Bachelor. Routes are `/`, `/<resort-id>`, `/daily-snow`, `/weather`, `/plumes`, and the eight regional children of those three forecast pages. The Daily Snow navigation tab opens United States West by default; Weather and Plumes always open Utah by default. Region selections stay in the URL and are not carried between pages. Region dropdowns sit at the top of forecast pages; select a region there to read its Daily Snow. Resort details are reached from the homepage, without a second navigation row. History fills from deployment, with no imported backfill.
 
 | Guide | What's inside |
 | --- | --- |

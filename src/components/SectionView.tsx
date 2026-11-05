@@ -23,7 +23,6 @@ export function renderSection(
     <RegionSelector
       section={id as "daily-snow" | "weather" | "plumes"}
       selected={region ?? (id === "daily-snow" ? "western-us" : "utah")}
-      explicit={!!region}
     />
   ) : undefined;
   switch (id) {
