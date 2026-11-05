@@ -23,12 +23,12 @@ export function sectionMetadata(section: SectionDef): Metadata {
   const description = section.id === "daily-snow" ? DAILY_SNOW_DESCRIPTION : SITE_DESCRIPTION;
   // Nested openGraph objects replace the parent's object, including its image.
   const images = [{
-    url: section.id === "daily-snow" ? "/daily-snow/opengraph-image" : "/share-brand-v2.png",
+    url: section.id === "daily-snow" ? "/daily-snow/opengraph-image" : "/share-brand-v3.png",
     width: 1200,
     height: 630,
     alt: section.id === "daily-snow"
       ? "Daily Snow — Mitchell's regional snow forecasts"
-      : "Mitchell’s Snow Report — Western United States",
+      : "Mitchell’s Snow Report — United States West",
   }];
   return {
     title: section.title,
@@ -42,6 +42,6 @@ export function regionalMetadata(section:string,region:string):Metadata{
  const r=regionById(region);if(!r)return {};
  const label=section==="daily-snow"?"Daily Snow":section==="weather"?"Mountain weather":"Ensemble plumes";
  const title=`${r.name} ${label}`;const url=`/${section}/${r.id}`;
- const images=[{url:section==="daily-snow"?`/daily-snow/${r.id}/opengraph-image`:"/share-brand-v2.png",width:1200,height:630,alt:title}];
+ const images=[{url:section==="daily-snow"?`/daily-snow/${r.id}/opengraph-image`:"/share-brand-v3.png",width:1200,height:630,alt:title}];
  return {title,description:`${label} for ${r.name}'s tracked resorts.`,openGraph:{...siteOpenGraph,title:`${title} · ${SITE_TITLE}`,url,images},twitter:{card:"summary_large_image",title,images}};
 }

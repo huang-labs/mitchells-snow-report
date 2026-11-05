@@ -335,7 +335,7 @@ it("uses the article skeleton for a pending direct archive link, then shows its 
   vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => { respond = resolve; })));
   window.history.replaceState(null, "", "/daily-snow?date=2026-10-31");
   render(<DailySnowPage report={report(post)} now={now} />);
-  expect(screen.getByRole("status").textContent).toBe("Loading Daily Snow…");
+  expect(screen.getByRole("status").textContent).toBe("Loading Daily Snows…");
   expect(document.querySelector("[aria-busy=true]")).toBeTruthy();
   expect(screen.queryByText(/posted every morning/)).toBeNull();
   await act(async () => { respond(new Response("unavailable", { status: 503 })); });

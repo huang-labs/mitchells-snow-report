@@ -26,9 +26,6 @@ export function RegionalPage({ report, now }: { report: ReportResponse; now: Dat
     <section className="page page--regional">
       <header className="page__header">
         <h1>Resorts</h1>
-        <p className="page__sub">
-          Your Western US favorites: the past week, the last 24 h, and the NWS forecast for the week ahead.
-        </p>
       </header>
       <div className="resort-timelines">
         {resorts.map((r) => (

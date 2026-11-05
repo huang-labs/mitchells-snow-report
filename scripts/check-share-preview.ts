@@ -24,7 +24,7 @@ for (const path of paths) {
     assert.ok(tags.has(key), `${url}: missing ${key}`);
     assert.equal(new URL(tags.get(key)!).origin, expectedOrigin, `${url}: ${key} points outside this deployment`);
   }
-  const expectedPath = path.startsWith("/daily-snow") ? path+"/opengraph-image" : "/share-brand-v2.png";
+  const expectedPath = path.startsWith("/daily-snow") ? path+"/opengraph-image" : "/share-brand-v3.png";
   for (const key of ["og:image", "twitter:image"]) {
     const image = new URL(tags.get(key)!);
     assert.equal(image.pathname, expectedPath);
