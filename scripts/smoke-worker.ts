@@ -42,7 +42,7 @@ try {
     const html = await res.text();
     assert.match(html, /role="status">Loading /, `accessible loading status for ${path}`);
     assert.match(html, /aria-busy="true"/, `initial skeleton for ${path}`);
-    const expectedImage = path.startsWith("/daily-snow") ? path+"/opengraph-image" : "/share-brand-v2.png";
+    const expectedImage = path.startsWith("/daily-snow") ? path+"/opengraph-image" : "/share-brand-v3.png";
     assert.ok(html.includes(`${expectedImage}\"`), `share image for ${path}`);
     const script = /src="([^\"]*\/_next\/static\/[^\"]+\.js)"/.exec(html)?.[1];
     assert.ok(script, `static script for ${path}`);
@@ -51,7 +51,7 @@ try {
     assert.match(js.headers.get("cache-control")!, /immutable/);
     await js.arrayBuffer();
   }
-  const brand = await get("/share-brand-v2.png");
+  const brand = await get("/share-brand-v3.png");
   assert.equal(brand.status, 200);
   assert.match(brand.headers.get("content-type")!, /^image\/png/);
   const brandedPng = decode(new Uint8Array(await brand.arrayBuffer()));

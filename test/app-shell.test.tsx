@@ -78,6 +78,7 @@ describe("useReport polling", () => {
 
 describe("sections", () => {
   it("maps sections to routes and back", () => {
+    expect(SECTIONS.find((s) => s.id === "daily-snow")).toMatchObject({ label: "Daily Snows", title: "Daily Snows" });
     expect(SECTIONS.map((s) => sectionHref(s.id))).toEqual(["/", "/daily-snow", "/weather", "/plumes", "/alta", "/snowbird", "/solitude", "/brighton", "/snowbasin", "/palisades-tahoe", "/mammoth-mountain", "/jackson-hole", "/big-sky", "/winter-park", "/steamboat", "/telluride", "/crystal-mountain", "/mt-bachelor"]);
     for (const [i, s] of SECTIONS.entries()) expect(sectionIndexFromPath(sectionHref(s.id))).toBe(i);
     expect(sectionIndexFromPath("/alta/")).toBe(4);

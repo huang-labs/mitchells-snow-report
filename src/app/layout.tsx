@@ -11,9 +11,9 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
   openGraph: {
     ...siteOpenGraph,
-    images: [{ url: "/share-brand-v2.png", width: 1200, height: 630, alt: "Mitchell’s Snow Report — Western United States" }],
+    images: [{ url: "/share-brand-v3.png", width: 1200, height: 630, alt: "Mitchell’s Snow Report — United States West" }],
   },
-  twitter: { card: "summary_large_image", title, images: ["/share-brand-v2.png"] },
+  twitter: { card: "summary_large_image", title, images: ["/share-brand-v3.png"] },
 };
 
 export const viewport: Viewport = {

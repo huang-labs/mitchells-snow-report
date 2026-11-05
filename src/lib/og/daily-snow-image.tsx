@@ -27,7 +27,7 @@ export function DailySnowShareCard({ post,channel="western-us" }: { post: Previe
         <div style={{ fontSize: 54, lineHeight: 1.12, letterSpacing: -1.5, fontWeight: 700 }}>{clipText(post?.title ?? "Your Western US snow forecast", 100)}</div>
         <div style={{ marginTop: 20, fontSize: 27, lineHeight: 1.35, color: C.muted }}>{clipText(post?.summary ?? DAILY_SNOW_DESCRIPTION, 180)}</div>
       </div>
-      <ShareFooter>{model ? `AI-generated forecast · ${model}` : "Western United States"}</ShareFooter>
+      <ShareFooter>{model ? `AI-generated forecast · ${model}` : "United States West"}</ShareFooter>
     </div>
   );
 }

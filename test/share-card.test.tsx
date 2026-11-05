@@ -33,7 +33,7 @@ describe("share preview", () => {
   it("ships the same dark branded PNG that its source renders", async () => {
     const response = new ImageResponse(<BrandedShareCard />, { width: 1200, height: 630, fonts: SHARE_CARD_FONTS });
     const rendered = new Uint8Array(await response.arrayBuffer());
-    const bundled = await readFile("public/share-brand-v2.png");
+    const bundled = await readFile("public/share-brand-v3.png");
     expectDarkImage(decode(bundled));
     expect(bundled.equals(Buffer.from(rendered))).toBe(true);
   });
@@ -42,6 +42,8 @@ describe("share preview", () => {
     const post = { date: "2026-11-01", title: "Snow returns", summary: "Fresh snow.", model: "@cf/zai-org/glm-5.3-flash" };
     const html = renderToStaticMarkup(<DailySnowShareCard post={post} />);
     expect(html).toContain(">AI</span>");
+    expect(html).toContain("United States West");
+    expect(html).not.toContain("Western United States");
     expect(html).toContain("AI-generated forecast · GLM 5.3 Flash");
     expect(html).toContain("November 1, 2026");
     expect(renderToStaticMarkup(<DailySnowShareCard post={null} />)).not.toContain("AI-generated");

@@ -19,7 +19,7 @@ export const GROUP_LABELS: Record<SectionGroup, string> = { resorts: "Resorts" }
 
 export const SECTIONS: SectionDef[] = [
   { id: "regional", title: "Resorts", label: "Resorts" },
-  { id: "daily-snow", title: "Daily Snow", label: "Daily Snow" },
+  { id: "daily-snow", title: "Daily Snows", label: "Daily Snows" },
   { id: "weather", title: "Mountain weather", label: "Weather" },
   { id: "plumes", title: "Ensemble plumes", label: "Plumes" },
   ...RESORTS.map(r => ({ id:r.id, title:r.name, label:r.name, group:"resorts" as const })),
