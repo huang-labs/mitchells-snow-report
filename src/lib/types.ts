@@ -362,6 +362,8 @@ export interface ReportResponse {
 export interface AfdPayload {
   discussions?: AfdPayload[];
   failures?: string[];
+  /** Set on a retained product whose office failed this run. */
+  lastError?: string | null;
   productId: string;
   office: string;
   issuedAt: string;

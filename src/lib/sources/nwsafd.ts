@@ -64,20 +64,26 @@ export const nwsAfdSource: SourceDefinition<AfdPayload> = {
     const offices=["SLC","STO","REV","RIW","TFX","BOU","GJT","SEW","PDT"];
     const previous=ctx.previous as AfdPayload|null;
     const failures:string[]=[];
-    const results=await Promise.all(offices.map(async office=>{
+    const results=await Promise.all(offices.map(async (office):Promise<AfdPayload|null>=>{
       const prior=(previous?.discussions??(previous?[previous]:[])).find(p=>p.office.replace(/^K/,"")===office);
       try {
         const headers={Accept:"application/ld+json"};
         const list=await ctx.fetchJson<ProductList>(`https://api.weather.gov/products/types/AFD/locations/${office}`,{headers});
         const latest=list["@graph"]?.[0];assertValid(latest?.id,`${office} AFD list empty`);
-        if(prior?.productId===latest.id)return prior;
+        if(prior?.productId===latest.id)return {...prior,lastError:null};
         const product=await ctx.fetchJson<Product>(productUrl(latest.id),{headers});
         const sections=parseAfd(product.productText);assertValid(sections.length,`${office} AFD has no usable sections`);
-        return {productId:product.id,office,issuedAt:new Date(product.issuanceTime).toISOString(),sections} satisfies AfdPayload;
-      }catch(e){failures.push(`${office}: ${e instanceof Error?e.message:String(e)}`);return prior??null;}
+        return {productId:product.id,office,issuedAt:new Date(product.issuanceTime).toISOString(),sections,lastError:null} satisfies AfdPayload;
+      }catch(e){
+        const message=`${office}: ${e instanceof Error?e.message:String(e)}`;failures.push(message);
+        // A retained product is marked so its office's failure stays visible.
+        return prior?{...prior,lastError:message}:null;
+      }
     }));
     const discussions=results.filter((p):p is AfdPayload=>p!==null);
-    assertValid(discussions.length,"No forecast discussion available");
-    return {payload:{...discussions[0],discussions,failures},sourceUpdatedAt:discussions.map(d=>d.issuedAt).sort()[0]};
+    const fresh=discussions.filter(d=>!d.lastError);
+    // A total outage is a failed collection, not a success built from retained products.
+    assertValid(fresh.length,`No forecast discussion collected this run (${failures.join("; ")})`);
+    return {payload:{...fresh[0],discussions,failures},sourceUpdatedAt:fresh.map(d=>d.issuedAt).sort()[0]};
   },
 };

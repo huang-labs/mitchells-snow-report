@@ -22,4 +22,4 @@ Temporary administrative access belongs on a disposable seed Preview. Remove the
 
 See [deployment and operations](DEPLOYMENT.md) for resource IDs, manual procedures and the current workflow. CI/reviewer/provider failures must be diagnosed independently; do not change to another runner/provider without checking the actual failure.
 
-A superseded setup token (`c04d0e852144ce42a10ed64dac25d75d`) is unused by CI. The authenticated CLI returns 403 when revoking user tokens; revoke that initial token in [Cloudflare API tokens](https://dash.cloudflare.com/profile/api-tokens). The active CI credential has the corrected account and zone policy.
+An initial setup token was superseded by the CI deployment token and is unused. The authenticated `cf` CLI cannot list or revoke API tokens (403), so revoke any unused token in [Cloudflare API tokens](https://dash.cloudflare.com/profile/api-tokens). The active CI credential has the corrected account and zone policy.

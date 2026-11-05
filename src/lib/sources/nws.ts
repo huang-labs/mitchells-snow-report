@@ -246,7 +246,9 @@ export const nwsSource: SourceDefinition<NwsPayload> = {
       }
     }));
     const points=results.filter((p):p is NonNullable<typeof p>=>p!==null);
-    assertValid(points.length,"No NWS mountain point collected successfully");
-    return {payload:{points,failures},sourceUpdatedAt:points.map(p=>p.gridUpdatedAt).filter((x):x is string=>!!x).sort()[0]??null};
+    const fresh=points.filter(p=>!p.lastError);
+    // A total outage is a failed collection, not a success built from retained points.
+    assertValid(fresh.length,`No NWS mountain point collected this run (${failures.join("; ")})`);
+    return {payload:{points,failures},sourceUpdatedAt:fresh.map(p=>p.gridUpdatedAt).filter((x):x is string=>!!x).sort()[0]??null};
   },
 };

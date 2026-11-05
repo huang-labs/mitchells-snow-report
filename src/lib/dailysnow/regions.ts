@@ -21,23 +21,30 @@ export function regionalSnapshot(snapshot: Snapshot, region: RegionId, area?: Fo
           .filter((s): s is string => !!s)
           .sort()[0] ?? null,
     };
+  // Scoped records take their age from the region's own entries, never another region's.
+  const oldest = (dates: Array<string | null | undefined>) => dates.filter((s): s is string => !!s).sort()[0] ?? null;
   const plumes = snapshot.sources.plumes;
-  if (plumes)
+  if (plumes) {
+    const charts = ((plumes.payload as PlumePayload | null)?.charts ?? []).filter(
+      (c) => PLUME_LOCATIONS.find((s) => s.code === c.stationCode)?.region === region,
+    );
     sources.plumes = {
       ...plumes,
-      payload: {
-        ...(plumes.payload as PlumePayload),
-        charts: ((plumes.payload as PlumePayload | null)?.charts ?? []).filter(
-          (c) => PLUME_LOCATIONS.find((s) => s.code === c.stationCode)?.region === region,
-        ),
-      },
+      payload: { ...(plumes.payload as PlumePayload), charts },
+      sourceUpdatedAt: oldest(charts.map((c) => c.initTime)),
     };
+  }
   const afd = snapshot.sources.nwsafd;
   const discussions =
     (afd?.payload as AfdPayload | null)?.discussions ?? (afd?.payload ? [afd.payload as AfdPayload] : []);
   const offices = new Set(points.map((p) => p.gridId));
   const selected = discussions.filter((d) => offices.has(d.office.replace(/^K/, "")));
-  if (afd && selected.length) sources.nwsafd = { ...afd, payload: { ...selected[0], discussions: selected } };
+  if (afd && selected.length)
+    sources.nwsafd = {
+      ...afd,
+      payload: { ...selected[0], discussions: selected },
+      sourceUpdatedAt: oldest(selected.map((d) => d.issuedAt)),
+    };
   const cams = snapshot.sources.resortcams;
   if (cams)
     sources.resortcams = {
