@@ -108,7 +108,7 @@ export function buildUserPrompt(digest: DailyDigest): string {
     `Write today's Daily Snow for ${digest.weekday} (${digest.date}). It is ${digest.nowLocal}.`,
     `Phase: ${digest.phase} (${digest.phaseReason}).`,
     digest.discussion
-      ? `The regional NWS forecast discussion was issued ${digest.discussion.issued}${digest.discussion.stale ? " and is OLD; prefer the gridpoint forecast" : ""}.`
+      ? `This region's NWS forecast discussions (by office) were issued ${digest.discussion.issued}${digest.discussion.stale ? " and are OLD; prefer the gridpoint forecast" : ""}.`
       : "No NWS forecast discussion is available today; keep the extended outlook brief and based on supplied gridpoint/structured ensemble guidance, without inventing synoptic mechanisms.",
     digest.phaseChange ? `Since our last post: ${digest.phaseChange}.` : "This is our first post; there is no earlier post to follow on from.",
     `Available figures: ${digest.figures.length ? digest.figures.map((f) => f.id).join(", ") : "none"}.`,
@@ -194,7 +194,8 @@ export function validateDailySnow(raw: unknown, digest: DailyDigest): LlmDailySn
   if (digest.observationCoverage?.currentResorts.length === 0 && /\b(?:reported|picked up|received|recorded)\s+(?:no|zero|nothing|\d)|\b(?:nothing|no (?:new )?snow)\s+(?:reported|to report)|\b(?:0|zero)\s*(?:″|inches)\s+reported/i.test(all)) {
     throw new Error("Current resort observations unavailable; prose claims measured snowfall");
   }
-  if (/\bplume\b[^.!?\n]{0,140}\b(?:shows?|indicates?|depicts?)\b[^.!?\n]{0,100}\b(?:wide|tight|dry|spread|agreement|outcomes?)\b/i.test(all)) {
+  // Evaluative claims only: a neutral "the plume below shows the spread of members" introduction is allowed.
+  if (/\bplume\b[^.!?\n]{0,140}\b(?:shows?|indicates?|depicts?|suggests?|reveals?)\s+(?:(?:a|an|the|some|little|good|strong|broad|close|fairly|very|quite|relatively)\s+)*(?:wide|wider|tight|tighter|narrow|large|small|big|dry|wet|agreement|consensus|uncertainty|disagreement|confidence)\b/i.test(all)) {
     throw new Error("Model output interprets an unseen plume image");
   }
   const bad = ungroundedInches(all, allowed);

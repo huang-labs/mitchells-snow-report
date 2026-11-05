@@ -61,7 +61,9 @@ export function regionalSnapshot(snapshot: Snapshot, region: RegionId, area?: Fo
     ...snapshot,
     region,
     sources,
-    stormTracking: area ? snapshot.areaStorms?.[area] : snapshot.stormTracking,
+    // Area runs use that area's memory. The retired single-record stormTracking is
+    // Utah's (Cottonwoods) and never leaks into another region.
+    stormTracking: area ? snapshot.areaStorms?.[area] : region === "utah" ? snapshot.stormTracking : undefined,
     areaStorms: Object.fromEntries(
       Object.entries(snapshot.areaStorms ?? {}).filter(([key]) => ids.includes(key as ForecastAreaId)),
     ),

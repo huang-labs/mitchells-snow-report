@@ -143,7 +143,8 @@ describe("digest", () => {
     expect(numbers.canyons[0].next24In).not.toBeNull();
     // A truncated forecast horizon must not masquerade as a complete seven days.
     expect(numbers.canyons[0].next7dIn).toBeNull();
-    expect(digest.discussion?.sections[0].name).toBe("KEY MESSAGES");
+    expect(digest.discussions?.[0].sections[0].name).toBe("KEY MESSAGES");
+    expect(digest.discussion).not.toHaveProperty("sections");
     // Entries stored before posting times were kept are labeled by day.
     expect(digest.recentPosts[0].forecast[0]).toBe("LCC: 10″ in the 24 h and 16″ in the 72 h from Saturday morning; next storm 17″");
     expect(digest.phaseChange).toBe("pre-storm (Saturday's post) → storm (today)");

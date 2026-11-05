@@ -90,7 +90,8 @@ export interface DailyDigest extends ContinuityDigest {
     sixHourSnow: string[];
     text: Array<{ period: string; forecast: string }>;
   }>;
-  discussion: { issued: string; stale: boolean; sections: AfdPayload["sections"] } | null;
+  /** Issuance summary of the region's own offices; their text is in `discussions`. */
+  discussion: { issued: string; stale: boolean } | null;
   figures: Array<{ id: string; caption: string; shows: string }>;
 }
 
@@ -345,6 +346,7 @@ export function buildDailyDigest(
   const rawNws = (snapshot.sources.nws?.payload ?? null) as NwsPayload | null;
   const nws = rawNws ? { ...rawNws, points: rawNws.points.filter((p) => forecastPointFresh(p, now)) } : null;
   const afd = (snapshot.sources.nwsafd?.payload ?? null) as AfdPayload | null;
+  const offices = afd?.discussions ?? (afd ? [afd] : []);
   const nwsFreshness = classify(SOURCE_BY_ID.nws, snapshot.sources.nws, now);
 
   const numbers: DailySnowNumbers = {
@@ -440,7 +442,7 @@ export function buildDailyDigest(
       const event = stormForPost(state, now);
       return event ? [stormDigest(event, now, zone)] : [];
     }),
-    discussions: (afd?.discussions ?? (afd ? [afd] : [])).map((a) => ({
+    discussions: offices.map((a) => ({
       office: a.office,
       issued: localTime(a.issuedAt, now, zone),
       stale: t - Date.parse(a.issuedAt) > AFD_STALE_MS,
@@ -499,11 +501,11 @@ export function buildDailyDigest(
         ),
       text: p.periods.map((x) => ({ period: x.name, forecast: x.detailedForecast })),
     })),
-    discussion: afd
+    // One summary over the region's own offices; each office's text appears once, in `discussions`.
+    discussion: offices.length
       ? {
-          issued: localTime(afd.issuedAt, now, zone),
-          stale: t - Date.parse(afd.issuedAt) > AFD_STALE_MS,
-          sections: afd.sections,
+          issued: offices.map((a) => `${a.office.replace(/^K/, "")} ${localTime(a.issuedAt, now, zone)}`).join("; "),
+          stale: offices.every((a) => t - Date.parse(a.issuedAt) > AFD_STALE_MS),
         }
       : null,
     ...buildContinuity(previous, history, numbers, phase, date, now, zone),

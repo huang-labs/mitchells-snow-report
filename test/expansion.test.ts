@@ -24,6 +24,9 @@ import { nwsSource } from "@/lib/sources/nws";
 import { plumesSource } from "@/lib/sources/plumes";
 import { nwsAfdSource } from "@/lib/sources/nwsafd";
 import { historyEntry } from "@/lib/dailysnow/continuity";
+import { inchAmounts } from "@/lib/ai/grounding";
+import { isSnowPlume } from "@/lib/dailysnow/plume";
+import { dailySnow as dailySnowArchive } from "@/worker/daily-snow";
 import type { AfdPayload } from "@/lib/types";
 import { dailySnowPublicationStatus } from "@/lib/dailysnow/publication";
 import { recordSnowLog } from "@/lib/snowlog/record";
@@ -746,5 +749,144 @@ describe("partial and total upstream outages", () => {
     expect(state.current?.older).toEqual({ date: "2026-11-04", title: "Yesterday" });
     const archived = JSON.parse((await channelKV(kv, "western-us").get(dailySnowKey(state.current!.date), "text"))!);
     expect(archived.older).toEqual({ date: "2026-11-04", title: "Yesterday" });
+  });
+});
+
+describe("model output grounding and scoping", () => {
+  it("reads spelled and numeric ranges joined by and/or as two amounts, never a sum", () => {
+    expect(inchAmounts("between two and three inches")).toEqual([2, 3]);
+    expect(inchAmounts("five or six inches")).toEqual([5, 6]);
+    expect(inchAmounts("5 or 6 inches and 2 and 4″")).toEqual([5, 6, 2, 4]);
+    expect(inchAmounts("twenty-five inches")).toEqual([25]);
+    expect(inchAmounts("six to eight inches")).toEqual([6, 8]);
+  });
+  it("allows a neutral plume introduction and rejects claims about an unseen plume", () => {
+    const { digest } = buildDailyDigest(regionalSnapshot(base, "utah"), null, [], now);
+    const withText = (text: string) => ({
+      ...reply(),
+      sections: [{ id: "update", paragraphs: [{ text, figure: "none" }] }],
+    });
+    expect(() =>
+      validateDailySnow(withText("The University of Utah plume below shows the spread of ensemble members."), digest),
+    ).not.toThrow();
+    for (const claim of ["The plume shows wide spread later in the week.", "The plume indicates good agreement on timing."])
+      expect(() => validateDailySnow(withText(claim), digest)).toThrow(/unseen plume/);
+  });
+  it("keeps the retired single storm record to Utah", () => {
+    const legacy = { ...base, stormTracking: { checkedAt: now.toISOString(), cursors: {}, events: [] } };
+    expect(regionalSnapshot(legacy, "utah").stormTracking).toBe(legacy.stormTracking);
+    expect(regionalSnapshot(legacy, "tahoe").stormTracking).toBeUndefined();
+  });
+  it("summarizes only the region's own offices and gives each office's text once", () => {
+    const colorado = buildDailyDigest(regionalSnapshot(base, "colorado"), null, [], now).digest;
+    expect(colorado.discussions?.map((d) => d.office)).toEqual(["BOU", "GJT"]);
+    expect(colorado.discussion?.issued).toMatch(/^BOU .+; GJT /);
+    expect(colorado.discussion).not.toHaveProperty("sections");
+    const tahoe = buildDailyDigest(regionalSnapshot(base, "tahoe"), null, [], now).digest;
+    expect(tahoe.discussions?.map((d) => d.office)).toEqual(["STO"]);
+  });
+});
+
+describe("channel archive, retention and figures", () => {
+  const png = () => new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]).buffer as ArrayBuffer;
+  /** A storm morning: a current NWS grid with snow ahead, so NWS figures are candidates too. */
+  const snowy = () => {
+    const s = structuredClone(base);
+    for (const p of (s.sources.nws!.payload as NwsPayload).points) {
+      p.gridUpdatedAt = new Date(+now - 3_600_000).toISOString();
+      p.sixHourSnow = p.sixHourSnow.map((b) => ({ ...b, snowIn: Date.parse(b.start) + 6 * 3_600_000 > +now ? 1 : b.snowIn }));
+    }
+    return s;
+  };
+  const candidates = () => buildDailyDigest(regionalSnapshot(snowy(), "utah"), null, [], now).figures;
+  const storedKey = (id: string) => {
+    const c = candidates().find((c) => c.figure.id === id);
+    if (c?.source?.kind !== "kv") throw new Error(`no stored source for ${id}`);
+    return c.source.key;
+  };
+  const answerWith = (figures: string[]) => ({
+    ...reply(),
+    sections: [
+      {
+        id: "update",
+        paragraphs: figures.map((figure) => ({ text: "The supplied forecast guidance follows.", figure })),
+      },
+    ],
+  });
+  const env = (kv: MemoryKV, figures: string[]) => ({
+    SNOW_KV: kv,
+    AI: {
+      async run() {
+        return { response: JSON.stringify(answerWith(figures)) };
+      },
+    },
+  });
+  const nonImage = () => candidates().find((c) => c.figure.kind !== "image" && !c.figure.id.startsWith("storm-recap"))!.figure.id;
+  const utahPost = async (kv: MemoryKV) => (await readChannelStates(kv)).utah!.current!;
+
+  it("archives posts and stills for 30 days and keeps the older post's own expiry when linking it", async () => {
+    const kv = new MemoryKV();
+    await kv.put(storedKey("plume-snow-cln"), png());
+    const ttls: Record<string, number | undefined> = {};
+    const put = kv.put.bind(kv);
+    kv.put = async (key: string, value: string | ArrayBuffer, opts?: { expirationTtl?: number }) => {
+      if (key.startsWith("channel:v1:utah:dailysnow")) ttls[key.replace("channel:v1:utah:", "")] = opts?.expirationTtl;
+      return put(key, value);
+    };
+    await runChannels(env(kv, ["plume-snow-cln"]), snowy(), now, { channel: "utah", force: true });
+    // 30 days after noon UTC on the post date (Nov 5), written at 15:00Z.
+    const ttl = 30 * 86_400 - 3 * 3_600;
+    const first = await utahPost(kv);
+    expect(ttls[dailySnowKey(first.date)]).toBe(ttl);
+    const still = Object.keys(ttls).find((k) => k.startsWith("dailysnow-fig:"))!;
+    expect(ttls[still]).toBe(ttl);
+    for (const k of Object.keys(ttls)) delete ttls[k];
+    await runChannels(env(kv, ["plume-snow-cln"]), snowy(), new Date(+now + 86_400_000), { channel: "utah", force: true });
+    expect(ttls[dailySnowKey("2026-11-06")]).toBe(ttl);
+    expect(ttls[dailySnowKey("2026-11-05")]).toBe(ttl - 86_400);
+    const older = JSON.parse((await channelKV(kv, "utah").get(dailySnowKey("2026-11-05"), "text"))!);
+    expect(older.newer).toMatchObject({ date: "2026-11-06" });
+  });
+  it("stops serving a channel's archived post past retention", async () => {
+    const kv = new MemoryKV();
+    const old = { ...(await (async () => {
+      const k = new MemoryKV();
+      await runChannels(env(k, [nonImage()]), snowy(), now, { channel: "utah", force: true });
+      return utahPost(k);
+    })()), date: "2026-09-01" };
+    await channelKV(kv, "utah").put(dailySnowKey("2026-09-01"), JSON.stringify(old));
+    const res = await dailySnowArchive(new Request("https://x/api/daily-snow?channel=utah&date=2026-09-01"), { SNOW_KV: kv });
+    expect(res.status).toBe(404);
+  });
+  it("drops figures whose still cannot be stored", async () => {
+    const kv = new MemoryKV(); // no plume panel stored
+    const other = nonImage();
+    await runChannels(env(kv, ["plume-snow-cln", other]), snowy(), now, { channel: "utah", force: true });
+    const post = await utahPost(kv);
+    expect(post.figures["plume-snow-cln"]).toBeUndefined();
+    expect(post.sections[0].paragraphs.map((p) => p.figure)).toEqual([null, other]);
+  });
+  it("uses another snow plume if the preferred still is missing", async () => {
+    const kv = new MemoryKV();
+    await kv.put(storedKey("plume-snow-pkcu1"), png());
+    await runChannels(env(kv, ["plume-snow-cln", nonImage()]), snowy(), now, { channel: "utah", force: true });
+    const post = await utahPost(kv);
+    expect(post.figures["plume-snow-cln"]).toBeUndefined();
+    expect(post.figures["plume-snow-pkcu1"]).toBeDefined();
+    expect(post.sections[0].paragraphs[0].figure).toBeNull();
+  });
+  it("reserves a slot for the required snow plume when six optional figures were selected", async () => {
+    const kv = new MemoryKV();
+    for (const c of candidates()) if (c.source?.kind === "kv") await kv.put(c.source.key, png());
+    const optional = candidates()
+      .map((c) => c.figure.id)
+      .filter((id) => !isSnowPlume(id) && !id.startsWith("storm-recap"))
+      .slice(0, 6);
+    expect(optional).toHaveLength(6);
+    await runChannels(env(kv, optional), snowy(), now, { channel: "utah", force: true });
+    const post = await utahPost(kv);
+    expect(Object.keys(post.figures)).toHaveLength(6);
+    expect(Object.keys(post.figures).some(isSnowPlume)).toBe(true);
+    expect(post.sections[0].paragraphs.at(-1)?.figure).toBeNull();
   });
 });
