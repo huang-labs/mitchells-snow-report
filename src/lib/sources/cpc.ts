@@ -14,6 +14,19 @@ function day(month: string, date: string, year: string): string {
   return iso;
 }
 
+const DAY_MS = 86_400_000;
+const tidy = (text: string) =>
+  text.replace(/([^\n])\n(?=[^\n])/g, "$1 ").replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{2,}/g, "\n\n").trim();
+
+/** One "N-M DAY OUTLOOK FOR NOV 10 - 14 2026" header: its window and where it sits in the discussion. */
+function outlookHeader(discussion: string, days: "6-10" | "8-14") {
+  const m = new RegExp(`${days} DAY OUTLOOK FOR ([A-Z]+) (\\d{1,2}) - (?:([A-Z]+) )?(\\d{1,2}) (\\d{4})`).exec(discussion);
+  assertValid(m, `CPC ${days}-day discussion unavailable`);
+  const endMonth = m[3] ?? m[1];
+  const startYear = months.indexOf(m[1].slice(0, 3)) > months.indexOf(endMonth.slice(0, 3)) ? String(+m[5] - 1) : m[5];
+  return { validFrom: day(m[1], m[2], startYear), validTo: day(endMonth, m[4], m[5]), start: m.index, end: m.index + m[0].length };
+}
+
 /** Verify the map page and written outlook describe the same issue and forecast period. */
 export function parseCpc(page: string, html: string): Omit<CpcPayload, "image"> {
   const text = plain(page).replace(/\s+/g, " ");
@@ -27,21 +40,31 @@ export function parseCpc(page: string, html: string): Omit<CpcPayload, "image"> 
   assertValid(pre, "CPC discussion unavailable");
   const discussion = plain(pre[1]).replace(/\r/g, "");
   const issued = /(\d{1,4}) (AM|PM) (EST|EDT) \w+ ([A-Za-z]+) (\d{1,2}) (\d{4})/.exec(discussion);
-  const period = /8-14 DAY OUTLOOK FOR ([A-Z]+) (\d{1,2}) - (?:(?:([A-Z]+) )?)(\d{1,2}) (\d{4})/.exec(discussion);
-  assertValid(issued && period, "CPC discussion dates unavailable");
+  assertValid(issued, "CPC discussion dates unavailable");
   const issueDate = day(issued[4], issued[5], issued[6]);
   assertValid(issueDate === day(updated[2], updated[1], updated[3]), "CPC issue dates do not match");
-  const end = day(period[3] ?? period[1], period[4], period[5]);
-  const startYear = months.indexOf(period[1].slice(0, 3)) > months.indexOf((period[3] ?? period[1]).slice(0, 3)) ? String(+period[5] - 1) : period[5];
-  assertValid(day(period[1], period[2], startYear) === validFrom && end === validTo, "CPC forecast periods do not match");
+  const week2 = outlookHeader(discussion, "8-14");
+  assertValid(week2.validFrom === validFrom && week2.validTo === validTo, "CPC forecast periods do not match");
+  // The 6–10-day outlook leads the same discussion and must start two days before week two.
+  const near = outlookHeader(discussion, "6-10");
+  assertValid(
+    near.end <= week2.start &&
+      Date.parse(near.validTo) - Date.parse(near.validFrom) === 4 * DAY_MS &&
+      Date.parse(validFrom) - Date.parse(near.validFrom) === 2 * DAY_MS,
+    "CPC 6–10-day period does not match",
+  );
   const clock = issued[1].padStart(4, "0");
   const hours = +clock.slice(0, 2), minutes = +clock.slice(2);
   assertValid(hours >= 1 && hours <= 12 && minutes < 60, "Invalid CPC issue time");
   const hour24 = hours % 12 + (issued[2] === "PM" ? 12 : 0);
   const issuedAt = new Date(`${issueDate}T${String(hour24).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00${issued[3] === "EST" ? "-05:00" : "-04:00"}`).toISOString();
-  const body = discussion.slice(period.index + period[0].length).split(/\n\s*FORECASTER:/)[0].trim();
-  assertValid(body.length > 100 && body.length <= 16000, "Invalid CPC discussion length");
-  return { issuedAt, validFrom, validTo, discussion: body.replace(/([^\n])\n(?=[^\n])/g, "$1 ").replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{2,}/g, "\n\n"), sourceUrl: CPC_PAGE };
+  const body = tidy(discussion.slice(week2.end).split(/\n\s*FORECASTER:/)[0]);
+  const nearBody = tidy(discussion.slice(near.end, week2.start));
+  for (const text of [body, nearBody]) assertValid(text.length > 100 && text.length <= 16000, "Invalid CPC discussion length");
+  return {
+    issuedAt, validFrom, validTo, discussion: body, sourceUrl: CPC_PAGE,
+    sixToTen: { validFrom: near.validFrom, validTo: near.validTo, discussion: nearBody },
+  };
 }
 
 export const cpcSource: SourceDefinition<CpcPayload> = {

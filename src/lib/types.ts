@@ -366,7 +366,10 @@ export interface CpcPayload {
   issuedAt: string;
   validFrom: string;
   validTo: string;
+  /** The 8–14-day discussion, matching validFrom/validTo and the map. */
   discussion: string;
+  /** The 6–10-day discussion from the same issue; absent on payloads collected before it was parsed. */
+  sixToTen?: { validFrom: string; validTo: string; discussion: string };
   sourceUrl: string;
   image: { key: string; originUrl: string; width: number; height: number };
 }
@@ -397,7 +400,13 @@ export type DailySnowSectionId = "update" | "short-term" | "extended";
 
 /** Figures are data or stored stills, frozen at posting time. Captions come from code, never the model. */
 export type DailySnowFigure = { id: string; caption: string } & (
-  | { kind: "forecast-comparison"; rows: Array<{ region: string; point: string; snowIn: number | null; issuedAt: string | null }> }
+  | {
+      kind: "forecast-comparison";
+      /** Consecutive, non-overlapping forecast windows: one column each. */
+      windows: Array<{ label: string; days: string; start: string; end: string }>;
+      /** One value per window, in window order; null means incomplete coverage. */
+      rows: Array<{ region: string; point: string; snowIn: Array<number | null>; issuedAt: string | null }>;
+    }
   | { kind: "snow-bars"; canyon: CanyonId; bars: SixHourSnow[] }
   | { kind: "snow-level"; series: Array<{ canyon: CanyonId; points: Array<{ start: string; ft: number }> }> }
   | { kind: "totals"; rows: Array<{ name: string; h24: number | null; h48: number | null; storm: number | null }> }

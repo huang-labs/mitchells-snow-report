@@ -15,6 +15,8 @@ import { ReportLoading } from "../loading/ReportLoading";
 import { StatusBadge } from "../ui";
 
 const SECTION_TITLE: Record<DailySnowSectionId, string> = { update: "Today", "short-term": "Next Few Days", extended: "Extended Forecast" };
+/** West covers this week with NWS points and week two with NOAA's outlook. */
+const WEST_SECTION_TITLE: Record<DailySnowSectionId, string> = { update: "The Big Picture", "short-term": "This Week", extended: "Week Two" };
 /** Display names by Workers AI model id suffix. */
 const MODEL_NAME: Record<string, string> = { "glm-5.3-flash": "GLM 5.3 Flash", "gpt-oss-120b": "gpt-oss-120b" };
 const modelName = (id: string) => MODEL_NAME[id.split("/").pop() ?? ""] ?? id;
@@ -47,7 +49,7 @@ function Article({ post }: { post: ApiDailySnow }) {
     <div className="dailysnow__article">
       {post.sections.map((s) => (
         <section key={s.id} className="dailysnow__section">
-          <h2>{post.channel === "western-us" && s.id === "update" ? "The Big Picture" : SECTION_TITLE[s.id]}</h2>
+          <h2>{post.channel === "western-us" ? WEST_SECTION_TITLE[s.id] : SECTION_TITLE[s.id]}</h2>
           {s.paragraphs.map((p, i) => (
             <div key={i}>
               <p>{readerWording(p.text)}</p>

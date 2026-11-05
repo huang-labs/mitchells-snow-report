@@ -18,12 +18,19 @@ describe("NOAA 8–14-day pattern outlook", () => {
     expect(p.discussion).toMatch(/^The 0Z ECMWF/);
     expect(p.discussion).toContain("deep trough and negative 500-hPa height anomalies");
     expect(p.discussion).not.toMatch(/ {2}|FORECASTER/);
+    // The 6–10-day outlook from the same issue, ending before week two's header.
+    expect(p.sixToTen).toMatchObject({ validFrom: "2026-11-10", validTo: "2026-11-14" });
+    expect(p.sixToTen!.discussion).toMatch(/^The 0Z ECMWF, GEFS, and Canadian ensemble mean forecasts/);
+    expect(p.sixToTen!.discussion).toContain("FORECAST CONFIDENCE FOR THE 6-10 DAY PERIOD");
+    expect(p.sixToTen!.discussion).not.toContain("8-14 DAY OUTLOOK");
   });
 
   it("rejects a map page and discussion from different issues", () => {
     expect(() => parseCpc(page.replace("Updated: 04 Nov 2026", "Updated: 03 Nov 2026"), discussion)).toThrow(/issue dates/);
     expect(() => parseCpc(page.replace("November 12 2026", "November 13 2026"), discussion)).toThrow(/8–14-day window|periods/);
     expect(() => parseCpc(page.replace(/814day\.03\.gif/g, "x.gif"), discussion)).toThrow(/metadata/);
+    expect(() => parseCpc(page, discussion.replace("6-10 DAY OUTLOOK FOR NOV 10 - 14 2026", "6-10 DAY OUTLOOK FOR NOV 9 - 13 2026"))).toThrow(/6–10-day period/);
+    expect(() => parseCpc(page, discussion.replace("6-10 DAY OUTLOOK FOR", "OUTLOOK FOR"))).toThrow(/6-10-day discussion unavailable/);
   });
 
   it("stores the verified map by content hash and keeps it out of stale or past articles", async () => {

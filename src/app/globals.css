@@ -376,7 +376,8 @@ a { color: var(--accent); }
 .plume__title small { font-size:.75rem; font-weight:400; }
 
 .dailysnow-outlook th small { display:block; font-size:var(--fs-label); color:var(--muted); font-weight:400; margin-top:4px; }
-.dailysnow-outlook td { width:32%; }
+.dailysnow-outlook thead th small { text-transform:none; letter-spacing:0; font-weight:400; margin-top:2px; }
+.dailysnow-outlook td { width:24%; }
 @media (min-width: 901px) {
   .plume-station:last-child:nth-child(odd) { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }
   .plume-station:last-child:nth-child(odd) .plume--full { grid-column:1 / -1; }

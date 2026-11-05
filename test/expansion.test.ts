@@ -576,22 +576,27 @@ describe("West comparison figures", () => {
     const input: ReturnType<typeof buildWesternInput> = { asOf: now.toISOString(), asOfLocal: "Thu 7:00 AM PST", timeZone: "America/Los_Angeles", coverage: "Tracked regions", patternOutlook: null, regions: [{
       id: "utah" as const, name: "Utah", edition: {} as never, observations: [],
       forecasts: [
-        { area: "LCC" as const, name: "Alta / Snowbird", source: "NWS", issuedAt: now.toISOString(), issuedLocal: "7 AM PST", start: now.toISOString(), next24In: 0, next72In: 0, next7dIn: 5 },
-        { area: "BCC" as const, name: "Brighton / Solitude", source: "NWS", issuedAt: now.toISOString(), issuedLocal: "7 AM PST", start: now.toISOString(), next24In: null, next72In: null, next7dIn: null },
+        { area: "LCC" as const, name: "Alta / Snowbird", source: "NWS", issuedAt: now.toISOString(), issuedLocal: "7 AM PST", start: now.toISOString(), next24In: 0, next72In: 0, next7dIn: 5, days4to7In: 5 },
+        { area: "BCC" as const, name: "Brighton / Solitude", source: "NWS", issuedAt: now.toISOString(), issuedLocal: "7 AM PST", start: now.toISOString(), next24In: null, next72In: null, next7dIn: null, days4to7In: 2 },
       ],
     }] };
     const figures = westernFigures(input);
-    expect(Object.keys(figures)).toEqual(["west-72h"]);
-    const near = figures["west-72h"];
-    expect(near.kind).toBe("forecast-comparison");
-    if (near.kind !== "forecast-comparison") throw new Error("Expected comparison");
-    expect(near.rows.map((r) => r.snowIn)).toEqual([0, null]);
-    expect(near.rows[0].issuedAt).toBe(now.toISOString());
-    expect(near.caption).toContain("next three days");
+    expect(Object.keys(figures)).toEqual(["west-week"]);
+    const week = figures["west-week"];
+    expect(week.kind).toBe("forecast-comparison");
+    if (week.kind !== "forecast-comparison") throw new Error("Expected comparison");
+    // Two consecutive windows that share their boundary, labeled with local weekdays.
+    expect(week.windows.map((w) => [w.label, w.days])).toEqual([["Days 1–3", "Thu–Sun"], ["Days 4–7", "Sun–Thu"]]);
+    expect(week.windows[0].end).toBe(week.windows[1].start);
+    expect(Date.parse(week.windows[1].end) - Date.parse(week.windows[0].start)).toBe(168 * 3600000);
+    // A reported zero, missing coverage and a later-window value stay distinct.
+    expect(week.rows.map((r) => r.snowIn)).toEqual([[0, 5], [null, 2]]);
+    expect(week.rows[0].issuedAt).toBe(now.toISOString());
+    expect(week.caption).toContain("this week");
     input.regions[0].forecasts[0].next72In = 9;
-    expect(near.rows[0].snowIn).toBe(0);
-    for (const f of input.regions[0].forecasts) f.next72In = null;
-    expect(westernFigures(input)["west-72h"]).toBeUndefined();
+    expect(week.rows[0].snowIn[0]).toBe(0);
+    for (const f of input.regions[0].forecasts) { f.next72In = null; f.days4to7In = null; }
+    expect(westernFigures(input)["west-week"]).toBeUndefined();
   });
 });
 
@@ -709,7 +714,7 @@ describe("West pattern outlook", () => {
     const cpc = base.sources.cpc!.payload as CpcPayload;
     await kv.put(cpc.image.key, fixtureBytes("cpc-814day.03.gif").buffer as ArrayBuffer);
     const { post, input } = await publish(base, kv);
-    expect(Object.keys(post.figures).sort()).toEqual(["west-72h", "west-pattern"]);
+    expect(Object.keys(post.figures).sort()).toEqual(["west-pattern", "west-week"]);
     const extended = post.sections.find((s) => s.id === "extended")!;
     expect(extended.paragraphs.map((p) => p.figure)).toEqual([null, "west-pattern"]);
     const map = post.figures["west-pattern"];
@@ -717,7 +722,9 @@ describe("West pattern outlook", () => {
     expect(map.url).toMatch(/channel=western-us$/);
     expect(map.caption).toContain("8–14-day 500-mb height outlook · Nov 12–18 · issued");
     const sent = JSON.parse(JSON.parse(input).messages[1].content);
-    expect(sent.patternOutlook).toMatchObject({ validLabel: "Nov 12–18" });
+    expect(sent.patternOutlook).toMatchObject({ validLabel: "Nov 12–18", sixToTen: { validLabel: "Nov 10–14" } });
+    expect(sent.patternOutlook.sixToTen.discussion).toMatch(/^The 0Z ECMWF, GEFS, and Canadian ensemble mean forecasts/);
+    expect(sent.regions[0].forecasts[0]).toHaveProperty("days4to7In");
     expect(sent.patternOutlook.discussion).toContain("trough");
     expect(sent.patternOutlook.image).toBeUndefined();
     expect(sent.figures).toEqual({ snowComparison: true, patternMap: true });
