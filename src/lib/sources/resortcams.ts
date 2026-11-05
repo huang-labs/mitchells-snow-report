@@ -161,7 +161,8 @@ export async function embeddedCams(ctx:FetchContext,resort:ResortId,pageUrl:stri
    if(titles[id])out.push({resort,kind:"youtube",pageUrl,title:titles[id],videoId:id});
  }
  for(const m of html.matchAll(/<iframe[^>]+src=["'](https:\/\/[^"']+)["'][^>]*>/gi)){
-   const url=new URL(decodeEntities(m[1]));
+   let url:URL;
+   try{url=new URL(decodeEntities(m[1]));}catch{continue;}
    if(!/(^|\.)(ozolio\.com|camstreamer\.com|roundshot\.com|hdrelay\.com)$/.test(url.hostname))continue;
    out.push({resort,kind:"embed",pageUrl,title:decodeEntities(/title=["']([^"']+)/i.exec(m[0])?.[1]??"Resort live camera"),embedUrl:url.toString()});
  }

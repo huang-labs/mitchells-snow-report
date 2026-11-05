@@ -3,7 +3,7 @@ import { RESORTS, REGIONS, CHANNELS, FORECAST_AREAS, regionById } from "@/lib/ca
 import { parseFavoriteHtml, parseBachelor, parseJackson, favoriteSources } from "@/lib/sources/favorites";
 import { parseMtnPowder } from "@/lib/sources/mtnpowder";
 import { runCollection } from "@/lib/collect";
-import { MemoryKV, readSnapshot } from "@/lib/store";
+import { MemoryKV, readSnapshot, writeSnapshot } from "@/lib/store";
 import { buildDailyDigest } from "@/lib/dailysnow/digest";
 import { regionalSnapshot, channelKV, channelStateKey } from "@/lib/dailysnow/regions";
 import { runChannels, readChannelStates } from "@/lib/dailysnow/channels";
@@ -421,6 +421,8 @@ describe("independent editions and stored artifacts", () => {
       expect(state.current?.figures["storm-recap-" + area]?.kind).toBe("storm-recap");
     expect(Object.keys(state.current!.figures).length).toBeLessThanOrEqual(6);
     expect(state.current?.areaStormRecaps).toHaveLength(3);
+    // Captions name the forecast area for readers, never its internal id.
+    expect(state.current?.figures["storm-recap-winter-park"]?.caption).toBe("Storm observations · Winter Park");
   });
   it("publishes regional editions without changing source state or another channel's archive", async () => {
     const kv = new MemoryKV();
@@ -534,5 +536,84 @@ describe("independent editions and stored artifacts", () => {
     expect(() => validateWestern(raw, input)).toThrow(/tahoe/);
     const yesterday = { ...editions.tahoe, date: "2026-11-04" };
     expect(buildWesternInput(base, { tahoe: yesterday }, now).regions).toHaveLength(0);
+  });
+});
+
+describe("collection and publication survive secondary write failures", () => {
+  it("keeps a collection run when a forecast area's storm archive write fails", async () => {
+    class FlakyKV extends MemoryKV {
+      stormPuts = 0;
+      async put(key: string, value: string | ArrayBuffer) {
+        if (key.startsWith("dailysnow-storm:")) {
+          this.stormPuts++;
+          throw new Error("KV write failed");
+        }
+        return super.put(key, value);
+      }
+    }
+    const kv = new FlakyKV();
+    const at = new Date(+now - 10 * 60000).toISOString();
+    const seeded = structuredClone(base);
+    seeded.areaStorms = {
+      ...seeded.areaStorms,
+      LCC: {
+        checkedAt: at,
+        cursors: {},
+        events: [
+          {
+            id: `LCC:${at}`,
+            firstObservedAt: at,
+            lastSnowAt: at,
+            updatedAt: at,
+            status: "active",
+            closedAt: null,
+            closureReason: null,
+            resorts: [],
+          },
+        ],
+      },
+    };
+    await writeSnapshot(kv, seeded);
+    const later = new Date(+now + 5 * 60000);
+    const summary = await runCollection({ SNOW_KV: kv }, { now: later, fetchImpl: createFixtureFetch().fetchImpl });
+    expect(kv.stormPuts).toBeGreaterThan(0);
+    expect(summary.results.filter((r) => !r.ok)).toEqual([]);
+    const stored = (await readSnapshot(kv))!;
+    expect(stored.sources.alta?.lastAttemptAt).toBe(later.toISOString());
+    expect(stored.areaStorms?.LCC?.events[0]?.id).toBe(`LCC:${at}`);
+  });
+  it("publishes a Western edition even when the older edition cannot be linked forward", async () => {
+    const kv = new MemoryKV();
+    const western = {
+      title: "Western Outlook",
+      summary: "Patterns vary across the tracked regions.",
+      overview: "Read each regional outlook below.",
+      regions: [{ region: "tahoe", text: "A quiet period for the tracked resort." }],
+    };
+    const env = {
+      SNOW_KV: kv,
+      AI: {
+        async run(_model: string, input: unknown) {
+          const isWestern = JSON.stringify(input).includes("western_daily_snow");
+          return { response: JSON.stringify(isWestern ? western : reply()) };
+        },
+      },
+    };
+    await runChannels(env, base, now, { channel: "tahoe", force: true });
+    const tahoe = (await readChannelStates(kv)).tahoe!.current!;
+    const olderDate = "2026-11-04";
+    // An unparsable older archive entry makes the forward link fail.
+    await channelKV(kv, "western-us").put(dailySnowKey(olderDate), "{not json");
+    await kv.put(
+      channelStateKey("western-us"),
+      JSON.stringify({ ...emptyDailySnowState(), current: { ...tahoe, channel: "western-us", date: olderDate } }),
+    );
+    const out = await runChannels(env, base, now, { channel: "western-us", force: true });
+    const today = localDate(now, "America/Los_Angeles");
+    expect(out).toEqual([{ channel: "western-us", published: today }]);
+    const state = (await readChannelStates(kv))["western-us"]!;
+    expect(state.current?.date).toBe(today);
+    expect(state.lastError).toBeNull();
+    expect(state.consecutiveFailures).toBe(0);
   });
 });

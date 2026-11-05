@@ -8,7 +8,7 @@ import { clipText } from "../clip";
 import type { DailySnowPost, DailySnowState, NwsPayload, Snapshot } from "../types";
 import { localDate, formatLocal } from "../time";
 import { dailySnowArchiveTtlS, DAILY_SNOW_ARCHIVE_POSTS } from "../report";
-import { dailySnowKey, type DailySnowEnv } from ".";
+import { dailySnowKey, linkNewer, type DailySnowEnv } from ".";
 import { historyEntry } from "./continuity";
 import { snowNext } from "./digest";
 import { DAILY_SNOW_TIMEOUT_MS } from "./llm";
@@ -191,15 +191,8 @@ export async function writeWestern(
   };
   await env.beforePublish?.();
   await env.SNOW_KV.put(dailySnowKey(date), JSON.stringify(post), { expirationTtl: dailySnowArchiveTtlS(date, now) });
-  if (post.older) {
-    const raw = await env.SNOW_KV.get(dailySnowKey(post.older.date), "text");
-    if (raw)
-      await env.SNOW_KV.put(
-        dailySnowKey(post.older.date),
-        JSON.stringify({ ...JSON.parse(raw), newer: { date, title: post.title } }),
-        { expirationTtl: dailySnowArchiveTtlS(post.older.date, now) },
-      );
-  }
+  // A failed forward link cannot fail an edition that is already archived.
+  if (post.older) await linkNewer(env.SNOW_KV, post.older.date, { date, title: post.title }, now);
   return {
     ...base,
     current: post,

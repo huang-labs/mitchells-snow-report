@@ -52,7 +52,7 @@ Numerical ensemble tables are verified only for CLN: six tables, seven ordered p
 
 History begins with this deployment. Each destination uses a 6 AM local snow day, with source reporting windows preserved. A published report before the prior evening cutoff is not reused as a new morning reading; future timestamps cannot become history. Local days can be 23 or 25 hours.
 
-Storm observations persist independently for each forecast area and are archived on material changes. Earlier rolling observations never become event totals; source counters can reset into separately labeled segments. New resort participants join an existing event when their reports arrive later.
+Storm observations persist independently for each forecast area and are archived on material changes. A tracking or archive failure in one area keeps that area's previous memory and never blocks source collection or publication; archives are written after the snapshot and retried on the next run. Earlier rolling observations never become event totals; source counters can reset into separately labeled segments. New resort participants join an existing event when their reports arrive later.
 
 Source snapshot merging remains best effort because KV has no compare-and-swap. Channel states, including AI attempt records, live outside the source snapshot. Late source writes cannot erase regional articles. Edition stills are revision-addressed; article/figure identities always include the channel. Inference is collection-time only.
 

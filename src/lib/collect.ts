@@ -142,14 +142,23 @@ export async function runCollection(env: CollectorEnv, opts: CollectOptions = {}
   snapshot.areaStorms={};
   snapshot.resortLastOperatingAt={...previous?.resortLastOperatingAt};
   for(const area of FORECAST_AREAS){
-    const areaSnapshot=regionalSnapshot(snapshot,area.region,area.id);
-    const state=advanceStormTracking(previous?.areaStorms?.[area.id],areaSnapshot,now);
-    for(const event of state.events)if(!event.id.startsWith(`${area.id}:`))event.id=`${area.id}:${event.id}`;
-    snapshot.areaStorms[area.id]=state;
-    await archiveStorms(env.SNOW_KV,{...areaSnapshot,stormTracking:state},now);
+    try {
+      const state=advanceStormTracking(previous?.areaStorms?.[area.id],regionalSnapshot(snapshot,area.region,area.id),now);
+      for(const event of state.events)if(!event.id.startsWith(`${area.id}:`))event.id=`${area.id}:${event.id}`;
+      snapshot.areaStorms[area.id]=state;
+    } catch (err) {
+      // One area's failure keeps its previous memory; collection and publication continue.
+      const prior=previous?.areaStorms?.[area.id];
+      if(prior)snapshot.areaStorms[area.id]=prior;
+      console.error(`dailysnow: storm tracking failed for ${area.id}`, err);
+    }
   }
-  for(const resort of buildDigest(snapshot,snapshot.resortLastOperatingAt,now).resorts){
-    if(resort.operatingNow)snapshot.resortLastOperatingAt[resort.id]=now.toISOString();
+  try {
+    for(const resort of buildDigest(snapshot,snapshot.resortLastOperatingAt,now).resorts){
+      if(resort.operatingNow)snapshot.resortLastOperatingAt[resort.id]=now.toISOString();
+    }
+  } catch (err) {
+    console.error("dailysnow: operating-status bookkeeping failed", err);
   }
   try {
     snapshot.snowLog = recordSnowLog(previous?.snowLog, snapshot, now);
@@ -160,6 +169,15 @@ export async function runCollection(env: CollectorEnv, opts: CollectOptions = {}
   }
   snapshot.writtenAt=new Date().toISOString();
   const stored=await writeSnapshot(env.SNOW_KV,snapshot);
+  // Archive after the snapshot write: working records remain in the snapshot,
+  // and the next run retries an area whose archive write failed.
+  for(const [area,state] of Object.entries(stored.areaStorms??{})){
+    try {
+      await archiveStorms(env.SNOW_KV,{...stored,stormTracking:state},now);
+    } catch (err) {
+      console.error(`dailysnow: storm archive failed for ${area}`, err);
+    }
+  }
   const publications=await runChannels(env,stored,now,{force:opts.forceDailySnow,channel:opts.channel,fetchImpl:opts.fetchImpl});
   return {
     startedAt:now.toISOString(),durationMs:Date.now()-started,
