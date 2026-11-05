@@ -15,14 +15,16 @@ and has a sliding limit of 100 requests per day. Actions secret
 `PR_AGENT_CLOUDFLARE_TOKEN` holds a dedicated user API token limited to Workers AI
 Read and AI Gateway Run on that account; the workflow builds the gateway URL from
 `CLOUDFLARE_ACCOUNT_ID`. That token in `Authorization` also satisfies gateway
-authentication. Every request sends `cf-aig-skip-cache`, so `/review` reruns
+authentication. Every request sends `cf-aig-skip-cache`, so a re-push reruns
 inference. Fallbacks are disabled. Review content goes to Cloudflare Workers AI and
 is visible in the gateway's logs.
 
 Reviews run on open, reopen, ready-for-review and pushes. Drafts, forks, Dependabot
-and bot events are skipped. A repository owner, member or collaborator can post
-exactly `/review` on an open PR to rerun; other commands and arguments are ignored. A newer push
-or `/review` cancels an in-progress review of the same PR. Automatic description
+and bot events are skipped. There is no comment command: to rerun, push a new
+commit (`git commit --allow-empty` works). Each commit is reviewed at most once;
+duplicate events for a commit replace each other, and an event for a commit that
+is no longer the PR head is skipped before inference. A review already running
+for an older commit finishes, so rapid pushes can each use a request. Automatic description
 rewriting and code suggestion generation are disabled. Review findings are
 advisory: keep this workflow optional in branch protection. GitHub tests and
 preview deployment remain independent.
@@ -45,4 +47,4 @@ Update deliberately and check live model compatibility after upgrades.
 
 Workflow and policy changes take effect after merging into main. Provider, auth
 or rate-limit failures appear in PR-Agent's native output, Actions logs and the
-gateway logs; fix the configuration and post `/review` to retry.
+gateway logs; fix the configuration and push a new commit to retry.
