@@ -35,13 +35,17 @@ function Chart({ label, height, children }: { label: string; height: number; chi
 const TOP = 20; // room for value labels above the tallest bar
 const AXIS = 24; // day labels under the axis
 
+export const SNOW_LEVEL_COLORS=["var(--accent)","var(--hold)","var(--ok)"];
 export interface SnowLevelSeries {
   canyon: string;
   points: Array<{ start: string; ft: number }>;
 }
 
 /** Forecast snow level, one line per canyon (CSS colors each canyon). */
-export function SnowLevel({ series, label }: { series: SnowLevelSeries[]; label: string }) {
+export function SnowLevel({ series, label,timeZone="America/Denver" }: { series: SnowLevelSeries[]; label: string;timeZone?:string }) {
+  const dayFmt=new Intl.DateTimeFormat("en-US",{timeZone,weekday:"short"});
+  const keyFmt=new Intl.DateTimeFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit"});
+  const newDay=(xs:Array<{start:string}>,i:number)=>i===0||keyFmt.format(new Date(xs[i].start))!==keyFmt.format(new Date(xs[i-1].start));
   const h = 120;
   const gutter = 44; // "8k ft" labels
   const all = series.flatMap((s) => s.points);
@@ -68,8 +72,8 @@ export function SnowLevel({ series, label }: { series: SnowLevelSeries[]; label:
             {ref.map((p, i) => newDay(ref, i) && x(p.start) + 30 <= w && (
               <text key={p.start} x={x(p.start) + 4} y={TOP + h + 17} className="chart__label">{dayFmt.format(new Date(p.start))}</text>
             ))}
-            {series.map((s) => (
-              <polyline key={s.canyon} className={`snow-level__line snow-level__line--${s.canyon.toLowerCase()}`} points={s.points.map((p) => `${x(p.start)},${y(p.ft)}`).join(" ")} />
+            {series.map((s,i) => (
+              <polyline key={s.canyon} style={{stroke:SNOW_LEVEL_COLORS[i%SNOW_LEVEL_COLORS.length],strokeDasharray:i?`${7-i*2} 5`:undefined}} className={`snow-level__line snow-level__line--${s.canyon.toLowerCase()}`} points={s.points.map((p) => `${x(p.start)},${y(p.ft)}`).join(" ")} />
             ))}
           </>
         );

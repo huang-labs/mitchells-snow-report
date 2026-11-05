@@ -8,7 +8,7 @@ import { sectionMetadata } from "@/lib/metadata";
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-  return SECTIONS.slice(1).filter((s) => s.id !== "daily-snow").map((s) => ({ section: s.id }));
+  return SECTIONS.slice(1).filter((s) => !["daily-snow","weather","plumes"].includes(s.id)).map((s) => ({ section: s.id }));
 }
 
 export async function generateMetadata({ params }: PageProps<"/[section]">): Promise<Metadata> {

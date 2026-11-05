@@ -21,6 +21,6 @@ it("shows the original chart instead of stored panels that have expired", async 
   // Collection stalled: the last-good payload outlives its panels.
   const later = new Date(FIXTURE_NOW.getTime() + PLUME_PANEL_TTL_S * 1000);
   render(<PlumesPage source={buildReport(snapshot, later).sources.plumes} now={later} />);
-  expect(screen.getAllByText(/cropped panels unavailable, showing the original chart/)).toHaveLength(2);
-  expect(screen.getAllByRole("img").filter((i) => i.getAttribute("src")?.startsWith("https://weather.utah.edu/"))).toHaveLength(2);
+  expect(screen.getAllByText(/cropped panels unavailable, showing the original chart/)).toHaveLength(12);
+  expect(screen.getAllByRole("img").filter((i) => i.getAttribute("src")?.startsWith("https://weather.utah.edu/"))).toHaveLength(12);
 });

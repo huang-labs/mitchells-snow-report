@@ -1,4 +1,6 @@
-import { denverDate } from "../recommend/digest";
+import { channelById, type ChannelId } from "../catalog";
+import { zonedParts } from "../time";
+import { denverDate } from "./facts";
 import { DAILY_SNOW_TIMEOUT_MS } from "./llm";
 import { denverParts } from "../time";
 import type { DailySnowState } from "../types";
@@ -18,13 +20,13 @@ export const LAST_ATTEMPT_HOUR = 10;
 export const RETRY_AFTER_MS = 10 * 60_000;
 export const MAX_ATTEMPTS = 3;
 /** Model requests reserved per day (two per attempt, manual runs included). */
-export const DAILY_CALL_CAP = 12;
+export const DAILY_CALL_CAP = 6;
 /** Longer than the worst case of one attempt (two model timeouts plus figure copies). */
 export const IN_FLIGHT_MS = 2 * DAILY_SNOW_TIMEOUT_MS + 2 * 60_000;
 
-export function attemptsToday(state: DailySnowState | undefined, now: Date): { count: number; calls: number } {
+export function attemptsToday(state: DailySnowState | undefined, now: Date, channel?:ChannelId): { count: number; calls: number } {
   const a = state?.attempts;
-  return a && a.date === denverDate(now) ? { count: a.count, calls: a.calls } : { count: 0, calls: 0 };
+  return a && a.date === denverDate(now,channelById(channel??"utah")!.timeZone) ? { count: a.count, calls: a.calls } : { count: 0, calls: 0 };
 }
 
 export function inFlight(state: DailySnowState | undefined, now: Date): boolean {
@@ -35,13 +37,15 @@ export function inFlight(state: DailySnowState | undefined, now: Date): boolean 
 }
 
 /** Returns the trigger name when a post should be written now, else null. */
-export function shouldRunDailySnow(state: DailySnowState | undefined, now: Date): string | null {
-  const p = denverParts(now);
+export function shouldRunDailySnow(state: DailySnowState | undefined, now: Date, channel?:ChannelId): string | null {
+  const zone=channelById(channel??"utah")!.timeZone;
+  const p = zonedParts(now,zone);
+  const postHour=channel==="western-us"?7:POST_HOUR;
   const minutes = p.hour * 60 + p.minute;
-  if (minutes < POST_HOUR * 60 || minutes >= LAST_ATTEMPT_HOUR * 60) return null;
-  if (state?.current?.date === denverDate(now)) return null;
+  if (minutes < postHour * 60 || minutes >= (postHour+4) * 60) return null;
+  if (state?.current?.date === denverDate(now,zone)) return null;
   if (inFlight(state, now)) return null;
-  const used = attemptsToday(state, now);
+  const used = attemptsToday(state, now,channel);
   if (used.count >= MAX_ATTEMPTS || used.calls + 2 > DAILY_CALL_CAP) return null;
   if (used.count > 0 && state?.lastError) {
     if (state.lastAttemptAt && now.getTime() - Date.parse(state.lastAttemptAt) < RETRY_AFTER_MS) return null;

@@ -2,29 +2,22 @@
 
 [← README](../README.md)
 
-Source freshness, publication status and the meaning of missing values. Code paths in this guide are relative to the repository root.
+Collection time, source publication time and article availability are separate. A fresh fetch of an old report remains an old report. Source windows and timestamps are retained; local displays use the resort or region's IANA time zone.
 
-Collection recency, upstream report age and publication availability are separate. Source thresholds are intentionally different: a daily resort report and a travel measurement do not expire at the same age. `src/lib/report.ts` classifies sources; `src/lib/freshness.ts` owns their public labels, tones and explanations. API state names remain compatible (`stale` displays as “Updates delayed”, `time-unknown` as “Time unknown”).
-
-| Badge | Treatment | Meaning |
+| State | Display | Meaning |
 | --- | --- | --- |
-| Current | Green | Collected on schedule, and the upstream report time is within the source's window: resorts 26 h, NWS 12 h, NWS discussion/ensemble 18 h, plumes 30 h, travel times 30 min |
-| Old report | Amber | Fetched recently, but the upstream report exceeds that source's window |
-| Time unknown | Neutral | A recent collection succeeded, but the source publishes no time or its report time could not be established |
-| Updates delayed | Amber | No successful fetch for more than 22 min, extended by a slower source's interval: NWS/travel times 32 min; plumes, ensemble and NWS discussion 47 min. The last good payload remains visible. This does not identify whether the source or collector is responsible. |
-| Unavailable | Red | No usable collected payload is available |
+| current | Current | Checked on schedule, source report within its age window |
+| old-report | Old report | Recently fetched, source publication too old or invalid/future |
+| time-unknown | Time unknown | Recent check, publication time not established |
+| stale | Updates delayed | No successful check within its collection window |
+| unavailable | Unavailable | No collected payload |
 
-Source badges live in page footers and resort-page headers. The Resorts page (`/`) shows no resort badges or resort footer; each timeline shows the resort's report time, and its footer is the NWS forecast's source line. The global required-feed banner groups unavailable and delayed feeds separately. A confirmed failed latest check is shown separately from freshness; recently collected data can remain Current while a subsequent check has failed. Source footers retain the source report time (America/Denver), last successful check and attribution. Measurement windows keep each source's own label. Missing data is never shown as zero. Where there is room (resort pages), **0″**, **not reported** and **—** mean reported zero, an empty reported field and a measurement the source does not provide, respectively; where space is tight (the Resorts timeline), the last two may share one “no data” mark. The data model always keeps all three states. On the Snowfall timeline a past day also distinguishes “no new morning report” (the resort was checked but hadn't published since the evening before) and “not recorded” (no morning check stored for that day); its screen-reader description names which.
+Report windows: resorts 26 h, NWS 12 h, discussions/numerical ensemble 18 h, plumes 30 h. Collection staleness is 22 minutes plus the interval beyond five minutes: NWS 32 minutes, half-hour sources 47. A confirmed failed latest check is separate from age. NWS points and plume stations retain independent errors/check times; regional footers consider only the selected region.
 
-Editorial content uses the same badge shape and semantic tones, with wording appropriate to its purpose:
+Reported **0** is distinct from **not reported** (published field empty) and **unavailable** (measurement not supplied). Resort pages preserve those states. Compact timelines may use one no-data mark for the latter two, while historical days also distinguish no new morning report from no collection. Ranges remain ranges. There is no station averaging or elevation correction.
 
-| Surface | Rule and behavior |
-| --- | --- |
-| Resort pick | “Recommendation needs updating” (amber) when the target date changes (tomorrow after 2 PM Denver) or generation exceeds 12 h. “Updates failing” (red) after three consecutive failures. Retain the prose but remove the resort header's AI-pick badge for either state. |
-| Latest Daily Snow | Always show edition date and posting time. Yesterday's edition is normal before 6 AM Denver; publication is pending during the 6–10 AM window. Show “Latest edition delayed” (amber), identically in teaser and article, when an expected edition is missing after retries/request budget are exhausted or the window closes. An in-flight final attempt can finish after 10 AM. An edition older than yesterday remains delayed overnight. |
-| Quiet-day Daily Snow | No delay warning when usable resort/forecast inputs establish that no edition is expected under the existing season/snow activity gate. Missing or delayed inputs cannot establish an intentional pause. |
-| Archived Daily Snow | Date and “Archive”, without a publication warning. The history rail calls the latest stored edition “Latest” with its date, never assumes it is today's. |
+Source metadata and reporting location appear quietly on detail pages. Lift-feed timestamps are independent of snow-report time where supplied. Resort camera stills older than three hours say “not updating”; capture time unknown and live-player status remain explicit.
 
-The API adds optional `dailySnow.publicationStatus` (`current`, `scheduled`, `pending`, `delayed`, `paused`) on the latest edition in `/api/report`; archive responses omit it. The existing `outdated` and `failing` fields remain for compatibility. Publication status is computed on reads using the schedule and shared activity rules; reads never collect sources or invoke AI. No additional KV keys or migrations are required.
+Latest Daily Snow always displays its edition date and posting time. Publication status is current, scheduled, pending, delayed or paused. Regional windows are 6–10 AM local; Western is 7–11 AM Pacific. A running final attempt can finish after cutoff. A missed expected edition retains the last good post and shows “Latest edition delayed”; an established quiet off-season pause does not. Missing inputs cannot establish a pause. Archive responses omit the current-publication warning.
 
-Context-specific qualifications stay beside the information they qualify: camera stills older than 3 h have an amber “not updating” caption; unknown capture times and stream-player status remain explicit. UDOT camera request time is not capture time. Noncurrent travel measurements retain an amber “Not live” explanation and muted values. Resort road notices older than 24 h are omitted. Dashboard polling errors, or more than 3 min since the last successful response, produce a global connection banner. Ensemble AI inputs retain their stricter eligibility checks. These rules are independent of badge presentation.
+The homepage shows report times and a shared value legend. Required unavailable/delayed feeds raise the global banner; API polling errors retain the last report with a connection notice. No API read collects data or generates AI.

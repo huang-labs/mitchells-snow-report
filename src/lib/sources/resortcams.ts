@@ -1,3 +1,4 @@
+import { CAM_PAGES, type ResortId } from "../catalog";
 import type { FetchContext } from "../http";
 import { decodeEntities } from "../metric";
 import type { PrimaryResortId, ResortCam, ResortCamsPayload } from "../types";
@@ -25,7 +26,7 @@ export const BRIGHTON_CONDITIONS_URL = "https://www.brightonresort.com/condition
  * own camera names. These lead each resort's webcam section; every other
  * camera the resort publishes follows in page order.
  */
-export const WANTED: Record<PrimaryResortId, RegExp[]> = {
+export const WANTED: Partial<Record<PrimaryResortId, RegExp[]>> = {
   // Alta publishes no lift-line camera.
   alta: [/^snow stake$/i, /^albion basin$/i],
   // Snow stake first, as at Alta. No Gad Zoom camera is published; Tram
@@ -128,7 +129,7 @@ async function youtubeCams(
       if (notExcluded(resort, clean)) found.push({ title: clean, videoId: id });
     }
   }
-  return order(found, WANTED[resort]).map((c) => ({ resort, kind: "youtube", pageUrl, ...c }));
+  return order(found, WANTED[resort]??[/snow.?stake/i,/lift/i]).map((c) => ({ resort, kind: "youtube", pageUrl, ...c }));
 }
 
 async function imageCams(
@@ -139,7 +140,7 @@ async function imageCams(
 ): Promise<ResortCam[]> {
   const chosen = order(
     parse(await ctx.fetchText(pageUrl, { browserLike: true })).filter((c) => notExcluded(resort, c.title)),
-    WANTED[resort],
+    WANTED[resort]??[/snow.?stake/i,/lift/i],
   );
   const cams = await Promise.all(
     chosen.map(async (c): Promise<ResortCam | null> => {
@@ -151,12 +152,28 @@ async function imageCams(
   return cams.filter((c): c is ResortCam => c !== null);
 }
 
+/** Only publicly embedded camera hosts on the curated official webcam pages. */
+export async function embeddedCams(ctx:FetchContext,resort:ResortId,pageUrl:string,titles:Record<string,string>):Promise<ResortCam[]>{
+ const html=await ctx.fetchText(pageUrl,{browserLike:true});
+ const out:ResortCam[]=[];
+ for(const id of youtubeIds(html)){
+   if(titles[id]===undefined){const meta=await ctx.fetchJson<OEmbed>(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}`).catch(()=>null);titles[id]=meta?.title??"";}
+   if(titles[id])out.push({resort,kind:"youtube",pageUrl,title:titles[id],videoId:id});
+ }
+ for(const m of html.matchAll(/<iframe[^>]+src=["'](https:\/\/[^"']+)["'][^>]*>/gi)){
+   const url=new URL(decodeEntities(m[1]));
+   if(!/(^|\.)(ozolio\.com|camstreamer\.com|roundshot\.com|hdrelay\.com)$/.test(url.hostname))continue;
+   out.push({resort,kind:"embed",pageUrl,title:decodeEntities(/title=["']([^"']+)/i.exec(m[0])?.[1]??"Resort live camera"),embedUrl:url.toString()});
+ }
+ return out;
+}
+
 export const resortCamsSource: SourceDefinition<ResortCamsPayload> = {
   id: "resortcams",
   label: "Resort webcams",
   category: "webcams",
   required: false,
-  attribution: "Alta, Snowbird, Solitude and Brighton webcams (resort websites)",
+  attribution: "Official resort webcam pages",
   sourceUrl: SNOWBIRD_WEBCAMS_URL,
   // Per-camera capture times are shown on each image instead.
   reportMaxAgeMs: null,
@@ -170,6 +187,7 @@ export const resortCamsSource: SourceDefinition<ResortCamsPayload> = {
       ["snowbird", imageCams(ctx, "snowbird", SNOWBIRD_WEBCAMS_URL, parseSnowbirdCams)],
       ["solitude", youtubeCams(ctx, "solitude", SOLITUDE_WEBCAMS_URL, streamTitles)],
       ["brighton", youtubeCams(ctx, "brighton", BRIGHTON_CONDITIONS_URL, streamTitles)],
+      ...Object.entries(CAM_PAGES).map(([id,page])=>[id as ResortId,embeddedCams(ctx,id as ResortId,page,streamTitles)] as [ResortId,Promise<ResortCam[]>]),
     ];
     const settled = await Promise.allSettled(jobs.map(([, p]) => p));
     const cameras: ResortCam[] = [];

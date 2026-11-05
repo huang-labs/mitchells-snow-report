@@ -1,3 +1,4 @@
+import { FORECAST_AREAS } from "@/lib/catalog";
 /**
  * Routes the collector's upstream URLs to responses captured from the real
  * sources on 2026-10-30 (test/fixtures). Test-only — never used at runtime.
@@ -37,7 +38,26 @@ const json = (v: unknown) => new Response(typeof v === "string" ? v : JSON.strin
 const html = (v: string) => new Response(v, { headers: { "content-type": "text/html" } });
 
 export function fixtureRoutes(): Array<[RegExp, Handler]> {
+  const captured = FORECAST_AREAS.map(a=>({area:a,data:JSON.parse(fixture(`nws-${a.id}.json`))}));
   return [
+    [/jacksonhole-prod\.zaneray\.com\/api\/trail-lift\.json/,()=>json(fixture("jackson-lifts.json"))],
+    [/api\.mtbachelor\.com\/api\/v1\/dor\/drupal\/lifts/,()=>json(fixture("bachelor-lifts.json"))],
+    [/api\.weather\.gov\/products\/types\/AFD\/locations\/(STO|REV|RIW|TFX|BOU|GJT|SEW|PDT)/,(u)=>json(JSON.parse(fixture("nws-afd-"+u.pathname.split("/").pop()+".json")).list)],
+    [/api\.weather\.gov\/products\/[0-9a-f-]+$/,(u)=>{for(const office of ["STO","REV","RIW","TFX","BOU","GJT","SEW","PDT"]){const d=JSON.parse(fixture("nws-afd-"+office+".json"));if(u.pathname.endsWith(d.product.id))return json(d.product);}return json(fixture("nws-afd-SLC.json"));}],
+    [/api\.weather\.gov\/points\//,(u)=>{const a=captured.find(x=>u.pathname.endsWith(`${x.area.latitude},${x.area.longitude}`));return a?json(a.data.point):new Response("No point fixture",{status:404});}],
+    [/api\.weather\.gov\/gridpoints\//,(u)=>{
+      const match=/gridpoints\/([^/]+)\/(\d+),(\d+)/.exec(u.pathname)!;
+      const found=captured.find(x=>x.data.point.properties.gridId===match[1]&&x.data.point.properties.gridX===+match[2]&&x.data.point.properties.gridY===+match[3]);
+      if(!found)return new Response("No grid fixture",{status:404});
+      if(found.area.id==="LCC"||found.area.id==="BCC")return json(fixture(u.pathname.endsWith("/forecast")?"nws-forecast-SLC-108-167.json":"nws-gridpoint-SLC-108-167.json"));
+      return json(u.pathname.endsWith("/forecast")?found.data.forecast:found.data.grid);
+    }],
+    [/snowbasin\.com\/the-mountain\/mountain-report/ ,()=>html(fixture("snowbasin-mountain-report.html"))],
+    [/tellurideskiresort\.com\/snow-report/,()=>html(fixture("telluride-snow-report.html"))],
+    [/jacksonhole-prod\.zaneray\.com\/api\/snow\.json/,()=>json(fixture("jackson-feed.json"))],
+    [/api\.mtbachelor\.com\/api\/v1\/dor\/drupal\/snow-reports/,()=>json(fixture("bachelor-feed.json"))],
+    [/bigskyresort\.com\/api\/reportpal/,()=>json(fixture("bigsky_reportpal.json"))],
+    [/v4\.mtnfeed\.com\/resorts\/(palisades-tahoe|mammoth|winter-park|steamboat|crystal-mountain)\.json/,(u)=>{const slug=u.pathname.split("/").pop()!.replace(".json","");const ids:Record<string,number>={"palisades-tahoe":61,mammoth:60,"winter-park":5,steamboat:6,"crystal-mountain":80};return json({resortIds:[ids[slug]],bearerToken:`TEST_${slug}`});}],
     [/weather\.utah\.edu\/text\/ensgefsdslccforecast\.html/, () => html(fixture("utah-ensemble-CLN-2026110112.html"))],
     [/alta\.com\/lift-terrain-status/, () => html(fixture("alta-lift-terrain-status.html"))],
     [/api\.snowbird\.com\/api\/v1\/dor\/drupal\/snow-reports/, () => json(fixture("snowbird-snow-reports.json"))],
@@ -45,16 +65,15 @@ export function fixtureRoutes(): Array<[RegExp, Handler]> {
     [/api\.snowbird\.com\/api\/v1\/dor\/drupal\/terrains/, () => json(fixture("snowbird-terrains.json"))],
     [/api\.snowbird\.com\/api\/v1\/dor\/sensors/, () => json(fixture("snowbird-sensors.json"))],
     [/api\.snowbird\.com\/api\/v1\/dor\/drupal\/parking/, () => json(fixture("snowbird-parking.json"))],
-    [/api\.snowbird\.com\/api\/v1\/dor\/drupal\/roads/, () => json(fixture("snowbird-roads.json"))],
-    [/api\.snowbird\.com\/api\/v1\/dor\/traffic/, () => json(fixture("snowbird-traffic-signs.json"))],
     [/v4\.mtnfeed\.com\/resorts\/solitude\.json/, () => json({ resortIds: [65], bearerToken: FAKE_TOKENS.solitude })],
     [/mtnpowder\.com\/feed\/v3\.json/, (u) => {
       const id = u.searchParams.get("resortId[]");
       const token = u.searchParams.get("bearer_token");
       if (id === "65" && token === FAKE_TOKENS.solitude) return json(fixture("mtnpowder-solitude.json"));
+      const slugs:Record<string,string>={"61":"palisades-tahoe","60":"mammoth","5":"winter-park","6":"steamboat","80":"crystal-mountain"};
+      const slug=slugs[id??""];if(slug&&token===`TEST_${slug}`)return json(fixture(`mtnpowder-${slug}.json`));
       return new Response("forbidden", { status: 403 });
     }],
-    [/brightonresort\.com\/api\/reportpal-roads/, () => json(fixture("brighton-reportpal-roads.json"))],
     [/brightonresort\.com\/api\/reportpal\?/, () => json(fixture("brighton-reportpal.json"))],
     [/weather\.utah\.edu\/index\.php/, (u) => {
       const station = u.searchParams.get("r") ?? "CLN";
@@ -66,14 +85,11 @@ export function fixtureRoutes(): Array<[RegExp, Handler]> {
       const headers = { "content-type": "image/png", "last-modified": "Fri, 30 Oct 2026 23:00:05 GMT" };
       return new Response(init?.method === "HEAD" ? null : fixtureBytes("utah-plume-CLN-2026110100.png"), { headers });
     }],
-    // SLC Area Forecast Discussion (captured 2026-11-01).
+    // Legacy SLC discussion capture, retained for controlled continuity tests.
     [/api\.weather\.gov\/products\/types\/AFD\/locations\/SLC/, () => json(fixture("nws-afd-list-SLC.json"))],
     [/api\.weather\.gov\/products\/[0-9a-f-]+$/, () => json(fixture("nws-afd-SLC.json"))],
     [/api\.weather\.gov\/gridpoints\/SLC\/\d+,\d+\/forecast/, () => json(fixture("nws-forecast-SLC-108-167.json"))],
     [/api\.weather\.gov\/gridpoints\/SLC\/\d+,\d+$/, () => json(fixture("nws-gridpoint-SLC-108-167.json"))],
-    [/cottonwoodcanyons\.udot\.utah\.gov\/road-information/, () => html(fixture("udot-road-information.html"))],
-    [/CC_Routes_TT\/FeatureServer\/0\/query/, () => json(fixture("udot-arcgis-travel-times.json"))],
-    [/udottraffic\.utah\.gov\/map\/Cctv\//, () => new Response(null, { headers: { "content-type": "image/jpeg" } })],
     // Resort webcam pages (captured 2026-11-01) and their camera hosts.
     [/alta\.com\/weather$/, () => html(fixture("alta-weather.html"))],
     [/snowbird\.com\/the-mountain\/webcams\/view-all-webcams/, () => html(fixture("snowbird-webcams.html"))],

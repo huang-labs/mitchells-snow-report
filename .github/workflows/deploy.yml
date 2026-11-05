@@ -1,10 +1,10 @@
 name: Deploy
 
 # Every push to main is tested, then deployed to production
-# (cottonwoods-snow-report.huang.mx). Pull requests are tested, then uploaded as a
-# non-deployed Worker version with a stable per-PR preview URL
-# (pr-<number>-cottonwoods-snow-report.huang-inc.workers.dev), linked in a PR comment.
-# Fork uploads require DEPLOYMENT_ENABLED=true after isolated resources are configured.
+# (mitchells-snow-report.huang.mx). Pull requests are tested, then uploaded as a
+# isolated Worker Preview deployment with a stable per-PR URL
+# (pr-<number>-mitchells-snow-report-preview.huang-inc.workers.dev), linked in a PR comment.
+# Fork uploads require MITCHELLS_DEPLOYMENT_ENABLED=true after isolated resources are configured.
 on:
   push:
     branches: [main]
@@ -38,12 +38,12 @@ jobs:
   deploy:
     needs: test
     if: >-
-      vars.DEPLOYMENT_ENABLED == 'true' &&
+      vars.MITCHELLS_DEPLOYMENT_ENABLED == 'true' &&
       github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: blacksmith-2vcpu-ubuntu-2404
     environment:
       name: production
-      url: https://cottonwoods-snow-report.huang.mx
+      url: https://mitchells-snow-report.huang.mx
     steps:
       - uses: useblacksmith/checkout@v1
       - uses: actions/setup-node@v7
@@ -61,7 +61,7 @@ jobs:
     needs: test
     # Only for PRs from this repo: fork and Dependabot PRs get no secrets.
     if: >-
-      vars.DEPLOYMENT_ENABLED == 'true' &&
+      vars.MITCHELLS_DEPLOYMENT_ENABLED == 'true' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.actor != 'dependabot[bot]'
@@ -83,23 +83,23 @@ jobs:
       - name: Build static frontend
         run: npm run build
         env:
-          SITE_URL: https://pr-${{ github.event.pull_request.number }}-cottonwoods-snow-report.huang-inc.workers.dev
-      # Uploads a version without deploying it: production traffic and cron
-      # triggers stay on the deployed version. The preview shares production
-      # bindings, so it reads the live KV snapshot.
-      - name: Upload preview version
+          SITE_URL: https://pr-${{ github.event.pull_request.number }}-mitchells-snow-report-preview.huang-inc.workers.dev
+      # Worker Previews support Durable Objects (version URLs do not). Each PR
+      # gets an isolated coordinator and reads the seeded preview-only KV.
+      # The preview Worker has no production route or collection cron.
+      - name: Deploy isolated PR preview
         id: upload
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.json
           ALIAS: pr-${{ github.event.pull_request.number }}
           SHA: ${{ github.event.pull_request.head.sha }}
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.json
         run: |
-          npx wrangler versions upload --preview-alias "$ALIAS" --tag "${SHA:0:7}"
-          url=$(jq -r 'select(.type == "version-upload") | .preview_alias_url // empty' "$WRANGLER_OUTPUT_FILE_PATH" | tail -n1)
+          npx wrangler preview --worker-name mitchells-snow-report-preview --name "$ALIAS" --ignore-base-config --tag "${SHA:0:7}"
+          url=$(jq -r 'select(.type == "preview") | .preview_urls[0] // empty' "$WRANGLER_OUTPUT_FILE_PATH" | tail -n1)
           if [ -z "$url" ]; then
-            echo "::error::No preview alias URL in wrangler output"
+            echo "::error::No Preview URL in wrangler output"
             exit 1
           fi
           echo "url=$url" >> "$GITHUB_OUTPUT"
@@ -114,7 +114,7 @@ jobs:
           URL: ${{ steps.upload.outputs.url }}
           SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          body=$(printf '### Preview\n\n%s\n\nUpdated for %s. Uses production data (read-only); cron collection does not run on previews.' "$URL" "${SHA:0:7}")
+          body=$(printf '### Preview\n\n%s\n\nUpdated for %s. Uses isolated preview data; cron collection does not run on previews.' "$URL" "${SHA:0:7}")
           # Target the preview comment itself; another workflow also posts as this bot.
           comment_id=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --jq '.[] | select(.user.login == "github-actions[bot]" and (.body // "" | startswith("### Preview\n"))) | .id' | head -n1)
           if [ -n "$comment_id" ]; then

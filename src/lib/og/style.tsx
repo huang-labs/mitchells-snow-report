@@ -16,7 +16,7 @@ export const SHARE_FRAME: CSSProperties = {
 export function ShareBrand({ large = false }: { large?: boolean }) {
   return (
     <div style={{ display: "flex", flexShrink: 0, flexDirection: large ? "column" : "row", fontSize: large ? 88 : 36, lineHeight: 1.08, letterSpacing: large ? -3 : -1, fontWeight: 700 }}>
-      <span>Cottonwoods</span>
+      <span>Mitchell’s</span>
       <span style={{ color: SHARE_COLORS.accent, marginLeft: large ? 0 : 10 }}>Snow Report</span>
     </div>
   );

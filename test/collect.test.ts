@@ -4,7 +4,7 @@ import { buildReport, classify, STALE_AFTER_MS } from "@/lib/report";
 import { SOURCES } from "@/lib/sources";
 import type { SourceDefinition } from "@/lib/sources/types";
 import { mergeSnapshot, MemoryKV, readSnapshot } from "@/lib/store";
-import type { DailySnowState, RecommendationState, Snapshot, SourceId, SourceRecord } from "@/lib/types";
+import type { DailySnowState, Snapshot, SourceId, SourceRecord } from "@/lib/types";
 import { createFixtureFetch, FAKE_TOKENS, FIXTURE_NOW } from "./fixtureFetch";
 
 const MIN = 60_000;
@@ -76,13 +76,11 @@ describe("collection with independent failure handling", () => {
 
   it("does not leak upstream tokens or query strings through the public API", async () => {
     const { fetchImpl } = createFixtureFetch();
-    await runCollection({ SNOW_KV: kv, UDOT_API_KEY: "SECRET_UDOT_KEY" }, { now: FIXTURE_NOW, fetchImpl });
+    await runCollection({ SNOW_KV: kv }, { now: FIXTURE_NOW, fetchImpl });
     const raw = (await kv.get("snapshot:v1", "text"))!;
     expect(raw).not.toContain(FAKE_TOKENS.solitude); // redacted even in stored diagnostics
-    expect(raw).not.toContain("SECRET_UDOT_KEY");
     const api = JSON.stringify(buildReport(await readSnapshot(kv), FIXTURE_NOW));
     expect(api).not.toContain(FAKE_TOKENS.solitude);
-    expect(api).not.toContain("SECRET_UDOT_KEY");
     expect(api).not.toContain("bearer_token");
   });
 });
@@ -128,7 +126,7 @@ describe("freshness semantics", () => {
   it("never-collected sources are unavailable and required ones are reported missing", () => {
     expect(classify(def, undefined, now).freshness).toBe("unavailable");
     const report = buildReport(null, now);
-    expect(report.requiredMissing.sort()).toEqual(["alta", "brighton", "plumes", "snowbird", "solitude"]);
+    expect(report.requiredMissing.sort()).toEqual(["alta", "big-sky", "brighton", "crystal-mountain", "jackson-hole", "mammoth-mountain", "mt-bachelor", "palisades-tahoe", "plumes", "snowbasin", "snowbird", "solitude", "steamboat", "telluride", "winter-park"]);
     expect(report.sources.nws.freshness).toBe("unavailable");
     expect(report.sources.nws.payload).toBeNull();
   });
@@ -176,7 +174,7 @@ describe("per-source collection intervals", () => {
     const has = (min: number, id: string) => collected[min].includes(id);
     expect([0, 5, 10, 15, 20, 25, 30].filter((m) => has(m, "alta"))).toEqual([0, 5, 10, 15, 20, 25, 30]);
     expect([0, 5, 10, 15, 20, 25, 30].filter((m) => has(m, "nws"))).toEqual([0, 15, 30]);
-    expect([0, 5, 10, 15, 20, 25, 30].filter((m) => has(m, "traveltimes"))).toEqual([0, 15, 30]);
+    expect(Object.values(collected).flat()).not.toContain("traveltimes");
     expect([0, 5, 10, 15, 20, 25, 30].filter((m) => has(m, "plumes"))).toEqual([0, 30]);
     // Skipped sources keep their record (and payload) in the snapshot.
     const snap = (await readSnapshot(kv))!;
@@ -303,12 +301,10 @@ describe("concurrent snapshot writers", () => {
       schemaVersion: 1,
       writtenAt: tNew,
       sources: {},
-      recommendation: { lastAttemptAt: tNew, current: { generatedAt: tNew } } as RecommendationState,
       dailySnow: { lastAttemptAt: tNew, current: { generatedAt: tNew } } as DailySnowState,
     };
     const merged = mergeSnapshot(latest, incoming);
     expect(merged.sources.alta).toBeUndefined(); // not in the incoming snapshot: treated as removed
-    expect(merged.recommendation?.lastAttemptAt).toBe(tNew);
     expect(merged.dailySnow?.lastAttemptAt).toBe(tNew);
     expect(merged.writtenAt).toBe(tNew);
   });

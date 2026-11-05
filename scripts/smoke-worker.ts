@@ -5,6 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decode } from "fast-png";
+import { REGIONS, RESORTS } from "../src/lib/catalog";
 import type { ReportResponse } from "../src/lib/types";
 
 // Exercise the bundled Worker and real asset routing in workerd, without
@@ -35,13 +36,13 @@ try {
     child.once("exit", (code) => finish(new Error(`Worker exited (${code})\n${output}`)));
   });
   const get = (path: string, method = "GET") => fetch(`${base}${path}`, { method, signal: AbortSignal.timeout(15_000) });
-  for (const path of ["/", "/daily-snow", "/weather", "/plumes", "/traffic", "/alta", "/snowbird", "/solitude", "/brighton"]) {
+  for (const path of ["/", "/daily-snow", "/weather", "/plumes", ...RESORTS.map(r=>"/"+r.id), ...REGIONS.flatMap(r=>["/daily-snow/"+r.id,"/weather/"+r.id,"/plumes/"+r.id])]) {
     const res = await get(path);
     assert.equal(res.status, 200, path);
     const html = await res.text();
     assert.match(html, /role="status">Loading /, `accessible loading status for ${path}`);
     assert.match(html, /aria-busy="true"/, `initial skeleton for ${path}`);
-    const expectedImage = path === "/daily-snow" ? "/daily-snow/opengraph-image" : "/share-brand-v2.png";
+    const expectedImage = path.startsWith("/daily-snow") ? path+"/opengraph-image" : "/share-brand-v2.png";
     assert.ok(html.includes(`${expectedImage}\"`), `share image for ${path}`);
     const script = /src="([^\"]*\/_next\/static\/[^\"]+\.js)"/.exec(html)?.[1];
     assert.ok(script, `static script for ${path}`);
@@ -69,7 +70,7 @@ try {
   assert.equal(report.status, 200);
   assert.equal(report.headers.get("cache-control"), "no-store");
   assert.equal(((await report.json()) as ReportResponse).sources.alta.freshness, "unavailable");
-  for (const path of ["/api/unknown", "/api/plume/CLN/2026110100/snow"]) {
+  for (const path of ["/traffic", "/api/unknown", "/api/plume/CLN/2026110100/snow"]) {
     const res = await get(path);
     assert.equal(res.status, 404);
     await res.arrayBuffer();
@@ -77,7 +78,7 @@ try {
   const method = await get("/api/report", "POST");
   assert.equal(method.status, 405);
   await method.arrayBuffer();
-  for (const path of ["/daily-snow/opengraph-image"]) {
+  for (const path of ["/daily-snow/opengraph-image", "/daily-snow/tahoe/opengraph-image"]) {
     const image = await get(path);
     assert.equal(image.status, 200);
     assert.equal(image.headers.get("content-type"), "image/png");
@@ -99,10 +100,10 @@ try {
   const figure = await get("/api/daily-snow/figure/2026-11-01/stake-alta");
   assert.equal(figure.status, 404);
   await figure.arrayBuffer();
-  const shareCheck = spawn(process.execPath, ["node_modules/tsx/dist/cli.mjs", "scripts/check-share-preview.ts", base, process.env.SITE_URL || "https://cottonwoods-snow-report.huang.mx"], { stdio: "inherit" });
+  const shareCheck = spawn(process.execPath, ["node_modules/tsx/dist/cli.mjs", "scripts/check-share-preview.ts", base, process.env.SITE_URL || "https://mitchells-snow-report.huang.mx"], { stdio: "inherit" });
   const [code] = await once(shareCheck, "exit");
   assert.equal(code, 0, "share metadata matches each section and deployment");
-  console.log("Worker smoke passed: 9 static pages, navigation payload, immutable JS, 404s, API methods, KV, static and Daily Snow PNGs, share metadata and HEAD.");
+  console.log("Worker smoke passed: 42 static pages, navigation payload, immutable JS, 404s, API methods, KV, static and Daily Snow PNGs, share metadata and HEAD.");
 } finally {
   child.kill("SIGTERM");
   await exited;

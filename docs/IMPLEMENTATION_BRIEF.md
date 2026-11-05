@@ -1,5 +1,7 @@
 # Cottonwoods Snow Report — implementation brief
 
+> Historical Cottonwoods brief. Current scope is the [Mitchell's expansion plan](EXPANSION_PLAN.md); source behavior is documented in [implementation notes](IMPLEMENTATION_NOTES.md).
+
 Status: design interview complete; user accepted the decisions below and requested an implementation handoff.
 Date: 2026-10-29. Revised 2026-11-01: the product is phone/desktop-first. Revised 2026-11-03: the TV slideshow mode was removed (PR #25), and its requirements are dropped from this brief.
 

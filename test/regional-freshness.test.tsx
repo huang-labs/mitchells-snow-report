@@ -23,20 +23,20 @@ it("shows no resort freshness badges or resort source line, whatever their state
   expect(document.body.textContent).not.toMatch(/Old report|Updates delayed|Latest check failed|snow reports \(resort websites\)/);
 });
 
-it("ends with the legend, then the NWS forecast's source line only", () => {
+it("ends with the legend explaining missing data and local days", () => {
   render(<RegionalPage now={now} report={withFreshness({ alta: "current", snowbird: "current", solitude: "current", brighton: "current" })} />);
   const page = document.querySelector(".page--regional")!;
-  expect([...page.children].map((e) => e.className).slice(-3)).toEqual(["resort-timelines", "legend", "source-line"]);
+  expect([...page.children].map((e) => e.className).slice(-2)).toEqual(["resort-timelines", "legend"]);
   expect(page.querySelector(".legend")?.textContent).toContain("reported zero");
   expect(page.querySelector(".legend")?.textContent).not.toMatch(/tap a day/);
-  expect(page.querySelectorAll(".source-line")).toHaveLength(1);
-  expect(page.querySelector(".source-line")?.textContent).toContain("Forecast grid updated");
+  expect(page.querySelectorAll(".source-line")).toHaveLength(0);
+  expect(page.querySelector(".legend")?.textContent).toContain("local time");
 });
 
 it("titles the page Resorts, with its subtitle", () => {
   render(<RegionalPage now={now} report={buildReport(null, now)} />);
   expect(document.querySelector("h1")?.textContent).toBe("Resorts");
-  expect(document.querySelector(".page__sub")?.textContent).toBe("Snowfall at each resort: the past week, the last 24 h, and the NWS forecast for the week ahead.");
+  expect(document.querySelector(".page__sub")?.textContent).toBe("Your Western US favorites: the past week, the last 24 h, and the NWS forecast for the week ahead.");
 });
 
 describe("summarizeFreshness", () => {

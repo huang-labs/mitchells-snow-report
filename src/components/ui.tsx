@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { ApiSource, Freshness, LiftStatus, Metric, Notice } from "@/lib/types";
-import { formatAge, formatDenver } from "@/lib/time";
+import { formatAge, formatDenver, formatLocal } from "@/lib/time";
 import { FRESHNESS_STATUS, type StatusTone } from "@/lib/freshness";
 
 export const FRESHNESS_TEXT = Object.fromEntries(Object.entries(FRESHNESS_STATUS).map(([key, status]) => [key, status.label])) as Record<Freshness, string>;
@@ -41,12 +41,12 @@ function formatNumber(v: number) {
   return Number.isInteger(v) ? String(v) : v.toFixed(1);
 }
 
-export function SourceLine({ source, now, reportLabel }: { source: ApiSource; now: Date; reportLabel?: string }) {
+export function SourceLine({ source, now, reportLabel, timeZone }: { source: ApiSource; now: Date; reportLabel?: string;timeZone?:string }) {
   return (
     <div className="source-line">
       <FreshnessBadge freshness={source.freshness} />
       <span>
-        {reportLabel ?? "Source time"}: <strong>{source.sourceUpdatedAt ? formatDenver(source.sourceUpdatedAt, now) : "unknown"}</strong>
+        {reportLabel ?? "Source time"}: <strong>{source.sourceUpdatedAt ? formatLocal(source.sourceUpdatedAt,now,timeZone) : "unknown"}</strong>
       </span>
       <span>
         Last successful check: <strong>{formatAge(source.lastSuccessfulFetchAt, now)}</strong>
@@ -81,11 +81,11 @@ const SEVERITY = { critical: 0, warning: 1, info: 2 } as const;
  * Resort alerts and road notices, most severe first: the title and text read as
  * one sentence, with the source and time on a quiet line below.
  */
-export function NoticeList({ notices, now, label }: { notices: Array<Notice & { source?: string }>; now: Date; label?: string }) {
+export function NoticeList({ notices, now, label,timeZone }: { notices: Array<Notice & { source?: string }>; now: Date; label?: string;timeZone?:string }) {
   return (
     <ul className="notices" aria-label={label}>
       {[...notices].sort((a, b) => SEVERITY[a.severity] - SEVERITY[b.severity]).map((n, i) => {
-        const meta = [n.source, n.updatedAt ? formatDenver(n.updatedAt, now) : null].filter(Boolean).join(" · ");
+        const meta = [n.source, n.updatedAt ? formatLocal(n.updatedAt,now,timeZone) : null].filter(Boolean).join(" · ");
         return (
           <li key={i} className={`notice notice--${n.severity}`}>
             <strong>{n.title}</strong> {n.text}

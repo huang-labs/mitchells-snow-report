@@ -4,10 +4,8 @@ import { parseBrighton } from "@/lib/sources/brighton";
 import { parseMtnPowder } from "@/lib/sources/mtnpowder";
 import { expandHourly, findNextStorm, summarizeGrid } from "@/lib/sources/nws";
 import { forecastHoursFromPath, parsePlumePage, runCodeToIso } from "@/lib/sources/plumes";
-import { parsePassConditions, parseSignFeed, parseSnowbirdRoads, parseUdotSite, severityOf } from "@/lib/sources/roads";
 import { parseSnowbird, snowbirdSensorTime } from "@/lib/sources/snowbird";
 import { SOLITUDE_OPTIONS } from "@/lib/sources/solitude";
-import { esriLocalToIso, parseCameraCaptions, parseTravelTimes } from "@/lib/sources/traffic";
 import { ValidationError } from "@/lib/sources/types";
 import { fromField, parseNumber } from "@/lib/metric";
 import { FIXTURE_NOW, fixture } from "./fixtureFetch";
@@ -185,50 +183,5 @@ describe("NWS gridpoints", () => {
     const m = expandHourly({ values: [{ validTime: "2026-11-01T00:00:00+00:00/PT6H", value: 25.4 * 6 }] }, "accum", (v) => v / 25.4);
     expect([...m.values()].map((v) => Math.round(v * 1000) / 1000)).toEqual([1, 1, 1, 1, 1, 1]);
     expect(findNextStorm(m, new Map(), new Date("2026-10-31T00:00:00Z"))).toMatchObject({ totalSnowIn: 6 });
-  });
-});
-
-describe("roads", () => {
-  it("extracts UDOT site alerts and mouth-of-canyon signs", () => {
-    const { notices, signs } = parseUdotSite(fixture("udot-road-information.html"));
-    const alert = notices.find((n) => n.title === "Seasonal Road Closure Alert");
-    expect(alert?.text).toMatch(/Guardsman Pass will close/);
-    expect(alert?.severity).toBe("warning"); // seasonal: no global banner
-    expect(signs.length).toBeGreaterThanOrEqual(3);
-    expect(signs.every((s) => !s.messages.includes("NO_MESSAGE"))).toBe(true);
-  });
-  it("filters statewide signs to the canyon roads", () => {
-    const signs = parseSignFeed(j("snowbird-traffic-signs.json"));
-    expect(signs.length).toBeGreaterThan(0);
-    expect(signs.every((s) => ["SR-190", "SR-209", "SR-210"].includes(s.roadway) || /Cottonwood|Wasatch/.test(s.name))).toBe(true);
-  });
-  it("ignores Snowbird CMS test rows and classifies severity", () => {
-    const rows = parseSnowbirdRoads(j("snowbird-roads.json"));
-    expect(rows.map((r) => r.title)).toEqual(["Highway SR-210"]);
-    expect(severityOf("SR-210 CLOSED FOR AVALANCHE CONTROL")).toBe("critical");
-    expect(severityOf("TRACTION LAW IN EFFECT")).toBe("warning");
-    const pass = parsePassConditions(j("brighton-reportpal-roads.json"));
-    expect(pass[0]).toMatchObject({ canyon: "BCC", severity: "info" });
-  });
-});
-
-describe("travel times and cameras", () => {
-  it("treats the layer's measurement time (not its edit time) as the observation", () => {
-    const p = parseTravelTimes(j("udot-arcgis-travel-times.json"), FIXTURE_NOW);
-    expect(p.newestMeasurementAt).toBe("2025-03-05T03:05:00.000Z");
-    expect(p.layerEditedAt! > p.newestMeasurementAt!).toBe(true);
-    expect(p.segments.find((s) => s.name === "9000 S to Alta")).toMatchObject({ from: "9000 S", to: "Alta", canyon: "LCC" });
-  });
-  it("rejects implausible future measurement times", () => {
-    const future = Date.UTC(2026, 9, 31, 12, 0); // would be 6 AM MDT Oct 31 — after FIXTURE_NOW
-    expect(esriLocalToIso(future)).toBe("2026-10-31T18:00:00.000Z");
-    const p = parseTravelTimes(
-      { features: [{ attributes: { Route_Name: "A to B", CANYON: "Little Cottonwood Canyon", DIRECTION: "Up", LATEST_LOCAL_DATETIME: future, Current_Travel_Time__min_: 5, Free_Flow_Travel_Time__min_: 5, Distance__miles_: 1 } }] },
-      FIXTURE_NOW,
-    );
-    expect(p.segments[0].measuredAt).toBeNull();
-  });
-  it("reads camera captions from the UDOT page", () => {
-    expect(parseCameraCaptions(fixture("udot-road-information.html")).get("171450")).toMatch(/Seven Turns/);
   });
 });

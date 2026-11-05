@@ -1,10 +1,9 @@
-import type { CanyonId, PrimaryResortId } from "../types";
+import type { CanyonId, PrimaryResortId, ResortReport } from "../types";
 
 /**
  * A snow day, keyed by the morning it ends: `2026-11-06` is the 24 hours ending at
- * 12:00 UTC on Nov 6 (5 AM MST / 6 AM MDT). Resorts publish their 24 h totals in
- * the morning and NWS issues snowfall in 6-hour blocks starting at 00/06/12/18 UTC,
- * so this boundary splits neither.
+ * 6 AM in the destination time zone on Nov 6. Local snow days can be 23 or
+ * 25 hours across DST; source reporting windows remain unchanged.
  */
 export type SnowDayKey = string;
 
@@ -23,6 +22,7 @@ export interface MorningReading {
   /** When the resort's window ends: its report time, or the fetch for sources that compute it then. */
   windowEnd: string | null;
   collectedAt: string;
+  reportingLocation?: ResortReport["reportingLocation"];
 }
 
 /** The NWS grid forecast for a whole snow day, as it stood when that day began. */

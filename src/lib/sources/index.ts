@@ -1,3 +1,4 @@
+import { favoriteSources } from "./favorites";
 import type { SourceId } from "../types";
 import { ensembleSource } from "./ensemble";
 import { altaSource } from "./alta";
@@ -6,10 +7,8 @@ import { nwsSource } from "./nws";
 import { nwsAfdSource } from "./nwsafd";
 import { plumesSource } from "./plumes";
 import { resortCamsSource } from "./resortcams";
-import { roadsSource } from "./roads";
 import { snowbirdSource } from "./snowbird";
 import { solitudeSource } from "./solitude";
-import { travelTimesSource, webcamsSource } from "./traffic";
 import type { SourceDefinition } from "./types";
 
 export const SOURCES: SourceDefinition[] = [
@@ -17,11 +16,9 @@ export const SOURCES: SourceDefinition[] = [
   snowbirdSource,
   solitudeSource,
   brightonSource,
+  ...favoriteSources,
   plumesSource,
   nwsSource,
-  roadsSource,
-  travelTimesSource,
-  webcamsSource,
   resortCamsSource,
   nwsAfdSource,
   ensembleSource,

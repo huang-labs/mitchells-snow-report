@@ -74,8 +74,6 @@ export function mergeSnapshot(latest: Snapshot | null, incoming: Snapshot): Snap
     sources[id] = !latestRecord || attemptMs(incomingRecord) >= attemptMs(latestRecord) ? incomingRecord : latestRecord;
   }
   const merged: Snapshot = { schemaVersion: incoming.schemaVersion, writtenAt: incoming.writtenAt, sources };
-  const recommendation = newerState(latest.recommendation, incoming.recommendation);
-  if (recommendation) merged.recommendation = recommendation;
   const dailySnow = newerState(latest.dailySnow, incoming.dailySnow);
   if (dailySnow) {
     // A reservation's older history must not remove a concurrently published edition.
@@ -91,6 +89,12 @@ export function mergeSnapshot(latest: Snapshot | null, incoming: Snapshot): Snap
   if (stormTracking) merged.stormTracking = stormTracking;
   const snowLog = mergeSnowLog(latest.snowLog, incoming.snowLog, new Date(incoming.writtenAt));
   if (snowLog) merged.snowLog = snowLog;
+  merged.resortLastOperatingAt={...latest.resortLastOperatingAt,...incoming.resortLastOperatingAt};
+  merged.areaStorms={};
+  for(const key of new Set([...Object.keys(latest.areaStorms??{}),...Object.keys(incoming.areaStorms??{})])) {
+    const area=key as keyof NonNullable<Snapshot["areaStorms"]>;
+    merged.areaStorms[area]=mergeStormTracking(latest.areaStorms?.[area],incoming.areaStorms?.[area]);
+  }
   return merged;
 }
 

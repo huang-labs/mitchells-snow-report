@@ -22,7 +22,7 @@ describe("deployment metadata base", () => {
     vi.stubEnv("SITE_URL", undefined);
     vi.resetModules();
     const metadata = await import("@/lib/metadata");
-    expect(metadata.metadataBase.origin).toBe("https://cottonwoods-snow-report.huang.mx");
+    expect(metadata.metadataBase.origin).toBe("https://mitchells-snow-report.huang.mx");
   });
 });
 
@@ -43,7 +43,7 @@ describe("section share metadata", () => {
 
   it("describes the daily forecast on Daily Snow", () => {
     const metadata = sectionMetadata(SECTIONS.find((s) => s.id === "daily-snow")!);
-    expect(metadata.description).toContain("daily snow forecast");
+    expect(metadata.description).toContain("Daily Snow forecasts");
     expect(metadata.openGraph).toHaveProperty("description", metadata.description);
     expect(metadata.twitter).toHaveProperty("description", metadata.description);
   });

@@ -1,4 +1,4 @@
-/* Cottonwoods Snow Report — light-first design for phones and desktop browsers.
+/* Mitchell’s Snow Report — light-first design for phones and desktop browsers.
    The dark appearance is a full theme: the saved choice lives on <html data-theme>,
    set before first paint by the layout's inline script; with no saved choice the
    system preference decides. Layout is mobile-first in spirit; 901px and up widen
@@ -7,15 +7,15 @@
    One type scale serves every page (use the tokens, not new pixel sizes):
      display  page titles (h1)            label    uppercase eyebrows, table heads
      h2       section headings            caption  figure captions, notes, timestamps
-     title    item names (resorts, teaser) meta    secondary lines under headings
+     title    item names (resorts) meta    secondary lines under headings
      prose    Daily Snow reading text      body     everything else
    Long-form content is page content: no card borders. The pale --panel fill is
-   reserved for summary panels (Daily Snow teaser, next storm, snow tiles, charts). */
+   reserved for summary panels (next storm, snow tiles, charts). */
 
 :root {
   --bg: #f8fafc; --panel: #edf3f9; --panel-2: #e1ebf5; --line: #dbe3ec;
   --text: #172b42; --muted: #586b7d; --accent: #1266a3; /* snow */
-  --ok: #287040; --warn: #87570a; --bad: #b23831; --hold: #755396;
+  --ok: #287040; --warn: #81520a; --bad: #b23831; --hold: #755396;
   --font: "Inter", "Segoe UI", "Helvetica Neue", Roboto, Arial, sans-serif;
 
   --fs-display: clamp(28px, 1.5vw + 22px, 40px);
@@ -208,11 +208,10 @@ a { color: var(--accent); }
 .snow-level__line--lcc, .snow-level__key--lcc::before { stroke: var(--accent); background: var(--accent); }
 .snow-level__line--bcc, .snow-level__key--bcc::before { stroke: var(--hold); background: var(--hold); }
 .snow-level__legend { display: inline-flex; gap: 12px; }
-.snow-level__key::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 5px; vertical-align: middle; }
+ .snow-level__key::before { background:currentColor; content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 5px; vertical-align: middle; }
 
 /* ---- Snowfall (regional) ---- */
-/* One block per resort, reaching into the gutters (like the teaser panel) so the AI
-   pick's accent line sits in the bleed while text keeps the page's aligned edge. */
+/* Resort blocks share the page gutters and keep names aligned. */
 .resort-timelines { display: flex; flex-direction: column; }
 .resort-timeline { position: relative; margin: 0 calc(-1 * var(--bleed)); padding: 20px var(--bleed); border-bottom: 1px solid var(--line); }
 .resort-timeline:first-child { padding-top: 0; }
@@ -239,31 +238,12 @@ a { color: var(--accent); }
 .legend__key--ghost { box-sizing: border-box; border: 1.5px dashed color-mix(in srgb, var(--muted) 70%, transparent); border-bottom: 0; }
 .legend__key--none { height: 6px; vertical-align: 0; border-radius: 0; background: repeating-linear-gradient(135deg, transparent 0 3px, color-mix(in srgb, var(--muted) 30%, transparent) 3px 4px); }
 
-/* AI pick: an accent line in the bleed spanning the picked resort and its reasoning. */
-.resort-timeline--picked::before { content: ""; position: absolute; left: 4px; top: 0; bottom: 20px; width: 3px; border-radius: 2px; background: var(--accent); }
-.pick-reasoning { max-width: 75ch; margin-top: 4px; font-size: var(--fs-meta); line-height: 1.55; }
-.pick-reasoning > strong { font-size: var(--fs-body); }
-.pick-reasoning p { margin-top: 6px; }
-.pick-reasoning__caveats { color: var(--warn); }
-.pick-reasoning__meta { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px; color: var(--muted); font-size: var(--fs-label); margin-top: 10px; overflow-wrap: anywhere; }
-
-/* Daily Snow teaser: a highlighted summary panel reaching into the gutters while
-   its text keeps the page's aligned edge; on phones it becomes a full-width band. */
-.dailysnow-teaser { margin: 0 calc(-1 * var(--bleed)) calc(28px - var(--page-gap)); padding: 16px var(--bleed); border-radius: 8px; background: var(--panel); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 28px; color: var(--text); text-decoration: none; }
-.dailysnow-teaser__title { font: 700 var(--fs-title)/1.25 var(--font); letter-spacing: -0.015em; grid-column: 1 / -1; }
-.dailysnow-teaser__summary { grid-column: 1; max-width: 72ch; line-height: 1.6; }
-.dailysnow-teaser__time { grid-column: 2; grid-row: 1; text-align: right; font-size: var(--fs-caption); color: var(--muted); }
-.dailysnow-teaser__more { grid-column: 2; grid-row: 3; align-self: end; text-align: right; color: var(--accent); font-weight: 650; font-size: var(--fs-meta); }
-@media (hover: hover) {
-  .dailysnow-teaser:hover .dailysnow-teaser__title { color: var(--accent); }
-}
-
 /* ---- Daily Snow (AI post) ---- */
 .dailysnow { max-width: 720px; width: 100%; margin: 0 auto; font-size: var(--fs-prose); }
 .dailysnow__header { display: flex; flex-direction: column; gap: 16px; }
 .dailysnow__meta { display: flex; align-items: baseline; justify-content: space-between; gap: 4px 24px; flex-wrap: wrap; }
 .dailysnow__posted { color: var(--muted); font-size: var(--fs-caption); }
-.dailysnow__posted, .dailysnow-teaser__time { display: flex; align-items: baseline; justify-content: flex-end; flex-wrap: wrap; gap: 6px 10px; }
+.dailysnow__posted { display: flex; align-items: baseline; justify-content: flex-end; flex-wrap: wrap; gap: 6px 10px; }
 .dailysnow__title { margin-top: 4px; }
 .dailysnow__summary { font-size: 18px; line-height: 1.5; font-weight: 500; color: var(--text); }
 .dailysnow__article { margin-top: 8px; }
@@ -348,7 +328,7 @@ a { color: var(--accent); }
 .periods dt::after { content: " — "; }
 
 /* ---- Plumes ---- */
-.plume-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto auto; grid-auto-flow: column; gap: 28px 24px; }
+.plume-grid { display: grid; grid-template-columns: repeat(var(--plume-columns, 2), minmax(0, 1fr)); grid-template-rows: auto auto; grid-auto-flow: column; gap: 28px 24px; }
 .plume--full { grid-row: span 2; }
 .plume { margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .plume__title { font: 650 var(--fs-h3)/1.3 var(--font); text-align: center; }
@@ -361,32 +341,6 @@ a { color: var(--accent); }
 .plume__now { stroke: #e8590c; stroke-width: 3; }
 .plume__nowlabel { font: 700 20px system-ui, sans-serif; fill: #e8590c; text-anchor: middle; }
 
-/* ---- Roads ---- */
-/* Two canyon columns, like the weather page: camera, road status panel, travel times. */
-.roads { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px 40px; }
-.canyon { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-.canyon__route { margin-top: 4px; font-size: var(--fs-caption); color: var(--muted); }
-.canyon__status { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 8px; background: var(--panel); }
-.travel { display: flex; flex-direction: column; gap: 8px; }
-.travel h3 { margin-bottom: 4px; }
-.travel__warning { color: var(--warn); font-size: var(--fs-caption); line-height: 1.5; }
-.travel-table { width: 100%; border-collapse: collapse; font-size: var(--fs-meta); }
-.travel-table th, .travel-table td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: baseline; }
-.travel-table :is(th, td):first-child { padding-left: 0; }
-.travel-table :is(th, td):last-child { padding-right: 0; text-align: right; }
-.travel-table td { white-space: nowrap; }
-.travel-table thead th { color: var(--muted); font-weight: 650; font-size: var(--fs-label); text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
-.travel-table tbody th { font-weight: 600; }
-.travel__dir { color: var(--muted); font-weight: 400; font-size: var(--fs-caption); }
-.travel__now { font-weight: 750; color: var(--accent); }
-.travel--stale .travel__now { color: var(--muted); font-weight: 600; }
-.travel__toggle { align-self: flex-start; background: transparent; border: 0; padding: 8px 0; color: var(--accent); cursor: pointer; font-size: var(--fs-meta); font-weight: 650; }
-.travel__toggle:hover { text-decoration: underline; }
-.cam { margin: 0; display: flex; flex-direction: column; gap: 8px; }
-.cam img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: contain; background: #000; border-radius: 6px; }
-.cam figcaption { font-size: var(--fs-caption); color: var(--muted); line-height: 1.5; }
-.cam figcaption strong { color: var(--text); font-weight: 600; }
-.cam__missing { display: grid; place-items: center; aspect-ratio: 16 / 10; border: 1px dashed var(--line); border-radius: 6px; color: var(--muted); font-size: var(--fs-meta); }
 .parking__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px 32px; margin-top: 16px; }
 .parking__resort h3 { margin-bottom: 8px; }
 .parking dl { margin: 0; font-size: var(--fs-meta); }
@@ -408,14 +362,19 @@ a { color: var(--accent); }
   .appearance-control button { width: 34px; }
   .editorial-page { padding-top: 28px; padding-bottom: 40px; }
 
-  .weather-grid, .plume-grid, .roads, .parking__grid { grid-template-columns: minmax(0, 1fr); }
+  .weather-grid, .plume-grid, .parking__grid { grid-template-columns: minmax(0, 1fr); }
   .plume-grid { grid-template-rows: none; grid-auto-flow: row; }
   .plume--full { grid-row: auto; }
 
-  .dailysnow-teaser { border-radius: 0; grid-template-columns: minmax(0, 1fr); }
-  .dailysnow-teaser__time { justify-content: flex-start; }
-  .dailysnow-teaser__time, .dailysnow-teaser__summary, .dailysnow-teaser__more { grid-column: 1; grid-row: auto; text-align: left; }
 
   .dailysnow__summary { font-size: 17px; }
   .dailysnow-figure--chart { padding: 12px; }
 }
+
+/* Regional navigation stays compact at phone and laptop widths. */
+.region-selector { display:flex; align-items:center; gap:.75rem; margin:0 0 1.5rem; }
+.region-selector label { font-size:.8rem; color:var(--muted); }
+.region-selector select { max-width:100%; min-height:44px; padding:.5rem 2rem .5rem .75rem; border:1px solid var(--line); border-radius:4px; background:var(--bg); color:inherit; font:inherit; }
+.dailysnow__coverage { font-size:.8rem; color:var(--muted); line-height:1.6; margin-top:2rem; }
+.plume__title small { font-size:.75rem; font-weight:400; }
+@media(max-width:600px) { .region-selector select { flex:1; min-width:0; } }

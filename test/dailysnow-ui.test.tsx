@@ -2,10 +2,10 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { clearArchivedPosts } from "@/components/dailysnow/archive";
-import { DailySnowPage, DailySnowTeaser } from "@/components/dailysnow/DailySnow";
+import { DailySnowPage } from "@/components/dailysnow/DailySnow";
 import { RegionalPage } from "@/components/sections/RegionalPage";
 import { buildReport } from "@/lib/report";
-import type { ApiDailySnow, ApiRecommendation } from "@/lib/types";
+import type { ApiDailySnow } from "@/lib/types";
 import type { StormRecord } from "@/lib/dailysnow/storm-types";
 
 const now = new Date("2026-11-01T15:00:00Z");
@@ -52,9 +52,9 @@ it.each(["24h", "48h"] as const)("shows a compact frozen storm recap with qualif
   render(<DailySnowPage report={report(withStorm)} now={now} />);
   const table = within(screen.getByRole("table", { name: "Observations for this storm" }));
   expect(table.getByRole("columnheader", { name: "Report time" })).toBeTruthy();
-  expect(table.getByRole("row", { name: "Alta 15″ · Reported storm total Sun, Nov 1, 5:00 AM" })).toBeTruthy();
-  expect(table.getByRole("row", { name: `Snowbird 15″ · Earlier ${window === "48h" ? "48 h" : "24 h"} observation Sat, Oct 31, 6:00 AM` })).toBeTruthy();
-  expect(table.getByText("Sat, Oct 31, 6:00 AM").getAttribute("datetime")).toBe("2026-10-31T12:00:00Z");
+  expect(table.getByRole("row", { name: "Alta 15″ · Reported storm total Sun, Nov 1, 5:00 AM MST" })).toBeTruthy();
+  expect(table.getByRole("row", { name: `Snowbird 15″ · Earlier ${window === "48h" ? "48 h" : "24 h"} observation Sat, Oct 31, 6:00 AM MDT` })).toBeTruthy();
+  expect(table.getByText("Sat, Oct 31, 6:00 AM MDT").getAttribute("datetime")).toBe("2026-10-31T12:00:00Z");
   expect(table.getByRole("row", { name: "Solitude 9″ · Earlier reported storm total Time unavailable" })).toBeTruthy();
   expect(table.getByRole("row", { name: "Brighton — · Storm total unavailable —" })).toBeTruthy();
   expect(table.queryAllByRole("link")).toHaveLength(0);
@@ -63,10 +63,10 @@ it.each(["24h", "48h"] as const)("shows a compact frozen storm recap with qualif
   expect(document.querySelectorAll(".dailysnow-storm")).toHaveLength(1);
 });
 
-it("attributes the NWS clearly in older saved prose and teaser summaries", () => {
+it("attributes the NWS clearly in older saved prose and summaries", () => {
   const old = { ...post, summary: "The discussion expects snow.", sections: [{ id: "update" as const, paragraphs: [{ text: "According to the discussion, snow ends today.", figure: null }] }] };
-  render(<><DailySnowPage report={report(old)} now={now} /><DailySnowTeaser post={old} now={now} /></>);
-  expect(screen.getAllByText("The NWS expects snow.")).toHaveLength(2);
+  render(<DailySnowPage report={report(old)} now={now} />);
+  expect(screen.getAllByText("The NWS expects snow.")).toHaveLength(1);
   expect(screen.getByText("According to the NWS, snow ends today.")).toBeTruthy();
   expect(document.body.textContent).not.toMatch(/discussion/i);
 });
@@ -91,20 +91,20 @@ it("shows the post as page content with the AI badge, sections and figures", () 
   expect(screen.getByText(/AI-generated from NWS forecasts.*GLM 5\.3 Flash/)).toBeTruthy();
 });
 
-it("uses the same publication-delay badge in the teaser and latest article", () => {
+it("labels a delayed replacement on the latest article", () => {
   const delayed: ApiDailySnow = { ...post, outdated: true, failing: true, publicationStatus: "delayed" };
-  render(<><DailySnowTeaser post={delayed} now={now} /><DailySnowPage report={report(delayed)} now={now} /></>);
+  render(<DailySnowPage report={report(delayed)} now={now} />);
   const badges = screen.getAllByText("Latest edition delayed");
-  expect(badges).toHaveLength(2);
+  expect(badges).toHaveLength(1);
   expect(badges.every((b) => b.className === "badge badge--warn")).toBe(true);
   expect(screen.queryByText(/Outdated|Today's post failed/)).toBeNull();
 });
 
 it.each(["scheduled", "pending", "paused"] as const)("dates the latest edition without a warning when publication is %s", (publicationStatus) => {
   const older = { ...post, outdated: true, publicationStatus };
-  render(<><DailySnowTeaser post={older} now={now} /><DailySnowPage report={report(older)} now={now} /></>);
+  render(<DailySnowPage report={report(older)} now={now} />);
   expect(screen.queryByText("Latest edition delayed")).toBeNull();
-  expect(screen.getAllByText(/Posted Yesterday|Posted Today/)).toHaveLength(2);
+  expect(screen.getAllByText(/Posted Sun, Nov 1, 6:00 AM MST/)).toHaveLength(1);
 });
 
 it("waits for the first post", () => {
@@ -120,7 +120,7 @@ it("opens an archived post and returns to the latest", async () => {
   const nav = within(document.querySelector<HTMLElement>(".dailysnow__nav")!);
   fireEvent.click(nav.getByRole("button", { name: /Storm Arrives/ }));
   expect(await screen.findByRole("heading", { level: 1, name: "Storm Arrives" })).toBeTruthy();
-  expect(fetchMock).toHaveBeenCalledWith("/api/daily-snow?date=2026-10-31");
+  expect(fetchMock).toHaveBeenCalledWith("/api/daily-snow?channel=western-us&date=2026-10-31");
   expect(window.location.search).toBe("?date=2026-10-31");
   expect(screen.getByText(/· Archive/)).toBeTruthy();
   expect(screen.queryByText("Latest edition delayed")).toBeNull();
@@ -166,7 +166,7 @@ it("walks the archive through each post's neighbor links, past the recent-posts 
   const nav = () => within(document.querySelector<HTMLElement>(".dailysnow__nav")!);
   fireEvent.click(nav().getByRole("button", { name: /Early Season Dusting/ }));
   expect(await screen.findByRole("heading", { level: 1, name: "Early Season Dusting" })).toBeTruthy();
-  expect(fetchMock).toHaveBeenCalledWith("/api/daily-snow?date=2026-09-15");
+  expect(fetchMock).toHaveBeenCalledWith("/api/daily-snow?channel=western-us&date=2026-09-15");
   expect(nav().getByRole("button", { name: /First Flakes/ })).toBeTruthy();
   // The newer link back to the live post drops ?date= rather than linking today's date.
   fireEvent.click(nav().getByRole("button", { name: /Storm Underway/ }));
@@ -283,37 +283,11 @@ it("retries an archived post that failed to load", async () => {
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });
 
-it("teases the post on the Snowfall page", () => {
+it("keeps the homepage focused on resort timelines", () => {
   render(<RegionalPage report={report(post)} now={now} />);
-  const link = screen.getByRole("link", { name: "Daily Snow: Storm Underway" });
-  expect(link.getAttribute("href")).toBe("/daily-snow");
-  expect(link.querySelector(".badge--ai")).not.toBeNull();
-  // The teaser leads the page, above the Snowfall header.
-  const page = document.querySelector(".page--regional")!;
-  expect(page.firstElementChild).toBe(link);
-  expect(link.nextElementSibling?.className).toBe("page__header");
-});
-
-const recommendation: ApiRecommendation = {
-  targetDate: "2026-11-01", mode: "storm", pick: "alta", plan: "Check road access before leaving.",
-  headline: "Alta today", caveats: [], runnerUp: null, generatedAt: now.toISOString(),
-  model: "@cf/zai-org/glm-5.3-flash", trigger: "morning", outdated: false, failing: false,
-};
-
-it.each([null, { ...recommendation, pick: null }])("hides the recommendation when there is no resort pick (%j)", (pick) => {
-  render(<RegionalPage report={{ ...report(post), recommendation: pick }} now={now} />);
+  expect(screen.queryByRole("link", { name: "Daily Snow: Storm Underway" })).toBeNull();
   expect(document.querySelector("aside.recommendation")).toBeNull();
-  expect(screen.getByRole("link", { name: "Daily Snow: Storm Underway" })).toBeTruthy();
-  expect(screen.queryByText("AI pick")).toBeNull();
-});
-
-it("keeps a previous resort pick visible with its update warnings", () => {
-  render(<RegionalPage report={{ ...report(post), recommendation: { ...recommendation, outdated: true, failing: true } }} now={now} />);
-  expect(screen.getByRole("generic", { name: "AI recommendation reasoning" })).toBeTruthy();
-  expect(screen.getByText("Alta today")).toBeTruthy();
-  expect(screen.getByText("Recommendation needs updating")).toBeTruthy();
-  expect(screen.getByText("Updates failing")).toBeTruthy();
-  expect(screen.queryByText("AI pick")).toBeNull();
+  expect(document.querySelectorAll(".resort-timeline")).toHaveLength(14);
 });
 
 it("draws plume figures like the plumes page: padded, Mountain Time axis, posting-time marker", () => {
@@ -333,7 +307,7 @@ it("draws plume figures like the plumes page: padded, Mountain Time axis, postin
     figures: { "plume-snow-cln": plume },
   };
   const { unmount } = render(<DailySnowPage report={report(withPlume)} now={now} />);
-  const svg = screen.getByRole("img", { name: /Accumulated Snow.*times in Mountain Time/ });
+  const svg = screen.getByRole("img", { name: /Accumulated Snow.*times in America\/Denver/ });
   // White margin around the crop (the shared plumes-page drawing).
   expect(svg.getAttribute("viewBox")).toBe("-20 -20 962 639");
   expect(svg.querySelector("image")?.getAttribute("href")).toBe(plume.url);
@@ -352,7 +326,7 @@ it("draws plume figures like the plumes page: padded, Mountain Time axis, postin
 
   // Code-added required figures render after the prose, without invented introductions.
   render(<DailySnowPage report={report({ ...withPlume, sections: [{ id: "update", paragraphs: [{ text: "A quiet day.", figure: null }] }] })} now={now} />);
-  expect(screen.getAllByRole("img", { name: /Accumulated Snow.*times in Mountain Time/ })).toHaveLength(1);
+  expect(screen.getAllByRole("img", { name: /Accumulated Snow.*times in America\/Denver/ })).toHaveLength(1);
   expect(screen.getByText("A quiet day.")).toBeTruthy();
 });
 

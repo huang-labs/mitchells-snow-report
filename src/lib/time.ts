@@ -155,3 +155,33 @@ export function denverMidnightsBetween(start: Date, end: Date): Date[] {
   }
   return out;
 }
+
+// Destination-local calendar helpers. Denver wrappers remain for Utah source timestamps.
+export function zonedParts(date: Date, timeZone: string = TZ) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(date).map(p => [p.type,p.value]));
+  return { year: +parts.year, month: +parts.month, day: +parts.day, hour: +parts.hour, minute: +parts.minute, second: +parts.second };
+}
+export function zonedToUtc(year: number, month: number, day: number, hour = 0, minute = 0, second = 0, timeZone: string = TZ): Date {
+  const wall = Date.UTC(year, month-1, day, hour, minute, second);
+  let guess = wall;
+  for (let i=0;i<3;i++) { const p=zonedParts(new Date(guess),timeZone); guess += wall-Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute,p.second); }
+  return new Date(guess);
+}
+export function localDate(date: Date, timeZone: string = TZ): string {
+  const p=zonedParts(date,timeZone); return `${p.year}-${String(p.month).padStart(2,"0")}-${String(p.day).padStart(2,"0")}`;
+}
+export function formatLocal(iso: string | null | undefined, now = new Date(), timeZone: string = TZ): string {
+  if (!iso || !Number.isFinite(Date.parse(iso))) return "unknown";
+  const d=new Date(iso);
+  return new Intl.DateTimeFormat("en-US", { timeZone, weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit", timeZoneName:"short" }).format(d);
+}
+export function parseLocalDateTime(text: string | null | undefined, timeZone: string = TZ): string | null {
+  const m=text?.trim().match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  return m ? zonedToUtc(+m[1],+m[2],+m[3],+m[4],+m[5],+(m[6]??0),timeZone).toISOString() : null;
+}
+
+export function localMidnightsBetween(start:Date,end:Date,timeZone:string=TZ):Date[]{
+ const p=zonedParts(start,timeZone),out:Date[]=[];
+ for(let i=0;i<400;i++){const d=zonedToUtc(p.year,p.month,p.day+i,0,0,0,timeZone);if(d>end)break;if(d>start)out.push(d);}
+ return out;
+}

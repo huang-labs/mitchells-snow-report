@@ -1,3 +1,4 @@
+import { RESORTS,regionById,type RegionId } from "@/lib/catalog";
 import { findSection } from "@/lib/sections";
 import styles from "./loading.module.css";
 
@@ -21,7 +22,7 @@ function Layout({ kind }: { kind: string }) {
     case "regional":
       return (
         <div className={styles.snowfall}>
-          {["Alta", "Snowbird", "Solitude", "Brighton"].map((name) => (
+          {RESORTS.map(({name}) => (
             <div className={styles.snowRow} key={name}>
               <div className={styles.resortName}>{name}</div>
               <div className={styles.snowStrip}>
@@ -49,19 +50,6 @@ function Layout({ kind }: { kind: string }) {
           ))}
         </div>
       );
-    case "traffic":
-      return (
-        <div className={styles.columns}>
-          {["Little Cottonwood Canyon", "Big Cottonwood Canyon"].map((name) => (
-            <div className={styles.canyon} key={name}>
-              <h2>{name}</h2>
-              <div className={styles.camera} />
-              <div className={styles.summary}><Lines /></div>
-              <Lines />
-            </div>
-          ))}
-        </div>
-      );
     default:
       return (
         <div className={styles.resort}>
@@ -77,15 +65,15 @@ function Layout({ kind }: { kind: string }) {
   }
 }
 
-function pageTitle(id: string) {
-  if (id === "weather") return "Cottonwoods mountain weather";
-  if (id === "plumes") return "Utah ensemble snow plumes";
+function pageTitle(id: string,region:RegionId="utah") {
+  if (id === "weather") return `${regionById(region)!.name} mountain weather`;
+  if (id === "plumes") return `${regionById(region)!.name} ensemble snow plumes`;
   return findSection(id)?.title ?? "Snow report";
 }
 
 /** One entry point for initial report loads and direct Daily Snow archive loads. */
-export function ReportLoading({ sectionId }: { sectionId: string }) {
-  const title = pageTitle(sectionId);
+export function ReportLoading({ sectionId,region }: { sectionId: string;region?:RegionId }) {
+  const title = pageTitle(sectionId,region);
   return (
     <div className={`${styles.loading} ${sectionId === "daily-snow" ? styles.reading : ""}`}>
       <span className={styles.screenReader} role="status">Loading {title}…</span>

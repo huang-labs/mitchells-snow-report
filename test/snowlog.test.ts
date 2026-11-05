@@ -224,7 +224,7 @@ describe("timeline model", () => {
       log: { resorts: { alta: { "2026-11-01": { state: "reported", valueIn: 5, label: "Last 24 hrs", windowEnd: "2026-11-01T03:00:00Z", collectedAt: "2026-11-01T13:00:00Z" } } }, forecasts: {} },
     });
     // 9 PM MDT on Oct 31, stored under the Nov 1 morning.
-    expect(evening.past.at(-1)!.detail).toBe("Sun, Nov 1 · 5″ reported by Alta (“Last 24 hrs” at Sat, Oct 31, 9:00 PM)");
+    expect(evening.past.at(-1)!.detail).toBe("Sun, Nov 1 · 5″ reported by Alta (“Last 24 hrs” at Oct 31, 9:00 PM)");
   });
 
   it("names the day boundary in local time across the daylight-saving change", () => {
@@ -234,7 +234,7 @@ describe("timeline model", () => {
     expect(model.future[1].detail).toMatch(/1\.2″ NWS forecast, 24 h to 5 AM/);
     // This forecast ends 6 days out, partway through the last day: no partial total.
     expect(model.future.at(-1)).toMatchObject({ state: "no_forecast", amountIn: null });
-    expect(model.last24.detail).toBe("Last 24 h · 3″ reported by Alta (“Last 24 hrs”, report Today 3:00 PM)");
+    expect(model.last24.detail).toBe("Last 24 h · 3″ reported by Alta (“Last 24 hrs”, report Sun, Nov 1, 3:00 PM MST)");
   });
 
   it("dates an old report in the screen-reader description, so it can't pass for today's", () => {
@@ -242,7 +242,7 @@ describe("timeline model", () => {
       resort: "alta", name: "Alta", canyon: "LCC", log, now, forecast: null,
       report: { reportTime: "2026-10-29T22:00:00Z", snowfall: { h24: inches(3) } } as unknown as ResortReport,
     });
-    expect(stale.last24.detail).toMatch(/report Thu, Oct 29, 4:00 PM\)$/);
+    expect(stale.last24.detail).toMatch(/report Thu, Oct 29, 4:00 PM MDT\)$/);
   });
 
   it("shares one bar scale, between 6″ and 18″", () => {

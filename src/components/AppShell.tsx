@@ -9,7 +9,7 @@ import { DashboardContext, DataBanners, type DashboardData } from "./dashboard-c
 import { useNow, useReport } from "./hooks";
 
 /** Appearance override, stored in localStorage; absent means "follow the system". */
-const APPEARANCE_KEY = "cottonwoods-snow-report.appearance";
+const APPEARANCE_KEY = "mitchells-snow-report.appearance";
 type Appearance = "light" | "dark";
 
 function readAppearance(storage: Pick<Storage, "getItem"> | undefined): Appearance | null {
@@ -75,7 +75,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="app">
         <header className="editorial-nav">
           <div className="editorial-nav__masthead">
-            <Link href="/" className="editorial-nav__brand">Cottonwoods <span>Snow Report</span></Link>
+            <Link href="/" className="editorial-nav__brand">Mitchell’s <span>Snow Report</span></Link>
             <div className="appearance-control" role="group" aria-label="Appearance">
               {(["light", "dark"] as const).map((mode) => (
                 <button key={mode} type="button" aria-label={`${mode === "light" ? "Light" : "Dark"} appearance`}
