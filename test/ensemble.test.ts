@@ -44,6 +44,13 @@ describe("published ensemble parser", () => {
   ])("rejects changed %s", (_, before, after) => {
     expect(() => parseEnsemble(html.replace(before, after))).toThrow();
   });
+  it("normalizes six-hour liquid trace negatives up to -0.05 and rejects larger ones", () => {
+    // The live table began publishing -0.02 in the minimum-member row on Nov 5, 2026.
+    expect(html).toContain(">-0.01<");
+    expect(parseEnsemble(html.replace(">-0.01<", ">-0.02<")).traceLiquidCorrections).toBe(3);
+    expect(parseEnsemble(html.replace(">-0.01<", ">-0.05<")).traceLiquidCorrections).toBe(3);
+    expect(() => parseEnsemble(html.replace(">-0.01<", ">-0.06<"))).toThrow(/Non-numeric ensemble value: liquidIn/);
+  });
   it("rejects absent tables and truncated periods", () => {
     expect(() => parseEnsemble(html.replace(/<table>[\s\S]*?<\/table>/, ""))).toThrow();
     expect(() => parseEnsemble(html.replace(/<td[^>]*>[^<]*<\/td>/, ""))).toThrow();

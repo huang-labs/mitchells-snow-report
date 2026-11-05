@@ -45,9 +45,9 @@ export function parseEnsemble(html: string): EnsemblePayload {
     values[key] = PERCENTILES.map((name, j) => {
       assertValid(rows[j + 1][0] === name, `Missing/ordered ensemble percentile: ${key} ${name}`);
       return rows[j + 1].slice(1).map((text) => {
-        // Published six-hour liquid contains nonphysical -0.01 in trace values.
-        // Normalize only that exact trace value; all other negatives fail.
-        if (key === "liquidIn" && text === "-0.01") { traceLiquidCorrections++; return 0; }
+        // Published six-hour liquid contains nonphysical trace negatives (-0.01, -0.02)
+        // from rounding. Normalize trace negatives down to -0.05; larger negatives fail.
+        if (key === "liquidIn" && /^-0\.0[1-5]$/.test(text)) { traceLiquidCorrections++; return 0; }
         assertValid(/^\d+(?:\.\d+)?$/.test(text), `Non-numeric ensemble value: ${key}`);
         const n = Number(text);
         assertValid(Number.isFinite(n) && n >= 0, `Invalid ensemble value: ${key}`);

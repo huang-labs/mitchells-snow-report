@@ -503,7 +503,7 @@ export interface ApiDailySnow extends DailySnowPost {
 /** Each variable is percentile rows × 40 six-hour lead columns. Totals are from initialization. */
 export type EnsembleVariable = "totalLiquidIn" | "totalSnowIn" | "liquidIn" | "snowIn" | "slr" | "wetBulbHalfFt";
 export interface EnsemblePayload {
-  /** Exact -0.01 in six-hour liquid normalized to zero; no other negative accepted. */
+  /** Six-hour liquid trace negatives (-0.01 to -0.05) normalized to zero; larger negatives are rejected. */
   traceLiquidCorrections: number;
   sourceUrl: string;
   model: string;
