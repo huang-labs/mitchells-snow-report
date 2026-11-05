@@ -15,7 +15,7 @@ import { StatusBadge } from "../ui";
 
 const SECTION_TITLE: Record<DailySnowSectionId, string> = { update: "Today", "short-term": "Next Few Days", extended: "Extended Forecast" };
 /** West covers this week with NWS points and week two with NOAA's outlook. */
-const WEST_SECTION_TITLE: Record<DailySnowSectionId, string> = { update: "The Big Picture", "short-term": "This Week", extended: "Week Two" };
+const WEST_SECTION_TITLE: Record<DailySnowSectionId, string> = { update: "The Big Picture", "short-term": "Short Term Forecast", extended: "Extended Forecast" };
 /** Display names by Workers AI model id suffix. */
 const MODEL_NAME: Record<string, string> = { "glm-5.3-flash": "GLM 5.3 Flash", "gpt-oss-120b": "gpt-oss-120b" };
 const modelName = (id: string) => MODEL_NAME[id.split("/").pop() ?? ""] ?? id;

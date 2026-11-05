@@ -376,7 +376,7 @@ it("shows the West selector before the article and renders forecast zeros separa
   const article = screen.getByRole("article");
   expect(article.firstElementChild).toBe(screen.getByRole("combobox", { name: "Region" }));
   expect(screen.getByRole("heading", { name: "The Big Picture" })).toBeTruthy();
-  expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(expect.arrayContaining(["The Big Picture", "This Week", "Week Two"]));
+  expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(expect.arrayContaining(["The Big Picture", "Short Term Forecast", "Extended Forecast"]));
   const table = within(screen.getByRole("table", { name: "NWS this week" }));
   expect(table.getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Mountain forecast point", "Days 1–3Thu–Sun", "Days 4–7Sun–Thu"]);
   expect(table.getByText("4.5″")).toBeTruthy();
