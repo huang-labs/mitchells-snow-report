@@ -61,4 +61,4 @@ The application still reflects the inherited Cottonwoods version.
 
 ## AI code review
 
-PRs use an advisory reviewer from another model family. Apply exactly one author label: `author:codex`, `author:claude`, or `author:glm`. See [AI code review](docs/AI_CODE_REVIEW.md) for setup, model routing and the `/review` command.
+PRs use an advisory reviewer from another model family. Apply exactly one author label: `author:codex`, `author:claude`, or `author:glm`; an optional `review:claude`, `review:gpt` or `review:glm` label picks the reviewer family. See [AI code review](docs/AI_CODE_REVIEW.md) for setup, model routing and the `/review` command.

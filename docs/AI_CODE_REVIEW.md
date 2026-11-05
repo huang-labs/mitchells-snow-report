@@ -18,6 +18,12 @@ stable across pushes while distributing reviews between the other two families:
 | `author:claude` | GPT-6.1 Sol | GLM 5.3 |
 | `author:glm` | Claude Opus 5.5 | GPT-6.1 Sol |
 
+To choose the reviewer instead, add one `review:claude`, `review:gpt` or
+`review:glm` label naming a family other than the author's. It overrides parity
+for every later review on that PR; removing it returns to parity. A `review:`
+label matching the author family, or more than one `review:` label, produces an
+Actions notice without inference.
+
 Setup: store a dedicated OpenRouter key as Actions secret `OPENROUTER_API_KEY`;
 set its spending cap/reset period in OpenRouter. Defaults are
 `anthropic/claude-opus-5.5`, `openai/gpt-6.1-sol`, and `z-ai/glm-5.3`. Optional
@@ -27,7 +33,7 @@ repository variables `AI_REVIEW_CLAUDE_MODEL`, `AI_REVIEW_GPT_MODEL`, and
 may switch hosting providers serving the same model. Review content is sent to
 OpenRouter and the selected provider under your account privacy settings.
 
-Reviews run on open, reopen, ready-for-review, pushes and author-label changes.
+Reviews run on open, reopen, ready-for-review, pushes and author- or review-label changes.
 Drafts, forks, Dependabot and bot events are skipped. Missing/conflicting author
 labels produce an Actions notice without inference. A collaborator with current
 write/maintain/admin permission can post exactly `/review` to rerun; other

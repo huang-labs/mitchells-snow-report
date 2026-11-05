@@ -19,7 +19,8 @@ jobs:
         github.event.pull_request.head.repo.full_name == github.repository &&
         !github.event.pull_request.draft &&
         (github.event.action != 'labeled' && github.event.action != 'unlabeled' ||
-         startsWith(github.event.label.name, 'author:'))) ||
+         startsWith(github.event.label.name, 'author:') ||
+         startsWith(github.event.label.name, 'review:'))) ||
        (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
         github.event.comment.body == '/review'))
     runs-on: blacksmith-2vcpu-ubuntu-2404
@@ -54,7 +55,22 @@ jobs:
               return;
             }
             const candidates = Object.keys(models).filter(family => `author:${family}` !== authors[0]);
-            const family = candidates[number % candidates.length];
+            // An optional review:<family> label picks one of the other two families; otherwise PR-number parity does.
+            const requested = pr.labels.map(label => label.name).filter(label => ['review:claude', 'review:gpt', 'review:glm'].includes(label));
+            if (requested.length > 1) {
+              const notice = 'Apply at most one review:claude, review:gpt, or review:glm label. No review credits were spent.';
+              core.notice(notice);
+              await core.summary.addRaw(notice).write();
+              return;
+            }
+            const override = requested.length ? { 'review:claude': 'claude', 'review:gpt': 'codex', 'review:glm': 'glm' }[requested[0]] : null;
+            if (override && !candidates.includes(override)) {
+              const notice = `${requested[0]} matches the author family (${authors[0]}); reviews must come from another family. No review credits were spent.`;
+              core.notice(notice);
+              await core.summary.addRaw(notice).write();
+              return;
+            }
+            const family = override ?? candidates[number % candidates.length];
             const model = models[family];
             const vendor = { claude: 'anthropic', codex: 'openai', glm: 'z-ai' }[family];
             if (!new RegExp(`^${vendor}/[a-zA-Z0-9._-]+$`).test(model)) throw new Error('Invalid reviewer model variable; use an explicit same-vendor OpenRouter model ID without the openrouter/ prefix.');
