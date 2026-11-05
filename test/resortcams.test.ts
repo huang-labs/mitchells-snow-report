@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { runCollection } from "@/lib/collect";
+import { createFetchContext } from "@/lib/http";
+import { embeddedCams } from "@/lib/sources/resortcams";
 import {
   captureTime,
   parseAltaCams,
@@ -133,5 +135,16 @@ describe("resort webcam collection", () => {
 
   it("is not a required source", () => {
     expect(resortCamsSource.required).toBe(false);
+  });
+});
+
+describe("embedded official resort cameras", () => {
+  it("skips a malformed iframe URL without dropping the resort's other cameras", async () => {
+    const page = `<iframe title="Bad" src="https://exa mple.com:bad/"></iframe>
+      <iframe title="Summit cam" src="https://g0.ozolio.com/player/abc"></iframe>`;
+    const fetchImpl = (async () => new Response(page, { headers: { "Content-Type": "text/html" } })) as typeof fetch;
+    const ctx = createFetchContext({}, FIXTURE_NOW, fetchImpl);
+    const cams = await embeddedCams(ctx, "telluride", "https://tellurideskiresort.com/webcams/", {});
+    expect(cams.map((c) => c.title)).toEqual(["Summit cam"]);
   });
 });

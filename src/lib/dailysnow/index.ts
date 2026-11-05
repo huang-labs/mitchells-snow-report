@@ -32,7 +32,7 @@ const MAX_IMAGE_BYTES = 3_000_000;
 
 /** Point the archived post at `date` forward to its newer neighbor. A failure only costs that one
     "newer" link (the page falls back to the archive list), so it never fails the new post. */
-async function linkNewer(kv: KVLike, date: string, newer: DailySnowLink, now: Date): Promise<void> {
+export async function linkNewer(kv: KVLike, date: string, newer: DailySnowLink, now: Date): Promise<void> {
   try {
     const raw = await kv.get(dailySnowKey(date), "text");
     if (!raw) return;

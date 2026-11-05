@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { formatDenver } from "@/lib/time";
+import { formatLocalRelative } from "@/lib/time";
 import { MetricValue } from "../ui";
 import { barLabel, type SnowTimelineModel, type TimelineDay } from "./model";
 import "./timeline.css";
@@ -66,7 +66,7 @@ export function SnowTimeline({
 }) {
   const m = model.last24.metric;
   // A figure without a report time is "Time unknown"; "No report" means no figure at all.
-  const reportTime = model.last24.reportTime ? formatDenver(model.last24.reportTime, now) : m ? "Time unknown" : null;
+  const reportTime = model.last24.reportTime ? formatLocalRelative(model.last24.reportTime, now, model.timeZone) : m ? "Time unknown" : null;
   return (
     <div className="snowtl">
       <div className="snowtl__head">

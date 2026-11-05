@@ -394,14 +394,16 @@ export function buildDailyDigest(
   for (const [area, state] of Object.entries(snapshot.areaStorms ?? {})) {
     const event = stormForPost(state, now);
     if (!event) continue;
+    // Readers and the model see the forecast area's display name, never its internal id.
+    const name = FORECAST_AREAS.find((a) => a.id === area)?.name ?? area;
     figures.push({
       figure: {
         id: `storm-recap-${area.toLowerCase()}`,
         kind: "storm-recap",
         storm: event,
-        caption: `Storm observations · ${area}`,
+        caption: `Storm observations · ${name}`,
       },
-      describe: `Retained source observations for ${area} only. Rolling observations are not storm totals; do not add them.`,
+      describe: `Retained source observations for ${name} only. Rolling observations are not storm totals; do not add them.`,
     });
   }
   const t = now.getTime();

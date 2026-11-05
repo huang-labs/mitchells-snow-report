@@ -13,7 +13,10 @@ export function RegionalPage({ report, now }: { report: ReportResponse; now: Dat
       canyon: r.canyon,
       report: report.sources[r.id]?.payload as ResortReport | null,
       log: report.snowLog,
-      forecast: points.find((p) => (p.id ?? (/BCC/.test(p.name) ? "BCC" : "LCC")) === r.canyon) ?? null,
+      // A failing point keeps its last payload for the Weather page; the timeline
+      // shows no forecast rather than presenting old guidance as current.
+      forecast:
+        points.find((p) => !p.lastError && (p.id ?? (/BCC/.test(p.name) ? "BCC" : "LCC")) === r.canyon) ?? null,
       now,
       timeZone: resortTimeZone(r.id),
     }),

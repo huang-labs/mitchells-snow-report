@@ -35,6 +35,8 @@ export interface SnowTimelineModel {
   future: TimelineDay[];
   last24: { metric: Metric | null; reportTime: string | null; detail: string };
   canyon: CanyonId;
+  /** The resort's IANA zone; report times display in it. */
+  timeZone?: string;
 }
 
 const tz = "America/Denver";
@@ -137,7 +139,7 @@ export function buildSnowTimeline(input: {
       : metric.state === "not_reported"
         ? `Last 24 h · ${name} left its 24 h total empty${at}`
         : `Last 24 h · ${name} doesn’t publish a 24 h total`;
-  return { past, future, last24: { metric, reportTime: report?.reportTime ?? null, detail }, canyon };
+  return { past, future, last24: { metric, reportTime: report?.reportTime ?? null, detail }, canyon, timeZone };
 }
 
 /** One scale for timelines shown together, so equal amounts draw equal bars. */
