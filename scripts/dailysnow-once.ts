@@ -8,7 +8,6 @@ import { channelById } from "../src/lib/catalog";
 import { historyEntry } from "../src/lib/dailysnow/continuity";
 import { buildDailyDigest } from "../src/lib/dailysnow/digest";
 import { regionalSnapshot } from "../src/lib/dailysnow/regions";
-import { seedStormTracking } from "../src/lib/dailysnow/storms";
 import { buildModelInput, validateDailySnow } from "../src/lib/dailysnow/llm";
 import { buildWesternInput, westernModelInput, validateWestern } from "../src/lib/dailysnow/western";
 import type { ApiDailySnow, ReportResponse, Snapshot, DailySnowPost } from "../src/lib/types";
@@ -23,7 +22,9 @@ const now=arg("--now")?new Date(arg("--now")!):new Date();
 const response=await fetch(url);
 if(!response.ok)throw new Error("Report HTTP "+response.status);
 const report=await response.json() as ReportResponse;
-let snapshot:Snapshot={schemaVersion:1,writtenAt:report.snapshotWrittenAt??now.toISOString(),sources:report.sources};
+// The same inputs collection hands to runChannels: sources plus per-area storm memory and operating history.
+let snapshot:Snapshot={schemaVersion:1,writtenAt:report.snapshotWrittenAt??now.toISOString(),sources:report.sources,areaStorms:report.areaStorms,resortLastOperatingAt:report.resortLastOperatingAt};
+if(!report.areaStorms||!report.resortLastOperatingAt)console.error("warning: this report predates exposed storm memory; area storm recaps and operating history are missing from the digest");
 const model=arg("--model")??PRIMARY_MODEL;
 const saved=arg("--validate"),saveTo=arg("--save-digest");
 if(channel.id==="western-us"){
@@ -40,7 +41,6 @@ if(channel.id==="western-us"){
     const res=await fetch(new URL("/api/daily-snow?date="+date+"&channel="+channel.id,url));
     return res.ok?await res.json() as ApiDailySnow:null;
   }))).filter((p):p is ApiDailySnow=>!!p);
-  snapshot.stormTracking=seedStormTracking(posts,now);
   const {digest}=buildDailyDigest(snapshot,current,posts.map(historyEntry),now);
   if(saveTo)writeFileSync(saveTo,JSON.stringify(digest,null,2));
   console.log(JSON.stringify(saved?validateDailySnow(responseJson(JSON.parse(readFileSync(saved,"utf8"))),digest):process.argv.includes("--digest")?digest:buildModelInput(model,digest),null,2));

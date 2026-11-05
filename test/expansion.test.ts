@@ -617,3 +617,51 @@ describe("collection and publication survive secondary write failures", () => {
     expect(state.consecutiveFailures).toBe(0);
   });
 });
+
+describe("prompt tuning inputs", () => {
+  it("rebuilds the same regional digest from /api/report as production gets from the snapshot", () => {
+    const at = new Date(+now - 10 * 60000).toISOString();
+    const s = structuredClone(base);
+    s.resortLastOperatingAt = { telluride: at };
+    s.areaStorms = {
+      ...s.areaStorms,
+      telluride: {
+        checkedAt: at,
+        cursors: {},
+        events: [
+          {
+            id: `telluride:${at}`,
+            firstObservedAt: at,
+            lastSnowAt: at,
+            updatedAt: at,
+            status: "active",
+            closedAt: null,
+            closureReason: null,
+            resorts: [
+              {
+                id: "telluride",
+                name: "Telluride",
+                total: null,
+                rolling: { amountIn: 4, window: "24h", reportTime: at, collectedAt: at, sourceUrl: "https://example.test" },
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const report = buildReport(s, now);
+    // As scripts/dailysnow-once.ts builds it from the public report.
+    const tuning: Snapshot = {
+      schemaVersion: 1,
+      writtenAt: report.snapshotWrittenAt!,
+      sources: report.sources,
+      areaStorms: report.areaStorms,
+      resortLastOperatingAt: report.resortLastOperatingAt,
+    };
+    const production = buildDailyDigest(regionalSnapshot(s, "colorado"), null, [], now).digest;
+    const rebuilt = buildDailyDigest(regionalSnapshot(tuning, "colorado"), null, [], now).digest;
+    expect(production.areaStorms).toHaveLength(1);
+    expect(production.figures.map((f) => f.id)).toContain("storm-recap-telluride");
+    expect(rebuilt).toEqual(production);
+  });
+});

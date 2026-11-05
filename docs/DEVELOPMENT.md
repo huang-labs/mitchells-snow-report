@@ -28,7 +28,7 @@ Use a free port per worktree. KV persists in `.wrangler/state`; worktrees do not
 
 ## Model evaluation
 
-`dailysnow:once` is read-only: it prints a real model request or digest, without inference or storage writes. It defaults to Mitchell's production report and Western; specify a local/preview report for unreleased features.
+`dailysnow:once` is read-only: it prints a real model request or digest, without inference or storage writes. It defaults to Mitchell's production report and Western; specify a local/preview report for unreleased features. Regional digests are rebuilt from the report's sources, per-area storm memory (`areaStorms`) and operating history (`resortLastOperatingAt`), the same inputs the collection cron passes to publication.
 
 ```sh
 npm run -s dailysnow:once -- --url http://localhost:8793/api/report --channel utah --digest
