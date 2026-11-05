@@ -194,7 +194,7 @@ describe("app shell", () => {
     const view = renderAt("/alta");
     await loadedHeading("Alta");
     expect(fireEvent.click(screen.getByRole("link", { name: "Forecast ↗" }))).toBe(false);
-    expect(nav.pathname).toBe("/weather");
+    expect(nav.pathname).toBe("/weather/utah");
     view.rerender(<AppShell><SectionView id="weather" /></AppShell>);
     expect(screen.getByRole("heading", { level: 1, name: "Utah mountain weather" })).toBeTruthy();
     expect(document.querySelector("[aria-busy=true]")).toBeNull();

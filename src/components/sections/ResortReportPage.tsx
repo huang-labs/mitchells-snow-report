@@ -195,7 +195,7 @@ export function ResortReportPage({
       >
         <div className="resort-section-heading">
           <h2 id="resort-weather-heading">On the mountain</h2>
-          <Link href="/weather">Forecast ↗</Link>
+          <Link href={`/weather/${resortById(source.id)?.region??"utah"}`}>Forecast ↗</Link>
         </div>
         {observations.length === 0 ? (
           <p className="muted">
