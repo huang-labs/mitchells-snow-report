@@ -8,9 +8,14 @@ import { denverMidnightsBetween } from "@/lib/time";
 import type { PlumeChart, PlumePayload } from "@/lib/types";
 import { createFixtureFetch, FIXTURE_NOW, fixtureBytes } from "./fixtureFetch";
 
+// Each plume collection decodes, crops and re-encodes 12 full-size charts, so
+// tests that run several collections take ~3-5 s on CI runners; vitest's 5 s
+// default leaves no headroom.
+const IMAGE_HEAVY = { timeout: 20_000 };
+
 const chart = () => fixtureBytes("utah-plume-CLN-2026110100.png");
 
-describe("plume panel cropping", () => {
+describe("plume panel cropping", IMAGE_HEAVY, () => {
   it("finds the accumulated snow and SLR panels from the chart's axes frames", () => {
     const panels = cropSnowPanels(chart());
     expect(panels.map((p) => p.id)).toEqual(["snow", "slr"]);
@@ -68,7 +73,7 @@ describe("plume panel cropping", () => {
   });
 });
 
-describe("plume collection", () => {
+describe("plume collection", IMAGE_HEAVY, () => {
   it("stores cropped panels per station and run, and references them by same-origin URL", async () => {
     const kv = new MemoryKV();
     const { fetchImpl } = createFixtureFetch();
@@ -112,7 +117,7 @@ describe("plume collection", () => {
   });
 });
 
-describe("plume panel recovery", () => {
+describe("plume panel recovery", IMAGE_HEAVY, () => {
   const H = 3_600_000;
   const pngCalls = (calls: string[]) => calls.filter((u) => u.endsWith(".png")).length;
   const charts = async (kv: MemoryKV) => ((await readSnapshot(kv))!.sources.plumes!.payload as PlumePayload).charts;
