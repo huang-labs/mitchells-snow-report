@@ -79,11 +79,12 @@ function NavRow({ label, pathname, children }: { label: string; pathname: string
   );
 }
 
-/** Regional URLs are authoritative; bare forecast routes use their normal defaults. */
+/** Only explicit regional URLs select a regional Daily Snow. Bare Weather/Plumes
+ * show fallback Utah while keeping national Daily Snow selected. */
 function channelFromPath(pathname: string | null): ChannelId | null {
   const [, section, region] = (pathname ?? "").split("/");
   if (!["daily-snow", "weather", "plumes"].includes(section)) return null;
-  return regionById(region)?.id ?? (section === "daily-snow" ? "western-us" : "utah");
+  return regionById(region)?.id ?? "western-us";
 }
 
 /** Resort pages keep Resorts marked as their parent; the homepage lists resorts. */

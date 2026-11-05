@@ -131,11 +131,19 @@ describe("forecast tab destinations", () => {
     expect(screen.getByRole("link", { name: "Plumes" }).getAttribute("href")).toBe("/plumes");
   });
 
-  it("uses Utah when visiting a base Weather or Plumes URL", () => {
-    const { rerender } = render(<SectionNav pathname="/weather" />);
+  it.each(["weather", "plumes"])("keeps national Daily Snow through fallback Utah on %s until a region is explicitly selected", (section) => {
+    const { rerender } = render(<SectionNav pathname="/daily-snow" />);
+    rerender(<SectionNav pathname={`/${section}`} />);
+    expect(screen.getByRole("link", { name: "Daily Snow" }).getAttribute("href")).toBe("/daily-snow");
+    expect(screen.getByRole("link", { name: "Weather" }).getAttribute("href")).toBe("/weather");
+    expect(screen.getByRole("link", { name: "Plumes" }).getAttribute("href")).toBe("/plumes");
+    rerender(<SectionNav pathname="/" />);
+    expect(screen.getByRole("link", { name: "Daily Snow" }).getAttribute("href")).toBe("/daily-snow");
+    // Explicit Utah selection is different from viewing Utah as the national fallback.
+    rerender(<SectionNav pathname={`/${section}/utah`} />);
     expect(screen.getByRole("link", { name: "Daily Snow" }).getAttribute("href")).toBe("/daily-snow/utah");
-    rerender(<SectionNav pathname="/plumes" />);
-    expect(screen.getByRole("link", { name: "Weather" }).getAttribute("href")).toBe("/weather/utah");
+    rerender(<SectionNav pathname="/" />);
+    expect(screen.getByRole("link", { name: "Daily Snow" }).getAttribute("href")).toBe("/daily-snow/utah");
   });
 });
 
