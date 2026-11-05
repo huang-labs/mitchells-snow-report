@@ -211,7 +211,7 @@ export function westernPatternFigure(input: ReturnType<typeof buildWesternInput>
       originUrl: o.image.originUrl,
       width: o.image.width,
       height: o.image.height,
-      caption: `NOAA Climate Prediction Center 8–14-day 500-mb height outlook · ${o.validLabel} · issued ${o.issuedLocal}. Lines show forecast mid-level heights; shading shows departures from normal (above normal suggests ridging, below normal suggests troughing).`,
+      caption: `NOAA Climate Prediction Center 8–14-day 500-mb height outlook · ${o.validLabel} · issued ${o.issuedLocal}. Solid green lines show forecast mid-level heights; dashed lines show departures from normal, red above (ridging) and blue below (troughing).`,
     },
     describe: "NOAA 8–14-day 500-mb height outlook map",
     source: { kind: "kv", key: o.image.key },
