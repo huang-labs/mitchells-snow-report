@@ -21,8 +21,8 @@ is visible in the gateway's logs.
 
 Reviews run on open, reopen, ready-for-review and pushes. Drafts, forks, Dependabot
 and bot events are skipped. There is no comment command: to rerun, push a new
-commit (`git commit --allow-empty` works). Each commit is reviewed at most once;
-duplicate events for a commit replace each other, and an event for a commit that
+commit (`git commit --allow-empty` works). Each push, reopen or ready-for-review
+event reviews the PR head once; duplicate events for a commit replace each other, and an event for a commit that
 is no longer the PR head is skipped before inference. A review already running
 for an older commit finishes, so rapid pushes can each use a request. Automatic description
 rewriting and code suggestion generation are disabled. Review findings are
