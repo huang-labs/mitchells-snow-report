@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { SECTIONS, sectionHref } from "@/lib/sections";
+import { regionById, type ChannelId } from "@/lib/catalog";
 
 // useLayoutEffect warns during server rendering; measuring only happens in the browser.
 const useBrowserLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -78,8 +79,24 @@ function NavRow({ label, pathname, children }: { label: string; pathname: string
   );
 }
 
+/** Regional URLs are authoritative; bare forecast routes use their normal defaults. */
+function channelFromPath(pathname: string | null): ChannelId | null {
+  const [, section, region] = (pathname ?? "").split("/");
+  if (!["daily-snow", "weather", "plumes"].includes(section)) return null;
+  return regionById(region)?.id ?? (section === "daily-snow" ? "western-us" : "utah");
+}
+
 /** Resort pages keep Resorts marked as their parent; the homepage lists resorts. */
 export function SectionNav({ pathname }: { pathname: string | null }) {
+  const routeChannel = channelFromPath(pathname);
+  const [rememberedChannel, setRememberedChannel] = useState<ChannelId>("western-us");
+  // Derive links from the current URL immediately. The effect only remembers the
+  // selection for a detour through Resorts; it never redirects or changes content.
+  const channel = routeChannel ?? rememberedChannel;
+  useEffect(() => {
+    if (routeChannel) setRememberedChannel(routeChannel);
+  }, [routeChannel]);
+
   const home = sectionHref(SECTIONS[0].id);
   const resort = SECTIONS.find((s) => s.group && sectionHref(s.id) === pathname);
 
@@ -87,7 +104,8 @@ export function SectionNav({ pathname }: { pathname: string | null }) {
     <div className="section-nav">
       <NavRow label="Sections" pathname={pathname}>
         {SECTIONS.filter((s) => !s.group).map((s) => (
-          <Link key={s.id} href={sectionHref(s.id)}
+          <Link key={s.id} href={channel !== "western-us" && ["daily-snow", "weather", "plumes"].includes(s.id)
+            ? `${sectionHref(s.id)}/${channel}` : sectionHref(s.id)}
             aria-current={(sectionHref(s.id) === pathname || pathname?.startsWith(`${sectionHref(s.id)}/`)) ? "page" : undefined}
             data-current={sectionHref(s.id) === home && resort ? "" : undefined}>{s.label}</Link>
         ))}

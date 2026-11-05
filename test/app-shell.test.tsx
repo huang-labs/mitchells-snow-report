@@ -109,6 +109,36 @@ async function loadedHeading(name: string) {
   return screen.findByRole("heading", { level: 1, name });
 }
 
+describe("forecast tab destinations", () => {
+  it.each(["daily-snow", "weather", "plumes"])("links directly to the selected region from %s", (section) => {
+    render(<SectionNav pathname={`/${section}/mammoth`} />);
+    for (const [label, target] of [["Daily Snow", "daily-snow"], ["Weather", "weather"], ["Plumes", "plumes"]]) {
+      expect(screen.getByRole("link", { name: label }).getAttribute("href")).toBe(`/${target}/mammoth`);
+    }
+    expect(screen.getByRole("link", { name: section === "daily-snow" ? "Daily Snow" : section === "weather" ? "Weather" : "Plumes" }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("remembers the region through Resorts and resets it when national Daily Snow is selected", () => {
+    const { rerender } = render(<SectionNav pathname="/plumes/tahoe" />);
+    rerender(<SectionNav pathname="/" />);
+    expect(screen.getByRole("link", { name: "Weather" }).getAttribute("href")).toBe("/weather/tahoe");
+    expect(screen.getByRole("link", { name: "Daily Snow" }).getAttribute("href")).toBe("/daily-snow/tahoe");
+    rerender(<SectionNav pathname="/daily-snow" />);
+    expect(screen.getByRole("link", { name: "Daily Snow" }).getAttribute("href")).toBe("/daily-snow");
+    expect(screen.getByRole("link", { name: "Weather" }).getAttribute("href")).toBe("/weather");
+    expect(screen.getByRole("link", { name: "Plumes" }).getAttribute("href")).toBe("/plumes");
+    rerender(<SectionNav pathname="/alta" />);
+    expect(screen.getByRole("link", { name: "Plumes" }).getAttribute("href")).toBe("/plumes");
+  });
+
+  it("uses Utah when visiting a base Weather or Plumes URL", () => {
+    const { rerender } = render(<SectionNav pathname="/weather" />);
+    expect(screen.getByRole("link", { name: "Daily Snow" }).getAttribute("href")).toBe("/daily-snow/utah");
+    rerender(<SectionNav pathname="/plumes" />);
+    expect(screen.getByRole("link", { name: "Weather" }).getAttribute("href")).toBe("/weather/utah");
+  });
+});
+
 describe("app shell", () => {
   it.each(SECTIONS)("shows an accessible initial skeleton for $id, then ready content", async ({ id, title }) => {
     let respond!: (response: Response) => void;
