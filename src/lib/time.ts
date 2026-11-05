@@ -185,7 +185,7 @@ export function formatLocal(iso: string | null | undefined, now = new Date(), ti
   const d=new Date(iso);
   return cachedDateFormat("en-US", { timeZone, weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit", timeZoneName:"short" }).format(d);
 }
-/** "Today 5:00 PM", "Yesterday 7:00 AM" or "Mon, Oct 26, 9:00 AM" in a destination's time zone. */
+/** "Today 5:00 PM", "Yesterday 7:00 AM" or "Oct 26, 9:00 AM" in a destination's time zone. */
 export function formatLocalRelative(iso: string | null | undefined, now = new Date(), timeZone: string = TZ): string {
   if (!iso || !Number.isFinite(Date.parse(iso))) return "unknown";
   const d = new Date(iso);
@@ -194,7 +194,7 @@ export function formatLocalRelative(iso: string | null | undefined, now = new Da
   if (day(d) === day(now)) return `Today ${time}`;
   if (day(d) === day(new Date(now.getTime() - 86_400_000))) return `Yesterday ${time}`;
   if (day(d) === day(new Date(now.getTime() + 86_400_000))) return `Tomorrow ${time}`;
-  return cachedDateFormat("en-US", { timeZone, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(d);
+  return cachedDateFormat("en-US", { timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(d);
 }
 export function parseLocalDateTime(text: string | null | undefined, timeZone: string = TZ): string | null {
   const m=text?.trim().match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
