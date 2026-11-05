@@ -14,7 +14,7 @@ function activeTab(tabs: HTMLElement | null): HTMLElement | null {
   return tabs?.querySelector<HTMLElement>(":scope > a[aria-current='page'], :scope > a[data-current]") ?? null;
 }
 
-/** Both rows share scrolling hints, active-tab placement and underline motion. */
+/** Section links share scrolling hints, active-tab placement and underline motion. */
 function NavRow({ label, pathname, children }: { label: string; pathname: string | null; children: ReactNode }) {
   const tabs = useRef<HTMLDivElement>(null);
   const [bar, setBar] = useState<Bar | null>(null);
@@ -78,15 +78,10 @@ function NavRow({ label, pathname, children }: { label: string; pathname: string
   );
 }
 
-/**
- * Resorts (`/`) is the first tab and the parent of the resort pages: on each resort
- * page Resorts stays marked and the row of resort links shows beneath it. `/` links
- * to the resorts from its own timelines, so it shows no row.
- */
+/** Resort pages keep Resorts marked as their parent; the homepage lists resorts. */
 export function SectionNav({ pathname }: { pathname: string | null }) {
   const home = sectionHref(SECTIONS[0].id);
   const resort = SECTIONS.find((s) => s.group && sectionHref(s.id) === pathname);
-  const expanded = Boolean(resort);
 
   return (
     <div className="section-nav">
@@ -97,16 +92,6 @@ export function SectionNav({ pathname }: { pathname: string | null }) {
             data-current={sectionHref(s.id) === home && resort ? "" : undefined}>{s.label}</Link>
         ))}
       </NavRow>
-      <div id="resort-navigation" className="section-nav__subnav" data-expanded={expanded ? "" : undefined}
-        inert={!expanded} aria-hidden={!expanded}>
-        <div className="section-nav__reveal">
-          <NavRow label="Resorts" pathname={pathname}>
-            {SECTIONS.filter((s) => s.group).map((s) => (
-              <Link key={s.id} href={sectionHref(s.id)} aria-current={(sectionHref(s.id) === pathname || pathname?.startsWith(`${sectionHref(s.id)}/`)) ? "page" : undefined}>{s.label}</Link>
-            ))}
-          </NavRow>
-        </div>
-      </div>
     </div>
   );
 }

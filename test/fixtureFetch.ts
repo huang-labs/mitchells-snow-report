@@ -52,6 +52,9 @@ export function fixtureRoutes(): Array<[RegExp, Handler]> {
       if(found.area.id==="LCC"||found.area.id==="BCC")return json(fixture(u.pathname.endsWith("/forecast")?"nws-forecast-SLC-108-167.json":"nws-gridpoint-SLC-108-167.json"));
       return json(u.pathname.endsWith("/forecast")?found.data.forecast:found.data.grid);
     }],
+    [/cpc\.ncep\.noaa\.gov\/products\/predictions\/814day\/500mb\.php/,()=>html(fixture("cpc-500mb.html"))],
+    [/cpc\.ncep\.noaa\.gov\/products\/predictions\/6-10_day\/fxus06\.html/,()=>html(fixture("cpc-fxus06.html"))],
+    [/cpc\.ncep\.noaa\.gov\/products\/predictions\/814day\/814day\.03\.gif/,()=>new Response(fixtureBytes("cpc-814day.03.gif"),{headers:{"content-type":"image/gif"}})],
     [/snowbasin\.com\/the-mountain\/mountain-report/ ,()=>html(fixture("snowbasin-mountain-report.html"))],
     [/tellurideskiresort\.com\/snow-report/,()=>html(fixture("telluride-snow-report.html"))],
     [/jacksonhole-prod\.zaneray\.com\/api\/snow\.json/,()=>json(fixture("jackson-feed.json"))],

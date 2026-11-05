@@ -345,3 +345,36 @@ it("uses the article skeleton for a pending direct archive link, then shows its 
   fireEvent.click(screen.getByRole("button", { name: "Back to the latest post" }));
   expect(screen.getByRole("heading", { name: "Storm Underway" })).toBeTruthy();
 });
+
+it("shows the West selector before the article and renders forecast zeros separately from missing values", () => {
+  const west: ApiDailySnow = {
+    ...post, channel: "western-us", timeZone: "America/Los_Angeles",
+    figures: { "west-week": { id: "west-week", kind: "forecast-comparison", caption: "NWS this week", windows: [
+      { label: "Days 1–3", days: "Thu–Sun", start: now.toISOString(), end: now.toISOString() },
+      { label: "Days 4–7", days: "Sun–Thu", start: now.toISOString(), end: now.toISOString() },
+    ], rows: [
+      { region: "Utah", point: "Alta", snowIn: [0, 4.5], issuedAt: now.toISOString() },
+      { region: "Utah", point: "Brighton", snowIn: [null, 2], issuedAt: null },
+    ] } },
+    sections: [
+      { id: "update", paragraphs: [{ text: "The broad weather pattern follows.", figure: null }] },
+      { id: "short-term", paragraphs: [{ text: "This week's pattern follows.", figure: "west-week" }] },
+      { id: "extended", paragraphs: [{ text: "Week two follows.", figure: null }] },
+    ],
+    regionalHighlights: [{ region: "utah", text: "A retained older edition's highlight." }],
+  };
+  render(<DailySnowPage report={report(west)} now={now} selector={<select aria-label="Region"><option>United States West</option></select>} />);
+  const article = screen.getByRole("article");
+  expect(article.firstElementChild).toBe(screen.getByRole("combobox", { name: "Region" }));
+  expect(screen.getByRole("heading", { name: "The Big Picture" })).toBeTruthy();
+  expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(expect.arrayContaining(["The Big Picture", "This Week", "Week Two"]));
+  const table = within(screen.getByRole("table", { name: "NWS this week" }));
+  expect(table.getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Mountain forecast point", "Days 1–3Thu–Sun", "Days 4–7Sun–Thu"]);
+  expect(table.getByText("4.5″")).toBeTruthy();
+  expect(table.getByText("0.0″")).toBeTruthy();
+  expect(table.getByText("—")).toBeTruthy();
+  // A row without an NWS issue time says so rather than formatting a missing timestamp.
+  expect(table.getByText("Utah · issue time not published")).toBeTruthy();
+  expect(table.getAllByText(/^Utah · issued /)).toHaveLength(1);
+  expect(within(article).queryAllByRole("link").filter((a) => a.getAttribute("href")?.startsWith("/daily-snow/"))).toHaveLength(0);
+});

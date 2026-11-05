@@ -8,8 +8,8 @@ import type { DailySnowState, Snapshot, SourceId, SourceRecord } from "@/lib/typ
 import { createFixtureFetch, FAKE_TOKENS, FIXTURE_NOW } from "./fixtureFetch";
 
 const MIN = 60_000;
-// Newest source capture: ensemble 12Z Nov 1. Older captures remain valid parser fixtures.
-const ALL_SOURCES_NOW = new Date("2026-11-01T18:30:00Z");
+// Newest source capture: CPC 8–14-day outlook issued 3 PM EST Nov 4. Older captures remain valid parser fixtures.
+const ALL_SOURCES_NOW = new Date("2026-11-04T21:00:00Z");
 
 function fakeSource(id: "alta" | "snowbird", impl: () => Promise<{ payload: unknown; sourceUpdatedAt: string | null }>): SourceDefinition {
   return { id, label: id, category: "resort", required: true, attribution: "", sourceUrl: "", reportMaxAgeMs: 26 * 60 * MIN, collect: impl };

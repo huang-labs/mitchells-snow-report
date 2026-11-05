@@ -1,4 +1,4 @@
-import type { ReactNode, CSSProperties } from "react";
+import type { ReactNode } from "react";
 import { regionById, type RegionId } from "@/lib/catalog";
 import type { ApiSource, PlumeChart, PlumePanel, PlumePayload } from "@/lib/types";
 import { plumePanelsLive } from "@/lib/plumePanels";
@@ -48,6 +48,7 @@ export function PlumesPage({ source, now,region="utah",selector }: { source: Api
   const p = source.payload as PlumePayload | null;
   return (
     <section className="page page--plumes">
+      {selector}
       <header className="page__header">
         <h1>{regionById(region)!.name} ensemble snow plumes</h1>
         {p && (
@@ -56,17 +57,16 @@ export function PlumesPage({ source, now,region="utah",selector }: { source: Api
           </p>
         )}
       </header>
-      {selector}
       {p?.failures?.filter(f=>!p.charts.some(c=>c.lastError===f)).map(f=><p key={f} className="source-line__error">Plume unavailable · {f}</p>)}
       {p?.charts.length ? (
-        // One column per station (snow on top, SLR below): the grid flows by column.
-        <div className="plume-grid" style={{"--plume-columns":p.charts.length} as CSSProperties}>
-          {p.charts.flatMap((c) =>
-            // A last-good payload can outlive its stored panels if collection stalls.
-            c.panels?.length && plumePanelsLive(c, now)
-              ? c.panels.map((panel) => <Panel key={`${c.stationCode}-${panel.id}`} chart={c} panel={panel} now={now} />)
-              : [<FullChart key={c.stationCode} chart={c} product={p.product} />],
-          )}
+        <div className="plume-grid">
+          {p.charts.map((c) => (
+            <div className="plume-station" key={c.stationCode}>
+              {c.panels?.length && plumePanelsLive(c, now)
+                ? c.panels.map((panel) => <Panel key={panel.id} chart={c} panel={panel} now={now} />)
+                : <FullChart chart={c} product={p.product} />}
+            </div>
+          ))}
         </div>
       ) : (
         <Unavailable source={source} what="Plume charts" />

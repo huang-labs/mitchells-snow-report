@@ -1,4 +1,5 @@
 import type { DailySnowFigure } from "@/lib/types";
+import { formatLocal } from "@/lib/time";
 import { resortById } from "@/lib/catalog";
 import { SnowLevel,SNOW_LEVEL_COLORS } from "../charts";
 import { SnowfallChart } from "../snowfall/SnowfallChart";
@@ -43,6 +44,23 @@ function Totals({ rows, label }: { rows: Extract<DailySnowFigure, { kind: "total
 export function Figure({ figure: f, postedAt,timeZone="America/Denver" }: { figure: DailySnowFigure; postedAt: string;timeZone?:string }) {
   let body;
   switch (f.kind) {
+    case "forecast-comparison": {
+      const max = Math.max(1, ...f.rows.flatMap((r) => r.snowIn.map((v) => v ?? 0)));
+      body = <table className="dailysnow-totals dailysnow-outlook" aria-label={f.caption}>
+        <thead><tr>
+          <th scope="col">Mountain forecast point</th>
+          {f.windows.map((w) => <th key={w.label} scope="col">{w.label}<small>{w.days}</small></th>)}
+        </tr></thead>
+        <tbody>{f.rows.map((r) => <tr key={`${r.region}-${r.point}`}>
+          <th scope="row">{r.point}<small>{r.region}{r.issuedAt ? ` · issued ${formatLocal(r.issuedAt, new Date(postedAt), timeZone)}` : " · issue time not published"}</small></th>
+          {r.snowIn.map((v, i) => <td key={f.windows[i]?.label ?? i}>{v === null ? <span className="muted">—</span> : <span className="dailysnow-totals__cell">
+            <span className="dailysnow-totals__bar" style={{ width: `${v / max * 100}%` }} />
+            <span>{v.toFixed(1)}″</span>
+          </span>}</td>)}
+        </tr>)}</tbody>
+      </table>;
+      break;
+    }
     case "storm-recap":
       body = <StormRecap storm={f.storm} timeZone={timeZone} />;
       break;

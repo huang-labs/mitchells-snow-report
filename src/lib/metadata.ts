@@ -6,7 +6,7 @@ export const SITE_TITLE = "Mitchell’s Snow Report";
 // Set at build time for PR previews; production keeps its custom domain.
 export const metadataBase = new URL(process.env.SITE_URL || "https://mitchells-snow-report.huang.mx");
 export const SITE_DESCRIPTION = "Snowfall, mountain forecasts and ensemble plumes for 14 Western US favorites.";
-export const DAILY_SNOW_DESCRIPTION = "Regional Daily Snow forecasts and a Western United States overview, with storm updates and mountain weather.";
+export const DAILY_SNOW_DESCRIPTION = "Regional Daily Snow forecasts and a United States West outlook, with storm updates and mountain weather.";
 
 export const siteOpenGraph = {
   type: "website" as const,

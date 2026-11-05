@@ -24,9 +24,9 @@ export function RegionSelector({
   }, [explicit, section, selected, router]);
   return (
     <div className="region-selector">
-      <label htmlFor={`region-${section}`}>Region</label>
       <select
         id={`region-${section}`}
+        aria-label="Region"
         value={selected}
         onChange={(e) => {
           const value = e.target.value;

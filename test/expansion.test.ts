@@ -8,13 +8,13 @@ import { buildDailyDigest } from "@/lib/dailysnow/digest";
 import { regionalSnapshot, channelKV, channelStateKey } from "@/lib/dailysnow/regions";
 import { runChannels, readChannelStates } from "@/lib/dailysnow/channels";
 import { dailySnowKey, emptyDailySnowState, planDailySnow, dailySnowFigureKey } from "@/lib/dailysnow";
-import { buildWesternInput, validateWestern } from "@/lib/dailysnow/western";
+import { buildWesternInput, dayRange, validateWestern, westernFigures } from "@/lib/dailysnow/western";
 import { localDate, zonedToUtc } from "@/lib/time";
 import { snowDayEnd, snowDayStart, forecastForDay } from "@/lib/snowlog/days";
 import { shouldRunDailySnow } from "@/lib/dailysnow/schedule";
 import { PRIMARY_MODEL, FALLBACK_MODEL } from "@/lib/ai/model";
 import type { Snapshot, NwsPayload, ResortReport, DailySnowPost, DailySnowState, PlumePayload } from "@/lib/types";
-import { createFixtureFetch, fixture } from "./fixtureFetch";
+import { createFixtureFetch, fixture, fixtureBytes } from "./fixtureFetch";
 import { regionalSource } from "@/lib/regionalSource";
 import { buildReport } from "@/lib/report";
 import { dailySnowActivity } from "@/lib/dailysnow/digest";
@@ -27,7 +27,7 @@ import { historyEntry } from "@/lib/dailysnow/continuity";
 import { inchAmounts } from "@/lib/ai/grounding";
 import { isSnowPlume } from "@/lib/dailysnow/plume";
 import { dailySnow as dailySnowArchive } from "@/worker/daily-snow";
-import type { AfdPayload } from "@/lib/types";
+import type { AfdPayload, CpcPayload } from "@/lib/types";
 import { dailySnowPublicationStatus } from "@/lib/dailysnow/publication";
 import { recordSnowLog } from "@/lib/snowlog/record";
 const now = new Date("2026-11-05T15:00:00Z");
@@ -369,7 +369,7 @@ describe("publication guards in channel state", () => {
 });
 
 describe("independent editions and stored artifacts", () => {
-  it("freezes overnight observations separately so Western can validate a true overnight amount",async()=>{
+  it("freezes overnight observations separately in Western context",async()=>{
     const s=structuredClone(regionalSnapshot(base,"colorado"));
     const report=s.sources.telluride!.payload as ResortReport;
     report.snowfall.overnight={state:"reported",value:6,unit:"in",label:"Snow overnight"};
@@ -382,8 +382,7 @@ describe("independent editions and stored artifacts", () => {
     expect(input.asOfLocal).toContain("7:00 AM PST");
     const observation=input.regions[0].observations.find(r=>r.name==="Telluride")!;
     expect(observation.windows.find(w=>w.window==="overnight")).toMatchObject({amountIn:6,label:"Snow overnight"});
-    const result=validateWestern({title:"Western Outlook",summary:"Weather varies.",overview:"Read the current regional forecasts.",regions:[{region:"colorado",text:"Telluride reported six inches overnight."}]},input);
-    expect(result.regions).toHaveLength(1);
+
   });
   it("keeps all three Colorado storm recaps when optional figures fill the model's six slots", async () => {
     const s = structuredClone(regionalSnapshot(base, "colorado"));
@@ -523,7 +522,7 @@ describe("independent editions and stored artifacts", () => {
     expect(second.lastError).toBeTruthy();
     expect(second.attempts.calls).toBe(4);
   });
-  it("rejects a Western highlight quoting another region's number and excludes yesterday's editions", async () => {
+  it("keeps Western amounts in computed figures, rejects links, and excludes yesterday's editions", async () => {
     const kv = new MemoryKV();
     const env = {
       SNOW_KV: kv,
@@ -541,17 +540,63 @@ describe("independent editions and stored artifacts", () => {
     input.regions[0].forecasts = [];
     input.regions[0].observations = [];
     const raw = {
-      title: "Western Outlook",
-      summary: "Patterns vary.",
-      overview: "Read each regional outlook below.",
-      regions: [
-        { region: "tahoe", text: "The NWS expects 90″." },
-        { region: "mammoth", text: "A quiet period." },
+      title: "Western Outlook", summary: "Patterns vary.",
+      sections: [
+        {id: "update", paragraphs: [{text: "The western pattern varies."}, {text: "Timing differs across mountain ranges."}]},
+        {id: "short-term", paragraphs: [{text: "The NWS expects 90″."}, {text: "Amounts belong in figures."}]},
+        {id: "extended", paragraphs: [{text: "Later guidance remains limited."}, {text: "Check future updates."}]},
       ],
     };
-    expect(() => validateWestern(raw, input)).toThrow(/tahoe/);
+    expect(() => validateWestern(raw, input)).toThrow(/snowfall amounts/);
+    raw.sections[1].paragraphs[0].text = "The mountain outlook follows.";
+    expect(validateWestern(raw, input).shortTerm).toHaveLength(2);
+    raw.sections[1].paragraphs[0].text = "Read [Tahoe](/daily-snow/tahoe).";
+    expect(() => validateWestern(raw, input)).toThrow(/links/);
+    // Six paragraphs of about 280 words each exceed the West ceiling.
+    const long = structuredClone(raw);
+    for (const section of long.sections) for (const p of section.paragraphs) p.text = "The mountain pattern shifts. ".repeat(70);
+    expect(() => validateWestern(long, input)).toThrow(/too long: \d+ words/);
+    const figures = westernFigures(input);
+    expect(Object.values(figures).every((f) => f.kind === "forecast-comparison")).toBe(true);
     const yesterday = { ...editions.tahoe, date: "2026-11-04" };
     expect(buildWesternInput(base, { tahoe: yesterday }, now).regions).toHaveLength(0);
+  });
+});
+
+describe("West date ranges", () => {
+  it("names the month once within a month and both months across one", () => {
+    expect(dayRange("2026-11-12", "2026-11-18")).toBe("Nov 12–18");
+    expect(dayRange("2026-11-28", "2026-12-04")).toBe("Nov 28–Dec 4");
+    expect(dayRange("2026-12-29", "2027-01-04")).toBe("Dec 29–Jan 4");
+  });
+});
+
+describe("West comparison figures", () => {
+  it("freezes matching point windows with zeros, missing coverage and source times", () => {
+    const input: ReturnType<typeof buildWesternInput> = { asOf: now.toISOString(), asOfLocal: "Thu 7:00 AM PST", timeZone: "America/Los_Angeles", coverage: "Tracked regions", patternOutlook: null, regions: [{
+      id: "utah" as const, name: "Utah", edition: {} as never, observations: [],
+      forecasts: [
+        { area: "LCC" as const, name: "Alta / Snowbird", source: "NWS", issuedAt: now.toISOString(), issuedLocal: "7 AM PST", start: now.toISOString(), next24In: 0, next72In: 0, next7dIn: 5, days4to7In: 5 },
+        { area: "BCC" as const, name: "Brighton / Solitude", source: "NWS", issuedAt: now.toISOString(), issuedLocal: "7 AM PST", start: now.toISOString(), next24In: null, next72In: null, next7dIn: null, days4to7In: 2 },
+      ],
+    }] };
+    const figures = westernFigures(input);
+    expect(Object.keys(figures)).toEqual(["west-week"]);
+    const week = figures["west-week"];
+    expect(week.kind).toBe("forecast-comparison");
+    if (week.kind !== "forecast-comparison") throw new Error("Expected comparison");
+    // Two consecutive windows that share their boundary, labeled with local weekdays.
+    expect(week.windows.map((w) => [w.label, w.days])).toEqual([["Days 1–3", "Thu–Sun"], ["Days 4–7", "Sun–Thu"]]);
+    expect(week.windows[0].end).toBe(week.windows[1].start);
+    expect(Date.parse(week.windows[1].end) - Date.parse(week.windows[0].start)).toBe(168 * 3600000);
+    // A reported zero, missing coverage and a later-window value stay distinct.
+    expect(week.rows.map((r) => r.snowIn)).toEqual([[0, 5], [null, 2]]);
+    expect(week.rows[0].issuedAt).toBe(now.toISOString());
+    expect(week.caption).toContain("this week");
+    input.regions[0].forecasts[0].next72In = 9;
+    expect(week.rows[0].snowIn[0]).toBe(0);
+    for (const f of input.regions[0].forecasts) { f.next72In = null; f.days4to7In = null; }
+    expect(westernFigures(input)["west-week"]).toBeUndefined();
   });
 });
 
@@ -603,8 +648,11 @@ describe("collection and publication survive secondary write failures", () => {
     const western = {
       title: "Western Outlook",
       summary: "Patterns vary across the tracked regions.",
-      overview: "Read each regional outlook below.",
-      regions: [{ region: "tahoe", text: "A quiet period for the tracked resort." }],
+      sections: [
+        {id: "update", paragraphs: [{text: "The western pattern varies."}, {text: "Timing differs across mountain ranges."}]},
+        {id: "short-term", paragraphs: [{text: "The near-term pattern follows."}, {text: "Mountain forecasts provide details."}]},
+        {id: "extended", paragraphs: [{text: "Later guidance remains limited."}, {text: "Check future updates."}]},
+      ],
     };
     const env = {
       SNOW_KV: kv,
@@ -631,6 +679,73 @@ describe("collection and publication survive secondary write failures", () => {
     expect(state.current?.date).toBe(today);
     expect(state.lastError).toBeNull();
     expect(state.consecutiveFailures).toBe(0);
+  });
+});
+
+describe("West pattern outlook", () => {
+  const western = {
+    title: "Western Outlook",
+    summary: "Patterns vary across the tracked regions.",
+    sections: [
+      {id: "update", paragraphs: [{text: "The western pattern varies."}, {text: "Timing differs across mountain ranges."}]},
+      {id: "short-term", paragraphs: [{text: "The near-term pattern follows."}, {text: "Mountain forecasts provide details."}]},
+      {id: "extended", paragraphs: [{text: "A trough settles near the coast."}, {text: "The map shows the pattern."}]},
+    ],
+  };
+  async function publish(snapshot: Snapshot, kv: MemoryKV) {
+    const inputs: string[] = [];
+    const env = {
+      SNOW_KV: kv,
+      AI: {
+        async run(_model: string, input: unknown) {
+          const body = JSON.stringify(input);
+          if (body.includes("western_daily_snow")) inputs.push(body);
+          return { response: JSON.stringify(body.includes("western_daily_snow") ? western : reply()) };
+        },
+      },
+    };
+    await runChannels(env, snapshot, now, { channel: "tahoe", force: true });
+    await runChannels(env, snapshot, now, { channel: "western-us", force: true });
+    return { post: (await readChannelStates(kv))["western-us"]!.current!, input: inputs[0] };
+  }
+
+  it("ends the extended section with the copied NOAA map and gives the model its discussion", async () => {
+    const kv = new MemoryKV();
+    const cpc = base.sources.cpc!.payload as CpcPayload;
+    await kv.put(cpc.image.key, fixtureBytes("cpc-814day.03.gif").buffer as ArrayBuffer);
+    const { post, input } = await publish(base, kv);
+    expect(Object.keys(post.figures).sort()).toEqual(["west-pattern", "west-week"]);
+    const extended = post.sections.find((s) => s.id === "extended")!;
+    expect(extended.paragraphs.map((p) => p.figure)).toEqual([null, "west-pattern"]);
+    const map = post.figures["west-pattern"];
+    if (map.kind !== "image") throw new Error("Expected image");
+    expect(map.url).toMatch(/channel=western-us$/);
+    expect(map.caption).toContain("8–14-day 500-mb height outlook · Nov 12–18 · issued");
+    // The CPC chart is contoured, not shaded.
+    expect(map.caption).toContain("dashed lines show departures from normal, red above (ridging) and blue below (troughing)");
+    const sent = JSON.parse(JSON.parse(input).messages[1].content);
+    expect(sent.patternOutlook).toMatchObject({ validLabel: "Nov 12–18", sixToTen: { validLabel: "Nov 10–14" } });
+    expect(sent.patternOutlook.sixToTen.discussion).toMatch(/^The 0Z ECMWF, GEFS, and Canadian ensemble mean forecasts/);
+    expect(sent.regions[0].forecasts[0]).toHaveProperty("days4to7In");
+    expect(sent.patternOutlook.discussion).toContain("trough");
+    expect(sent.patternOutlook.image).toBeUndefined();
+    expect(sent.figures).toEqual({ snowComparison: true, patternMap: true });
+  });
+
+  it("publishes the extended prose without a map when the outlook is stale or the copy fails", async () => {
+    const stale = structuredClone(base);
+    stale.sources.cpc!.status = "error";
+    const { post, input } = await publish(stale, new MemoryKV());
+    expect(post.figures["west-pattern"]).toBeUndefined();
+    expect(post.sections.find((s) => s.id === "extended")!.paragraphs.every((p) => p.figure === null)).toBe(true);
+    const sentStale = JSON.parse(JSON.parse(input).messages[1].content);
+    expect(sentStale.patternOutlook).toBeNull();
+    expect(sentStale.figures).toEqual({ snowComparison: true, patternMap: false });
+    // Current outlook whose stored map has expired: the figure is dropped, the post still publishes.
+    const { post: missing, input: missingInput } = await publish(base, new MemoryKV());
+    expect(missing.figures["west-pattern"]).toBeUndefined();
+    // The prompt only promises figures the post will contain.
+    expect(JSON.parse(JSON.parse(missingInput).messages[1].content).figures).toEqual({ snowComparison: true, patternMap: false });
   });
 });
 
@@ -736,8 +851,11 @@ describe("partial and total upstream outages", () => {
     const western = {
       title: "Western Outlook",
       summary: "Patterns vary across the tracked regions.",
-      overview: "Read each regional outlook below.",
-      regions: [{ region: "tahoe", text: "A quiet period for the tracked resort." }],
+      sections: [
+        {id: "update", paragraphs: [{text: "The western pattern varies."}, {text: "Timing differs across mountain ranges."}]},
+        {id: "short-term", paragraphs: [{text: "The near-term pattern follows."}, {text: "Mountain forecasts provide details."}]},
+        {id: "extended", paragraphs: [{text: "Later guidance remains limited."}, {text: "Check future updates."}]},
+      ],
     };
     const env = {
       SNOW_KV: kv,
@@ -757,6 +875,9 @@ describe("partial and total upstream outages", () => {
     const state = (await readChannelStates(kv))["western-us"]!;
     expect(state.attempts.count).toBe(2);
     expect(state.current?.older).toEqual({ date: "2026-11-04", title: "Yesterday" });
+    expect(state.current?.sections.map((s) => s.id)).toEqual(["update", "short-term", "extended"]);
+    expect(state.current?.regionalHighlights).toBeUndefined();
+    expect(Object.values(state.current!.figures).every((f) => f.kind === "forecast-comparison")).toBe(true);
     const archived = JSON.parse((await channelKV(kv, "western-us").get(dailySnowKey(state.current!.date), "text"))!);
     expect(archived.older).toEqual({ date: "2026-11-04", title: "Yesterday" });
   });

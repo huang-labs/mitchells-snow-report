@@ -287,10 +287,7 @@ it("makes each resort's timeline one link to its page, named by the resort", () 
     expect(links).toHaveLength(1);
     expect(links[0].classList.contains("resort-name__link")).toBe(true);
     expect(links[0].getAttribute("href")).toBe(`/${RESORTS.find(r=>r.name===links[0].textContent)!.id}`);
-    // "View more" is a visible cue inside the block's link area, not a second link.
-    const more = block.querySelector(".snowtl__footer .resort-timeline__more")!;
-    expect(more.textContent).toBe("View more →");
-    expect(more.closest("a")).toBeNull();
+    expect(block.textContent).not.toContain("View more");
   }
 });
 
