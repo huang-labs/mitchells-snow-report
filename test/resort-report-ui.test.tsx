@@ -21,6 +21,11 @@ beforeAll(async () => {
 });
 afterEach(cleanup);
 
+it("opens a resort's own forecast region regardless of the saved regional preference",()=>{
+  render(renderSection("mammoth-mountain",report,FIXTURE_NOW,null));
+  expect(screen.getByRole("link",{name:"Forecast ↗"}).getAttribute("href")).toBe("/weather/mammoth");
+});
+
 it.each(["alta", "snowbird", "solitude", "brighton"])(
   "renders %s as a long-form report page",
   (id) => {
