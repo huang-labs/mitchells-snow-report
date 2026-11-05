@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { clearArchivedPosts } from "@/components/dailysnow/archive";
+import { ReportLoading } from "@/components/loading/ReportLoading";
 import { DailySnowPage } from "@/components/dailysnow/DailySnow";
 import { RegionalPage } from "@/components/sections/RegionalPage";
 import { buildReport } from "@/lib/report";
@@ -63,12 +64,20 @@ it.each(["24h", "48h"] as const)("shows a compact frozen storm recap with qualif
   expect(document.querySelectorAll(".dailysnow-storm")).toHaveLength(1);
 });
 
-it("attributes the NWS clearly in older saved prose and summaries", () => {
+it.each([undefined, "utah"] as const)("uses the article header while Daily Snow loads for %s", (region) => {
+  render(<ReportLoading sectionId="daily-snow" region={region} />);
+  expect(screen.getByRole("status").textContent).toBe("Loading Daily Snow…");
+  expect(screen.getByText(region ? "Utah" : "United States West").className).toBe("eyebrow");
+  expect(screen.getByText("AI").className).toContain("badge--ai");
+  expect(screen.getByRole("heading", { name: "Daily Snow" }).className).toContain("screenReader");
+  expect(screen.getByRole("region", { name: "Daily Snow" }).getAttribute("aria-busy")).toBe("true");
+});
+
+it("preserves discussion references in saved prose and summaries", () => {
   const old = { ...post, summary: "The discussion expects snow.", sections: [{ id: "update" as const, paragraphs: [{ text: "According to the discussion, snow ends today.", figure: null }] }] };
   render(<DailySnowPage report={report(old)} now={now} />);
-  expect(screen.getAllByText("The NWS expects snow.")).toHaveLength(1);
-  expect(screen.getByText("According to the NWS, snow ends today.")).toBeTruthy();
-  expect(document.body.textContent).not.toMatch(/discussion/i);
+  expect(screen.getAllByText("The discussion expects snow.")).toHaveLength(1);
+  expect(screen.getByText("According to the discussion, snow ends today.")).toBeTruthy();
 });
 afterEach(() => {
   cleanup();
@@ -335,7 +344,7 @@ it("uses the article skeleton for a pending direct archive link, then shows its 
   vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => { respond = resolve; })));
   window.history.replaceState(null, "", "/daily-snow?date=2026-10-31");
   render(<DailySnowPage report={report(post)} now={now} />);
-  expect(screen.getByRole("status").textContent).toBe("Loading Daily Snows…");
+  expect(screen.getByRole("status").textContent).toBe("Loading Daily Snow…");
   expect(document.querySelector("[aria-busy=true]")).toBeTruthy();
   expect(screen.queryByText(/posted every morning/)).toBeNull();
   await act(async () => { respond(new Response("unavailable", { status: 503 })); });

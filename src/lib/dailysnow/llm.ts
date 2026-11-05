@@ -3,7 +3,6 @@ import { inchAmounts, inchAmountsIn, ungroundedInches } from "../ai/grounding";
 import { clipText } from "../clip";
 import type { DailySnowParagraph, DailySnowSectionId } from "../types";
 import type { DailyDigest } from "./digest";
-import { readerWording } from "./wording";
 
 export const DAILY_SNOW_MAX_TOKENS = 8000;
 /**
@@ -60,7 +59,6 @@ Rules:
 - observationCoverage is authoritative. When it lists no currentResorts, all current measured snowfall is unavailable. A dry forecast does not establish measured zero; do not say nothing fell, nothing was reported, or quote an old zero as a current observation.
 - Images supply no facts: never state a snow-stake reading, describe snow seen in a photo, claim "our readings", or compare image readings with reports. Only resort-reported observations are available. Do not calculate a future base depth by adding forecasts to today's base.
 - Resort-reported amounts are measurements; NWS amounts are forecasts. Say which is which. The NWS input contains no measured snowfall for the past 24/48 hours; never claim it does.
-- In reader-facing prose attribute the forecast source as "the NWS" (for example "the NWS expects"). Never say "the discussion" or "the forecast discussion"; readers do not know that internal source name.
 - If a resort's report is old or missing (see dataFreshness and reportTime), say its morning report isn't out yet rather than using its numbers as this morning's.
 - Do not mention roads, parking, lift openings or which resort to ski.
 - Use ″ for inches, local 12-hour times, and weekday names rather than dates.`;
@@ -134,7 +132,7 @@ export interface LlmDailySnow {
   sections: Array<{ id: DailySnowSectionId; paragraphs: DailySnowParagraph[] }>;
 }
 
-const clip = (value: unknown, max: number) => clipText(typeof value === "string" ? readerWording(value) : value, max);
+const clip = clipText;
 
 /** Fields whose amounts may not be quoted: the last post's text is context, and its amounts are out of date. */
 const NOT_DATA = new Set(["previousPost"]);
