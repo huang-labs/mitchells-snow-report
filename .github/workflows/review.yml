@@ -2,85 +2,25 @@ name: AI review
 
 on:
   pull_request_target:
-    types: [opened, reopened, ready_for_review, synchronize, labeled, unlabeled]
+    types: [opened, reopened, ready_for_review, synchronize]
   issue_comment:
     types: [created]
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
-  select:
+  review:
     # The trusted base workflow never checks out or executes PR code.
+    # Same-repo, non-draft PRs review automatically; a collaborator can comment exactly /review on an open PR.
     if: >-
       github.event.sender.type != 'Bot' &&
       ((github.event_name == 'pull_request_target' &&
         github.event.pull_request.head.repo.full_name == github.repository &&
-        !github.event.pull_request.draft &&
-        (github.event.action != 'labeled' && github.event.action != 'unlabeled' ||
-         startsWith(github.event.label.name, 'author:') ||
-         startsWith(github.event.label.name, 'review:'))) ||
+        !github.event.pull_request.draft) ||
        (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
-        github.event.comment.body == '/review'))
-    runs-on: blacksmith-2vcpu-ubuntu-2404
-    outputs:
-      model: ${{ steps.route.outputs.model }}
-      head: ${{ steps.route.outputs.head }}
-    steps:
-      - uses: actions/github-script@v8
-        id: route
-        env:
-          CLAUDE_MODEL: ${{ vars.AI_REVIEW_CLAUDE_MODEL || 'anthropic/claude-opus-5.5' }}
-          GPT_MODEL: ${{ vars.AI_REVIEW_GPT_MODEL || 'openai/gpt-6.1-sol' }}
-          GLM_MODEL: ${{ vars.AI_REVIEW_GLM_MODEL || 'z-ai/glm-5.3' }}
-        with:
-          script: |
-            const number = context.payload.pull_request?.number ?? context.payload.issue.number;
-            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: number });
-            if (pr.state !== 'open' || pr.draft || pr.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}` || pr.user.login === 'dependabot[bot]') return;
-            if (context.payload.pull_request && context.payload.pull_request.head.sha !== pr.head.sha) return;
-            if (context.eventName === 'issue_comment') {
-              const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
-                ...context.repo, username: context.payload.comment.user.login
-              });
-              if (!['admin', 'maintain', 'write'].includes(data.permission)) return;
-            }
-            const models = { claude: process.env.CLAUDE_MODEL, codex: process.env.GPT_MODEL, glm: process.env.GLM_MODEL };
-            const authors = pr.labels.map(label => label.name).filter(label => ['author:claude', 'author:codex', 'author:glm'].includes(label));
-            if (authors.length !== 1) {
-              const notice = 'Apply exactly one author:codex, author:claude, or author:glm label. No review credits were spent.';
-              core.notice(notice);
-              await core.summary.addRaw(notice).write();
-              return;
-            }
-            const candidates = Object.keys(models).filter(family => `author:${family}` !== authors[0]);
-            // An optional review:<family> label picks one of the other two families; otherwise PR-number parity does.
-            const requested = pr.labels.map(label => label.name).filter(label => ['review:claude', 'review:gpt', 'review:glm'].includes(label));
-            if (requested.length > 1) {
-              const notice = 'Apply at most one review:claude, review:gpt, or review:glm label. No review credits were spent.';
-              core.notice(notice);
-              await core.summary.addRaw(notice).write();
-              return;
-            }
-            const override = requested.length ? { 'review:claude': 'claude', 'review:gpt': 'codex', 'review:glm': 'glm' }[requested[0]] : null;
-            if (override && !candidates.includes(override)) {
-              const notice = `${requested[0]} matches the author family (${authors[0]}); reviews must come from another family. No review credits were spent.`;
-              core.notice(notice);
-              await core.summary.addRaw(notice).write();
-              return;
-            }
-            const family = override ?? candidates[number % candidates.length];
-            const model = models[family];
-            const vendor = { claude: 'anthropic', codex: 'openai', glm: 'z-ai' }[family];
-            if (!new RegExp(`^${vendor}/[a-zA-Z0-9._-]+$`).test(model)) throw new Error('Invalid reviewer model variable; use an explicit same-vendor OpenRouter model ID without the openrouter/ prefix.');
-            core.setOutput('model', `openrouter/${model}`);
-            core.setOutput('head', pr.head.sha);
-            await core.summary.addRaw(`Reviewer: ${model}; author: ${authors[0]}; commit: ${pr.head.sha}`).write();
-
-  review:
-    needs: select
-    if: needs.select.outputs.model != ''
+        github.event.issue.state == 'open' && github.event.comment.body == '/review' &&
+        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)))
     runs-on: blacksmith-2vcpu-ubuntu-2404
     # Allow two 20-minute attempts plus startup/backoff for a transient retry.
     timeout-minutes: 45
@@ -88,25 +28,25 @@ jobs:
       contents: read
       pull-requests: write
     concurrency:
-      # A delayed old-head event cannot cancel a newer head's review.
-      group: ai-review-${{ github.event.pull_request.number || github.event.issue.number }}-${{ needs.select.outputs.head }}
+      # A newer push or /review replaces an in-progress review of the same PR.
+      group: ai-review-${{ github.event.pull_request.number || github.event.issue.number }}
       cancel-in-progress: true
     steps:
       - name: PR-Agent review
         uses: The-PR-Agent/pr-agent@efdde4afe14aa401a3889012c7f3e9ef3081a430 # v0.49.0
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          OPENROUTER__KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          CONFIG__MODEL: ${{ needs.select.outputs.model }}
-          CONFIG__MODEL_WEAK: ${{ needs.select.outputs.model }}
-          CONFIG__MODEL_REASONING: ${{ needs.select.outputs.model }}
-          CONFIG__FALLBACK_MODELS: '[]'
+          # GLM 5.3 on Workers AI through the `pr-agent` AI Gateway (model set in .pr_agent.toml).
+          CLOUDFLARE_API_BASE: https://gateway.ai.cloudflare.com/v1/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/pr-agent/workers-ai/v1
+          CLOUDFLARE_API_KEY: ${{ secrets.PR_AGENT_CLOUDFLARE_TOKEN }}
+          # Every review and /review rerun runs fresh inference.
+          LITELLM__EXTRA_HEADERS: '{"cf-aig-skip-cache": "true"}'
           # Read review policy from the trusted default branch, never the PR branch.
           PR_AGENT_CONFIG_BRANCH: ${{ github.event.repository.default_branch }}
           CONFIG__USE_GLOBAL_SETTINGS_FILE: 'false'
           GITHUB_ACTION_CONFIG__AUTO_REVIEW: 'true'
           GITHUB_ACTION_CONFIG__AUTO_DESCRIBE: 'false'
           GITHUB_ACTION_CONFIG__AUTO_IMPROVE: 'false'
-          GITHUB_ACTION_CONFIG__PR_ACTIONS: '["opened", "reopened", "ready_for_review", "labeled", "unlabeled"]'
+          GITHUB_ACTION_CONFIG__PR_ACTIONS: '["opened", "reopened", "ready_for_review"]'
           GITHUB_ACTION_CONFIG__HANDLE_PUSH_TRIGGER: 'true'
           GITHUB_ACTION_CONFIG__PUSH_COMMANDS: '["/review"]'

@@ -6,7 +6,7 @@ The housekeeping [PR #1](https://github.com/huang-labs/mitchells-snow-report/pul
 
 ## Configured resources
 
-GitHub Actions and Blacksmith runners are enabled. Exactly one author label selects an advisory reviewer from a different family; Codex uses `author:codex`. The encrypted OpenRouter secret is configured and the housekeeping PR received a real review.
+GitHub Actions and Blacksmith runners are enabled. Every PR receives an advisory GLM 5.3 review through the `pr-agent` AI Gateway; see [AI code review](AI_CODE_REVIEW.md).
 
 Cloudflare account access was verified through the owner's authenticated `cf` CLI. Dedicated production and preview KV, the preview parent Worker, and an AI Gateway are configured. Account ID and a dedicated account/zone-scoped deployment token are encrypted GitHub Actions secrets. The application contains no token values.
 
