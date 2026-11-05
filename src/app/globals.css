@@ -115,10 +115,6 @@ a { color: var(--accent); }
 .section-nav__tabs:not([data-bar]) > .section-nav__bar { display: none; }
 .section-nav__tabs[data-animate] > .section-nav__bar { transition: transform 220ms cubic-bezier(0.2, 0, 0, 1), width 220ms cubic-bezier(0.2, 0, 0, 1); }
 
-.section-nav__subnav { display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden; transition: grid-template-rows 200ms ease, opacity 200ms ease, visibility 200ms; }
-.section-nav__subnav[data-expanded] { grid-template-rows: 1fr; opacity: 1; visibility: visible; }
-.section-nav__reveal { min-height: 0; overflow: hidden; }
-
 @media (min-width: 901px) {
   .section-nav__tabs { gap: 32px; }
   .section-nav__tabs > a { min-height: 52px; font-size: var(--fs-body); }
@@ -328,8 +324,9 @@ a { color: var(--accent); }
 .periods dt::after { content: " — "; }
 
 /* ---- Plumes ---- */
-.plume-grid { display: grid; grid-template-columns: repeat(var(--plume-columns, 2), minmax(0, 1fr)); grid-template-rows: auto auto; grid-auto-flow: column; gap: 28px 24px; }
-.plume--full { grid-row: span 2; }
+.plume-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 24px; }
+.plume-station { min-width: 0; display: grid; align-content: start; gap: 28px; }
+.weather-point:last-child:nth-child(odd), .plume-station:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .plume { margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .plume__title { font: 650 var(--fs-h3)/1.3 var(--font); text-align: center; }
 .plume__svg { display: block; width: 100%; height: auto; border-radius: 6px; }
@@ -350,7 +347,7 @@ a { color: var(--accent); }
 .page__notes { display: flex; flex-direction: column; gap: 6px; margin-top: calc(24px - var(--page-gap)); }
 
 @media (prefers-reduced-motion: reduce) {
-  .section-nav__tabs[data-animate] > .section-nav__bar, .section-nav__subnav { transition: none; }
+  .section-nav__tabs[data-animate] > .section-nav__bar { transition: none; }
 }
 
 /* ---- narrow screens (phones and small tablets) ---- */
@@ -372,9 +369,17 @@ a { color: var(--accent); }
 }
 
 /* Regional navigation stays compact at phone and laptop widths. */
-.region-selector { display:flex; align-items:center; gap:.75rem; margin:0 0 1.5rem; }
-.region-selector label { font-size:.8rem; color:var(--muted); }
-.region-selector select { max-width:100%; min-height:44px; padding:.5rem 2rem .5rem .75rem; border:1px solid var(--line); border-radius:4px; background:var(--bg); color:inherit; font:inherit; }
+.region-selector { position:relative; width:fit-content; max-width:100%; margin:0 0 24px; }
+.page > .region-selector { margin-bottom:0; }
+.region-selector::after { content:""; position:absolute; right:16px; top:18px; width:7px; height:7px; border-right:2px solid var(--muted); border-bottom:2px solid var(--muted); transform:rotate(45deg); pointer-events:none; }
+.region-selector select { appearance:none; display:block; width:100%; min-height:44px; padding:10px 44px 10px 14px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); font:600 var(--fs-meta)/1.4 var(--font); cursor:pointer; }
+.region-selector select:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
 .dailysnow__coverage { font-size:.8rem; color:var(--muted); line-height:1.6; margin-top:2rem; }
 .plume__title small { font-size:.75rem; font-weight:400; }
-@media(max-width:600px) { .region-selector select { flex:1; min-width:0; } }
+
+.dailysnow-outlook th small { display:block; font-size:var(--fs-label); color:var(--muted); font-weight:400; margin-top:4px; }
+.dailysnow-outlook td { width:32%; }
+@media (min-width: 901px) {
+  .plume-station:last-child:nth-child(odd) { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }
+  .plume-station:last-child:nth-child(odd) .plume--full { grid-column:1 / -1; }
+}

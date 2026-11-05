@@ -2,7 +2,7 @@
 
 [← README](../README.md)
 
-Eight regional editions target **6 AM local time**. Western United States targets **7 AM Pacific / 8 AM Mountain**, synthesizing only today's available regional editions. Forecast amounts in Western are recomputed from one snapshot over matching 24/72/168-hour windows; regional article totals with different start times are context only.
+Eight regional editions target **6 AM local time**. United States West targets **7 AM Pacific / 8 AM Mountain**, using today's available regional editions as context for an original article about the overall pattern, near-term weather and extended outlook. It has no regional article links or per-region highlight list; the page selector provides regional navigation. Forecast amounts in Western are recomputed from one snapshot over matching 24/72/168-hour windows; regional article totals with different start times are context only.
 
 ## Facts before prose
 
@@ -12,7 +12,7 @@ NWS totals require complete hourly coverage and uniformly allocate interval accu
 
 Numerical ensemble data is verified only for Alta-Collins and remains LCC-scoped within Utah. Other regions receive NWS facts/discussions plus plume image references. Images are unseen supporting figures: models cannot read pixels or describe a particular image's spread/outcomes. Percentiles cannot be added, subtracted or divided into new forecasts.
 
-Validation checks schemas, section/figure identities, supplied inch amounts, missing-observation claims and some unsupported image interpretations. Western also checks each region's amounts against its own structured facts. These checks cannot establish every semantic association in free prose; real outputs require review for location, period, attribution and unsupported claims.
+Validation checks schemas, section/figure identities, supplied inch amounts, missing-observation claims and some unsupported image interpretations. United States West leaves all snowfall amounts to code-drawn figures and rejects numerical snowfall amounts and links in model prose. Two frozen figures compare NWS mountain points over the next three and seven days, retaining issue times, matching windows, zeros and missing coverage separately. These checks cannot establish every semantic association in free prose; real outputs require review for location, period, attribution and unsupported claims.
 
 ## Scheduling and limits
 

@@ -345,3 +345,23 @@ it("uses the article skeleton for a pending direct archive link, then shows its 
   fireEvent.click(screen.getByRole("button", { name: "Back to the latest post" }));
   expect(screen.getByRole("heading", { name: "Storm Underway" })).toBeTruthy();
 });
+
+it("shows the West selector before the article and renders forecast zeros separately from missing values", () => {
+  const west: ApiDailySnow = {
+    ...post, channel: "western-us", timeZone: "America/Los_Angeles",
+    figures: { "west-72h": { id: "west-72h", kind: "forecast-comparison", caption: "NWS next three days", rows: [
+      { region: "Utah", point: "Alta", snowIn: 0, issuedAt: now.toISOString() },
+      { region: "Utah", point: "Brighton", snowIn: null, issuedAt: null },
+    ] } },
+    sections: [{ id: "update", paragraphs: [{ text: "The broad weather pattern follows.", figure: "west-72h" }] }],
+    regionalHighlights: [{ region: "utah", text: "A retained older edition's highlight." }],
+  };
+  render(<DailySnowPage report={report(west)} now={now} selector={<select aria-label="Region"><option>United States West</option></select>} />);
+  const article = screen.getByRole("article");
+  expect(article.firstElementChild).toBe(screen.getByRole("combobox", { name: "Region" }));
+  expect(screen.getByRole("heading", { name: "The Big Picture" })).toBeTruthy();
+  const table = within(screen.getByRole("table", { name: "NWS next three days" }));
+  expect(table.getByText("0.0″")).toBeTruthy();
+  expect(table.getByText("—")).toBeTruthy();
+  expect(within(article).queryAllByRole("link").filter((a) => a.getAttribute("href")?.startsWith("/daily-snow/"))).toHaveLength(0);
+});

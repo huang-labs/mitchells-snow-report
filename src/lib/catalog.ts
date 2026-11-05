@@ -13,7 +13,7 @@ export const REGIONS = [
 export type RegionId = (typeof REGIONS)[number]["id"];
 export type ChannelId = RegionId | "western-us";
 export const CHANNELS = [
-  { id: "western-us", name: "Western United States", timeZone: "America/Los_Angeles" },
+  { id: "western-us", name: "United States West", timeZone: "America/Los_Angeles" },
   ...REGIONS,
 ] as const;
 export const regionById = (id: string) => REGIONS.find((r) => r.id === id);

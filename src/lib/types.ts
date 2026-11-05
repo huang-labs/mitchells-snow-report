@@ -385,6 +385,7 @@ export type DailySnowSectionId = "update" | "short-term" | "extended";
 
 /** Figures are data or stored stills, frozen at posting time. Captions come from code, never the model. */
 export type DailySnowFigure = { id: string; caption: string } & (
+  | { kind: "forecast-comparison"; rows: Array<{ region: string; point: string; snowIn: number | null; issuedAt: string | null }> }
   | { kind: "snow-bars"; canyon: CanyonId; bars: SixHourSnow[] }
   | { kind: "snow-level"; series: Array<{ canyon: CanyonId; points: Array<{ start: string; ft: number }> }> }
   | { kind: "totals"; rows: Array<{ name: string; h24: number | null; h48: number | null; storm: number | null }> }

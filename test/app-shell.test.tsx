@@ -214,14 +214,7 @@ describe("app shell", () => {
       expect(await loadedHeading(title)).toBeTruthy();
       const parent = within(screen.getByRole("navigation", { name: "Sections" })).getByRole("link", { name: "Resorts" });
       expect(parent.hasAttribute("data-current")).toBe(Boolean(SECTIONS[i].group));
-      if (SECTIONS[i].group) {
-        const resorts = screen.getByRole("navigation", { name: "Resorts" });
-        const links = within(resorts).getAllByRole("link");
-        expect(links.map((a) => a.getAttribute("href"))).toEqual(["/alta", "/snowbird", "/solitude", "/brighton", "/snowbasin", "/palisades-tahoe", "/mammoth-mountain", "/jackson-hole", "/big-sky", "/winter-park", "/steamboat", "/telluride", "/crystal-mountain", "/mt-bachelor"]);
-        expect(links.filter((a) => a.getAttribute("aria-current") === "page").map((a) => a.textContent)).toEqual([SECTIONS[i].label]);
-      } else {
-        expect(screen.queryByRole("navigation", { name: "Resorts" })).toBeNull();
-      }
+      expect(screen.queryByRole("navigation", { name: "Resorts" })).toBeNull();
       if (SECTIONS[i].id === "plumes") {
         // Four cropped panels, each with a Mountain Time axis.
         expect(await screen.findAllByRole("img", { name: /times in America\/Denver/ })).toHaveLength(6);
@@ -271,7 +264,7 @@ describe("resort navigation", () => {
     expect(parent().getAttribute("aria-current")).toBe("page");
     expect(parent().hasAttribute("data-current")).toBe(false);
     expect(screen.queryByRole("navigation", { name: "Resorts" })).toBeNull();
-    expect(document.getElementById("resort-navigation")!.hasAttribute("inert")).toBe(true);
+    expect(document.getElementById("resort-navigation")).toBeNull();
     // There is no separate disclosure button any more.
     expect(screen.queryByRole("button", { name: "Resorts" })).toBeNull();
   });
@@ -280,16 +273,16 @@ describe("resort navigation", () => {
     render(<SectionNav pathname={`/${name.toLowerCase()}`} />);
     expect(parent().getAttribute("aria-current")).toBeNull();
     expect(parent().hasAttribute("data-current")).toBe(true);
-    expect(within(screen.getByRole("navigation", { name: "Resorts" })).getByRole("link", { name }).getAttribute("aria-current")).toBe("page");
+    expect(screen.queryByRole("navigation", { name: "Resorts" })).toBeNull();
   });
 
-  it("shows the resort row only on resort pages", () => {
+  it("keeps one navigation row on every page", () => {
     const view = render(<SectionNav pathname="/weather" />);
     expect(screen.queryByRole("navigation", { name: "Resorts" })).toBeNull();
-    expect(document.getElementById("resort-navigation")!.hasAttribute("inert")).toBe(true);
+    expect(document.getElementById("resort-navigation")).toBeNull();
     expect(parent().hasAttribute("data-current")).toBe(false);
     view.rerender(<SectionNav pathname="/alta" />);
-    expect(screen.getByRole("navigation", { name: "Resorts" })).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "Resorts" })).toBeNull();
     view.rerender(<SectionNav pathname="/" />);
     expect(screen.queryByRole("navigation", { name: "Resorts" })).toBeNull();
   });

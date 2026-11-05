@@ -96,11 +96,11 @@ export function WeatherPage({ source, now,region="utah",selector }: { source: Ap
   const payload = source.payload as NwsPayload | null;
   return (
     <section className="page page--weather">
+      {selector}
       <header className="page__header">
         <h1>{regionById(region)!.name} mountain weather</h1>
         <p className="page__sub">NWS mountain gridpoint forecasts. Day = 6 AM–6 PM, night = 6 PM–6 AM destination local time; maxima/minima within each block.</p>
       </header>
-      {selector}
       {payload?.failures?.filter(f=>!payload.points.some(p=>p.lastError===f)).map(f=><p key={f} className="source-line__error">Forecast unavailable · {f}</p>)}
       {payload?.points.length ? (
         <div className="weather-grid">

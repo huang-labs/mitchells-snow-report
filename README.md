@@ -6,7 +6,7 @@ A snow and conditions dashboard for 14 favorite Western United States resorts, b
 
 - Compare resort snowfall day by day (past week, last 24 h, NWS week ahead), lift and terrain status, and webcams.
 - Select eight regions for NWS mountain weather and University of Utah plumes.
-- Read eight regional **Daily Snow** forecasts and a **Western United States** overview, labeled as AI with model attribution.
+- Read eight regional **Daily Snow** forecasts and a standalone **United States West** article with NWS comparison figures, labeled as AI with model attribution.
 
 Next.js builds the static frontend. A Cloudflare Worker serves the APIs and collects upstream data on a five-minute cron, storing the latest successful results in KV. Pages read that stored data; AI generation runs during collection. Webcam collection retries failed YouTube metadata lookups and uses official Snowbasin and Jackson Hole camera feeds; blocked or unsupported pages retain their official webcam links. See [source notes](docs/IMPLEMENTATION_NOTES.md#adapters) for coverage and retry behavior.
 
@@ -48,7 +48,7 @@ See [Local development](docs/DEVELOPMENT.md) for the full command reference, sch
 The fork's approved scope is in the [Mitchell's expansion plan](docs/EXPANSION_PLAN.md).
 The [repository setup](docs/REPOSITORY_SETUP.md) records isolated Cloudflare resources and CI readiness.
 
-The fixed favorites are Alta, Snowbird, Solitude, Brighton, Snowbasin, Palisades Tahoe, Mammoth Mountain, Jackson Hole, Big Sky, Winter Park, Steamboat, Telluride, Crystal Mountain and Mt. Bachelor. Routes are `/`, `/<resort-id>`, `/daily-snow`, `/weather`, `/plumes`, and the eight regional children of those three forecast pages. Daily Snow defaults to Western; Weather and Plumes remember the last region. History fills from deployment, with no imported backfill.
+The fixed favorites are Alta, Snowbird, Solitude, Brighton, Snowbasin, Palisades Tahoe, Mammoth Mountain, Jackson Hole, Big Sky, Winter Park, Steamboat, Telluride, Crystal Mountain and Mt. Bachelor. Routes are `/`, `/<resort-id>`, `/daily-snow`, `/weather`, `/plumes`, and the eight regional children of those three forecast pages. Daily Snow defaults to United States West; Weather and Plumes remember the last region. Region dropdowns sit at the top of forecast pages; select a region there to read its Daily Snow. Resort details are reached from the homepage, without a second navigation row. History fills from deployment, with no imported backfill.
 
 | Guide | What's inside |
 | --- | --- |
