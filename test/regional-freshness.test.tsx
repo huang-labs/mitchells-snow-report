@@ -33,10 +33,10 @@ it("ends with the legend explaining missing data and local days", () => {
   expect(page.querySelector(".legend")?.textContent).toContain("local time");
 });
 
-it("titles the page Resorts and goes directly to timelines", () => {
+it("titles the page Resorts with snowfall windows above the timelines", () => {
   render(<RegionalPage now={now} report={buildReport(null, now)} />);
   expect(document.querySelector("h1")?.textContent).toBe("Resorts");
-  expect(document.querySelector(".page__sub")).toBeNull();
+  expect(document.querySelector(".page__sub")?.textContent).toBe("Reported snowfall: past 7 days and last 24 hours · NWS forecast: next 7 days.");
   expect(document.querySelector(".page__header")?.nextElementSibling?.className).toBe("resort-timelines");
 });
 

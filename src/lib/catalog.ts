@@ -3,7 +3,7 @@ export type TimeZone = "America/Denver" | "America/Los_Angeles";
 export const REGIONS = [
   { id: "utah", name: "Utah", timeZone: "America/Denver" },
   { id: "tahoe", name: "Tahoe", timeZone: "America/Los_Angeles" },
-  { id: "mammoth", name: "Mammoth / Eastern Sierra", timeZone: "America/Los_Angeles" },
+  { id: "mammoth", name: "Mammoth", timeZone: "America/Los_Angeles" },
   { id: "tetons", name: "Tetons", timeZone: "America/Denver" },
   { id: "montana", name: "Montana", timeZone: "America/Denver" },
   { id: "colorado", name: "Colorado", timeZone: "America/Denver" },
