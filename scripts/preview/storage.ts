@@ -4,6 +4,7 @@ import { SNAPSHOT_KEY } from "../../src/lib/store";
 import type { DailySnowState } from "../../src/lib/types";
 import {
   Cloudflare,
+  CloudflareApiError,
   PRODUCTION_KV,
   assertPreviewNamespace,
 } from "./cloudflare";
@@ -64,10 +65,34 @@ export class PreviewStorage {
   }
   async put(key: string, value: ArrayBuffer | string, expiration?: number) {
     const query = expiration ? `?expiration=${expiration}` : "";
-    await this.cf.response(
-      `/storage/kv/namespaces/${this.namespace.id}/values/${encodeURIComponent(key)}${query}`,
-      { method: "PUT", body: value },
-    );
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await this.cf.response(
+          `/storage/kv/namespaces/${this.namespace.id}/values/${encodeURIComponent(key)}${query}`,
+          { method: "PUT", body: value },
+        );
+        return;
+      } catch (error) {
+        // Namespace creation can succeed before KV's write path recognizes it.
+        // Only this idempotent preview write is retried; auth and other failures are not.
+        if (
+          !(error instanceof CloudflareApiError) ||
+          error.status !== 404 ||
+          !error.issues.some(
+            (issue) =>
+              issue.code === 10013 &&
+              /namespace not found/i.test(issue.message),
+          ) ||
+          attempt >= 5
+        )
+          throw error;
+        const delay = 1000 * 2 ** attempt;
+        console.log(
+          `Preview KV namespace not ready; retrying write in ${delay / 1000}s (${attempt + 1}/5)`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
   }
   async seed(now = Date.now()): Promise<number> {
     if (await this.get(SEED_KEY)) return 0;
