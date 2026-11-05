@@ -15,10 +15,10 @@ permissions:
   contents: read
 
 # Never run two production deploys at once; a newer push waits for the current one.
-# On a PR, a newer push cancels the in-flight run instead.
+# Finish preview writes and runner cleanup before another deployment starts.
 concurrency:
   group: deploy-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 
 jobs:
   test:
@@ -73,8 +73,14 @@ jobs:
     environment:
       name: preview
       url: ${{ steps.upload.outputs.url }}
+    concurrency:
+      group: preview-data-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    timeout-minutes: 30
     steps:
       - uses: useblacksmith/checkout@v1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -84,41 +90,23 @@ jobs:
         run: npm run build
         env:
           SITE_URL: https://pr-${{ github.event.pull_request.number }}-mitchells-snow-report-preview.huang-inc.workers.dev
-      # Each PR gets an isolated Worker Preview that reads the seeded
-      # preview-only KV.
-      # The preview Worker has no production route or collection cron.
-      - name: Deploy isolated PR preview
+      - name: Seed dedicated PR data, refresh sources and deploy preview
         id: upload
+        run: npx tsx scripts/preview-run.ts deploy --pr "$PR"
         env:
+          PR: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          ALIAS: pr-${{ github.event.pull_request.number }}
-          SHA: ${{ github.event.pull_request.head.sha }}
-          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.json
-        run: |
-          npx wrangler preview --worker-name mitchells-snow-report-preview --name "$ALIAS" --ignore-base-config --tag "${SHA:0:7}"
-          url=$(jq -r 'select(.type == "preview") | .preview_urls[0] // empty' "$WRANGLER_OUTPUT_FILE_PATH" | tail -n1)
-          if [ -z "$url" ]; then
-            echo "::error::No Preview URL in wrangler output"
-            exit 1
-          fi
-          echo "url=$url" >> "$GITHUB_OUTPUT"
+      - name: Remove abandoned temporary runner
+        if: always()
+        run: npx tsx scripts/preview-run.ts cleanup-runner --pr "$PR"
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Verify deployed share previews
         run: npx tsx scripts/check-share-preview.ts "$PREVIEW_URL"
         env:
           PREVIEW_URL: ${{ steps.upload.outputs.url }}
-      - name: Comment preview link on PR
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number }}
-          URL: ${{ steps.upload.outputs.url }}
-          SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          body=$(printf '### Preview\n\n%s\n\nUpdated for %s. Uses isolated preview data; cron collection does not run on previews.' "$URL" "${SHA:0:7}")
-          # Target the preview comment itself; another workflow also posts as this bot.
-          comment_id=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --jq '.[] | select(.user.login == "github-actions[bot]" and (.body // "" | startswith("### Preview\n"))) | .id' | head -n1)
-          if [ -n "$comment_id" ]; then
-            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" -f body="$body"
-          else
-            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$body"
-          fi

@@ -20,7 +20,9 @@
     "dailysnow:once": "tsx scripts/dailysnow-once.ts",
     "dailysnow:replay": "tsx scripts/dailysnow-replay.ts",
     "share:render": "tsx scripts/render-share-image.ts",
-    "smoke": "tsx scripts/smoke-worker.ts"
+    "smoke": "tsx scripts/smoke-worker.ts",
+    "preview:refresh": "tsx scripts/preview-dispatch.ts refresh",
+    "preview:dailysnow": "tsx scripts/preview-dispatch.ts dailysnow"
   },
   "dependencies": {
     "@cf-wasm/og": "0.5.0",
