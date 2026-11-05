@@ -4,6 +4,7 @@ name: Deploy
 # (cottonwoods-snow-report.huang.mx). Pull requests are tested, then uploaded as a
 # non-deployed Worker version with a stable per-PR preview URL
 # (pr-<number>-cottonwoods-snow-report.huang-inc.workers.dev), linked in a PR comment.
+# Fork uploads require DEPLOYMENT_ENABLED=true after isolated resources are configured.
 on:
   push:
     branches: [main]
@@ -36,7 +37,9 @@ jobs:
 
   deploy:
     needs: test
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: >-
+      vars.DEPLOYMENT_ENABLED == 'true' &&
+      github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: blacksmith-2vcpu-ubuntu-2404
     environment:
       name: production
@@ -58,6 +61,7 @@ jobs:
     needs: test
     # Only for PRs from this repo: fork and Dependabot PRs get no secrets.
     if: >-
+      vars.DEPLOYMENT_ENABLED == 'true' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.actor != 'dependabot[bot]'

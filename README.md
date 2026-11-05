@@ -45,6 +45,10 @@ See [Local development](docs/DEVELOPMENT.md) for the full command reference, sch
 
 ## Documentation
 
+The fork's approved scope is in the [Mitchell's expansion plan](docs/EXPANSION_PLAN.md).
+Complete the [repository setup](docs/REPOSITORY_SETUP.md) before feature implementation.
+The application still reflects the inherited Cottonwoods version.
+
 | Guide | What's inside |
 | --- | --- |
 | [Architecture](docs/ARCHITECTURE.md) | Runtime, routes, collection, source cadences, storage and share images |

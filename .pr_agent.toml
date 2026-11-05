@@ -36,8 +36,9 @@ Report actionable defects introduced by this diff with a concrete trigger,
 impact, and file/line reference. Prioritize correctness, regressions, security,
 and violations of the trusted repository instructions over style preferences.
 Preserve source-specific measurement windows, observation timestamps, and the
-distinction between zero, not reported, and unavailable. Local time is
-America/Denver; evaluate scheduling across daylight-saving changes. AI prose
+distinction between zero, not reported, and unavailable. Local times follow the
+resort or region's IANA time zone (America/Denver or America/Los_Angeles);
+evaluate scheduling across daylight-saving changes. AI prose
 must be grounded in facts computed by code and visibly attributed. Check
 responsive layouts and that feature styles and changes remain contained.
 Tests should cover meaningful behavior; do not demand tests for prose-only or
