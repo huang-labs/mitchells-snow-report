@@ -17,14 +17,18 @@ Checked on November 5, 2026:
 - The repository variable `DEPLOYMENT_ENABLED` is `false`. The housekeeping
   workflow change requires exactly `true` for production and preview uploads;
   tests remain enabled independently.
-- No repository Actions secrets or variables inherited from organization Actions
-  settings were available. No GitHub deployment environments existed at audit.
-- Blacksmith runner access has not been verified. Listing organization runners
-  returned HTTP 403 because the current token lacks organization-admin scope;
-  that does not establish whether workflow jobs can use Blacksmith.
+- `OPENROUTER_API_KEY` is configured as an encrypted repository Actions secret.
+  No Cloudflare Actions secrets or available organization Actions secrets exist.
+- Blacksmith runner access is verified by the first PR's successful test job,
+  including typecheck, application tests, Worker build, and smoke checks.
+- The first ready-for-review event selected GLM 5.3 and posted a real advisory
+  review successfully. It reported no major issues or security concerns.
+- Production and preview uploads skipped under the readiness gate. Their
+  credentials, environments, and isolated resources still need setup.
 
-Workflow registration is not proof of a successful CI run, AI review, or preview.
-Verify each stage from actual runs and their logs.
+The [housekeeping PR](https://github.com/huang-labs/mitchells-snow-report/pull/1)
+records the live validation. CI and AI review are verified; preview deployment is
+not yet configured.
 
 ## CI and AI review
 
@@ -75,9 +79,10 @@ accumulate naturally after launch.
 
 ## Completion checks
 
-- CI runs successfully on a PR.
-- The appropriate AI reviewer posts a real review for the current head.
-- Preview deployment uses Mitchell's resources and comments a working URL.
-- Preview pages demonstrate real collected data and correctly scoped AI output.
-- Production configuration names only Mitchell's resources.
-- The expansion implementation starts from main after the housekeeping PR merges.
+- [x] CI runs successfully on a PR.
+- [x] The appropriate AI reviewer posts a real review. Every subsequent head
+  needs its own review/checks, visible on the PR.
+- [ ] Preview deployment uses Mitchell's resources and comments a working URL.
+- [ ] Preview pages demonstrate real collected data and correctly scoped AI output.
+- [ ] Production configuration names only Mitchell's resources.
+- [ ] The expansion implementation starts from main after the housekeeping PR merges.
