@@ -35,8 +35,6 @@ function Layout({ kind }: { kind: string }) {
     case "daily-snow":
       return (
         <div className={styles.article}>
-          <div className={styles.articleTitle} /><div className={styles.articleTitle} />
-          <Lines />
           <div className={styles.articleSection}><div className={styles.shortLine} /><Lines /><Lines /></div>
         </div>
       );
@@ -78,10 +76,20 @@ export function ReportLoading({ sectionId,region }: { sectionId: string;region?:
     <div className={`${styles.loading} ${sectionId === "daily-snow" ? styles.reading : ""}`}>
       <span className={styles.screenReader} role="status">Loading {title}…</span>
       <section aria-busy="true" aria-label={title}>
-        <header className={styles.header}>
+        {sectionId === "daily-snow" ? <header className={`dailysnow__header ${styles.articleHeader}`}>
+          <h1 className={styles.screenReader}>{title}</h1>
+          <p className="eyebrow">{region ? regionById(region)!.name : "United States West"}</p>
+          <div className="dailysnow__meta">
+            <span className="eyebrow">Daily Snow<span className="badge badge--ai">AI</span></span>
+          </div>
+          <div aria-hidden="true" className={`${styles.articleHeading} ${styles.shapes}`}>
+            <div className={styles.articleTitle} /><div className={styles.articleTitle} />
+          </div>
+          <div aria-hidden="true" className={styles.shapes}><Lines /></div>
+        </header> : <header className={styles.header}>
           <h1>{title}</h1>
-          {sectionId !== "daily-snow" && <div aria-hidden="true" className={styles.subtitle}><Lines /></div>}
-        </header>
+          <div aria-hidden="true" className={styles.subtitle}><Lines /></div>
+        </header>}
         <div aria-hidden="true" className={styles.shapes}><Layout kind={sectionId} /></div>
       </section>
     </div>

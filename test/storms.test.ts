@@ -4,7 +4,6 @@ import { runCollection } from "@/lib/collect";
 import { buildDailyDigest } from "@/lib/dailysnow/digest";
 import { archiveStorms, trackStorms } from "@/lib/dailysnow/storm-store";
 import { advanceStormTracking, mergeStormTracking, seedStormTracking, stormDigest, stormForPost, stormKey } from "@/lib/dailysnow/storms";
-import { readerWording } from "@/lib/dailysnow/wording";
 import { askDailySnow, buildModelInput, validateDailySnow } from "@/lib/dailysnow/llm";
 import { PRIMARY_MODEL } from "@/lib/ai/model";
 import { mergeSnapshot, MemoryKV, readSnapshot, writeSnapshot } from "@/lib/store";
@@ -266,7 +265,7 @@ describe("persistent storm observations", () => {
     const post=state.current!;
     expect(post.stormRecap?.resorts[0].total?.amountIn).toBe(15);
     expect(post.figures["storm-recap"]).toMatchObject({ kind: "storm-recap", storm: post.stormRecap });
-    expect(post.sections[0].paragraphs[0].text).toContain("The NWS expects");
+    expect(post.sections[0].paragraphs[0].text).toContain("The discussion expects");
     state=await planDailySnow(state,{...snapshot(48,{alta:{storm:0,h24:3}}),stormTracking:monday},{SNOW_KV:kv,AI:ai},at(48),{force:true})!.run!();
     expect(state.current?.stormRecap?.id).toBe(post.stormRecap?.id);
     const archived = await kv.get(`dailysnow:v1:${post.date}`, "text");
@@ -280,7 +279,7 @@ describe("persistent storm observations", () => {
     const s = { ...snapshot(24, { alta: { storm: 0 } }), stormTracking: run(snapshot(24, { alta: { storm: 0 } }), state) };
     const d = buildDailyDigest(s, null, [], at(24)).digest;
     const raw = { title: "A Break", summary: "Alta reported 15″ for the storm.", sections: [{ id: "update", paragraphs: [{ text: "The discussion expects a dry day.", figure: "storm-recap" }] }] };
-    expect(validateDailySnow(raw, d).sections[0].paragraphs[0].text).toBe("The NWS expects a dry day.");
+    expect(validateDailySnow(raw, d).sections[0].paragraphs[0].text).toBe("The discussion expects a dry day.");
     expect(() => validateDailySnow({ ...raw, summary: "The final numbers are in." }, d)).toThrow(/final storm totals/);
     expect(() => validateDailySnow({ ...raw, summary: "Alta reported 99″ for the storm." }, d)).toThrow(/not in the data/);
     expect(JSON.stringify(buildModelInput("test", d))).toContain("storm-recap");
@@ -384,14 +383,4 @@ describe("archive bootstrap and attribution", () => {
     await trackStorms(kv, previous, current, at(49));
     expect(resort(current.stormTracking!, "alta").total?.amountIn).toBe(15);
   });
-
-  it.each([
-    ["The discussion calls for light snow.", "The NWS calls for light snow."],
-    ["According to the discussion, snow ends.", "According to the NWS, snow ends."],
-    ["The NWS discussion expects snow.", "The NWS expects snow."],
-    ["Dry today. The forecast discussion expects snow tomorrow.", "Dry today. The NWS expects snow tomorrow."],
-    ["The NWS Area Forecast Discussion keeps snow going.", "The NWS keeps snow going."],
-    ["NWS's discussion favors Alta.", "The NWS favors Alta."],
-    ["There was a discussion of totals.", "There was a discussion of totals."],
-  ])("attributes %s in plain language", (input, expected) => expect(readerWording(input)).toBe(expected));
 });

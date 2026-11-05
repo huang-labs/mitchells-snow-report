@@ -4,7 +4,6 @@ import { CHANNELS,regionById,type ChannelId } from "@/lib/catalog";
 import { useState, type ReactNode } from "react";
 import { formatLocal } from "@/lib/time";
 import { isSnowPlume } from "@/lib/dailysnow/plume";
-import { readerWording } from "@/lib/dailysnow/wording";
 import type { ApiDailySnow, DailySnowSectionId, ReportResponse } from "@/lib/types";
 import { prefetchArchivedPost, useArchivedPost } from "./archive";
 import { Figure } from "./figures";
@@ -16,7 +15,7 @@ import { StatusBadge } from "../ui";
 
 const SECTION_TITLE: Record<DailySnowSectionId, string> = { update: "Today", "short-term": "Next Few Days", extended: "Extended Forecast" };
 /** West covers this week with NWS points and week two with NOAA's outlook. */
-const WEST_SECTION_TITLE: Record<DailySnowSectionId, string> = { update: "The Big Picture", "short-term": "This Week", extended: "Week Two" };
+const WEST_SECTION_TITLE: Record<DailySnowSectionId, string> = { update: "Summary", "short-term": "Short Term Forecast", extended: "Extended Forecast" };
 /** Display names by Workers AI model id suffix. */
 const MODEL_NAME: Record<string, string> = { "glm-5.3-flash": "GLM 5.3 Flash", "gpt-oss-120b": "gpt-oss-120b" };
 const modelName = (id: string) => MODEL_NAME[id.split("/").pop() ?? ""] ?? id;
@@ -52,7 +51,7 @@ function Article({ post }: { post: ApiDailySnow }) {
           <h2>{post.channel === "western-us" ? WEST_SECTION_TITLE[s.id] : SECTION_TITLE[s.id]}</h2>
           {s.paragraphs.map((p, i) => (
             <div key={i}>
-              <p>{readerWording(p.text)}</p>
+              <p>{p.text}</p>
               {p.figure && post.figures[p.figure] && <Figure figure={post.figures[p.figure]} postedAt={post.generatedAt} timeZone={post.timeZone} />}
               {s === post.sections[0] && i === 0 && post.figures["storm-recap"] && !referenced.has("storm-recap") && <Figure figure={post.figures["storm-recap"]} postedAt={post.generatedAt} timeZone={post.timeZone} />}
             </div>
@@ -67,7 +66,7 @@ function Article({ post }: { post: ApiDailySnow }) {
 function Footer({ post }: { post: ApiDailySnow }) {
   return (
     <p className="dailysnow__footer">
-      AI-generated from NWS forecasts, University of Utah plumes and resort reports · {modelName(post.model)}. Check official forecasts and avalanche conditions before heading out.
+      AI-generated from NWS forecasts and discussion, University of Utah plumes and resort reports · {modelName(post.model)}. Check official forecasts and avalanche conditions before heading out.
     </p>
   );
 }
@@ -105,7 +104,7 @@ export function DailySnowPage({ report, now,channel="western-us",selector }: { r
     window.scrollTo?.(0, 0);
   };
 
-  if (!post && loading) return <ReportLoading sectionId="daily-snow" />;
+  if (!post && loading) return <ReportLoading sectionId="daily-snow" region={channel === "western-us" ? undefined : channel} />;
 
   if (!post) {
     return (
@@ -131,8 +130,8 @@ export function DailySnowPage({ report, now,channel="western-us",selector }: { r
           <header className="dailysnow__header">
             <p className="eyebrow">{definition.name}</p>
             <Eyebrow post={post} now={now} archived={post.date !== current?.date} />
-            <h1 className="dailysnow__title">{readerWording(post.title)}</h1>
-            <p className="dailysnow__summary">{readerWording(post.summary)}</p>
+            <h1 className="dailysnow__title">{post.title}</h1>
+            <p className="dailysnow__summary">{post.summary}</p>
           </header>
           <Article post={post} />
           {post.regionalHighlights?.map(highlight=><section className="dailysnow__section" key={highlight.region}><h2>{regionById(highlight.region)!.name}</h2><p>{highlight.text}</p></section>)}
