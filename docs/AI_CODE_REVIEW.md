@@ -46,7 +46,11 @@ in-progress/full-diff reviews and their persistent findings are updated.
 Policy is in `.pr_agent.toml`: **high reasoning for all three models**, a 131,072-token
 context budget and a 32,768-token completion allowance shared by reasoning and
 the final review. Each model call has up to 20 minutes; the job allows 45 minutes
-for startup and one transient-error retry. Large-PR chunking stays disabled.
+for startup and one transient-error retry. A diff over the budget is reviewed in
+up to four chunks whose findings are merged; files that still do not fit are listed
+in the review's coverage footer. Chunks are reviewed independently, so a chunk
+cannot see code in another chunk. Captured fixtures (`test/fixtures/**`) and
+`package-lock.json` are excluded from review.
 An exhausted budget fails the review rather than lowering reasoning effort.
 These limits are not dollar caps. The official Action wrapper is pinned
 to v0.49.0's commit; its Dockerfile uses upstream's rolling `github_action` image.
