@@ -1,6 +1,6 @@
 # Working in this repository
 
-The owner builds this dashboard with several AI agents working on features in parallel. They decide product and design direction, review changes on PR preview deployments, and merge PRs. These notes cover how to work alongside them. [README.md](README.md) covers the system itself.
+The owner builds this web app with several AI agents working on features in parallel. They decide product and design direction, review changes on PR preview deployments, and merge PRs. These notes cover how to work alongside them. [README.md](README.md) covers the system itself.
 
 ## How the owner works
 
@@ -15,7 +15,7 @@ The owner builds this dashboard with several AI agents working on features in pa
 ## Product and design
 
 - For the Mitchell's expansion, read [docs/EXPANSION_PLAN.md](docs/EXPANSION_PLAN.md) for approved scope and [docs/REPOSITORY_SETUP.md](docs/REPOSITORY_SETUP.md) before configuring Actions or deployment.
-- The dashboard serves phones and desktop browsers. Check layout changes at phone widths and at ordinary laptop widths.
+- The web app serves phones and desktop browsers. Check layout changes at phone widths and at ordinary laptop widths.
 - Long-form content is page content: no card border or panel. Use card styling only for summaries and charts. Give an article one reading width and let its children fill it, so every edge lines up.
 - Label AI output wherever it appears (the `badge--ai` badge, plus a footer naming the model), and keep it visibly separate from measured or forecast data.
 - Keep resort pages consistent in structure while honoring each resort's available data. Preserve source-specific measurement windows and report/observation times. Never show missing data as zero: keep a reported zero visibly distinct from a missing value. Where space is tight, a page may show “not reported” and “not published” as a single “no data” mark; the data model keeps all three states.

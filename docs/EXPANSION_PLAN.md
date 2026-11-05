@@ -4,8 +4,8 @@
 
 Status: design approved on November 5, 2026; implementation delivered in the expansion PR. The follow-up design uses the name United States West, top-of-page dropdowns without visible labels, and a standalone West article with comparison figures instead of regional highlights and links. Resort navigation uses homepage links rather than a resort subnav. This document retains the approved scope; current operations and source findings live in the linked guides.
 
-Expand the Cottonwoods dashboard into Mitchell's Snow Report at
-`mitchells-snow-report.huang.mx`. Launch with a fixed list of 14 United States
+Expand the Cottonwoods web app into Mitchell's Snow Report at
+`mitchells-snow-report.huang.mx`. Launch with a fixed list of 16 United States
 resorts, eight regional forecast channels, and a Western United States Daily Snow
 overview. International favorites are outside this release.
 
@@ -26,16 +26,18 @@ order:
 2. Snowbird
 3. Solitude
 4. Brighton
-5. Snowbasin
-6. Palisades Tahoe
-7. Mammoth Mountain
-8. Jackson Hole
-9. Big Sky
-10. Winter Park
-11. Steamboat
-12. Telluride
-13. Crystal Mountain
-14. Mt. Bachelor
+5. Park City
+6. Deer Valley
+7. Snowbasin
+8. Palisades Tahoe
+9. Mammoth Mountain
+10. Jackson Hole
+11. Big Sky
+12. Winter Park
+13. Steamboat
+14. Telluride
+15. Crystal Mountain
+16. Mt. Bachelor
 
 Each resort has a detail page with the same structure, showing the snow reports,
 operations, observations, and webcams its sources support. Missing data remains
@@ -47,7 +49,7 @@ on what each resort publishes.
 
 | Region | Tracked resorts | Time zone |
 | --- | --- | --- |
-| Utah | Alta, Snowbird, Solitude, Brighton, Snowbasin | America/Denver |
+| Utah | Alta, Snowbird, Solitude, Brighton, Park City, Deer Valley, Snowbasin | America/Denver |
 | Tahoe | Palisades Tahoe | America/Los_Angeles |
 | Mammoth / Eastern Sierra | Mammoth Mountain | America/Los_Angeles |
 | Tetons | Jackson Hole | America/Denver |
@@ -60,7 +62,7 @@ Daily Snow defaults to **Western United States**, followed by these eight region
 choices. The overview covers the tracked western regions, not the entire country.
 Weather and Plumes remember the last regional selection, initially Utah. Choosing
 the Western overview preserves that regional preference. Direct links override
-saved preferences. The homepage always shows all 14 resorts.
+saved preferences. The homepage always shows all 16 resorts.
 
 Place a compact, labeled region selector below the relevant page heading. Use
 fixed, shareable regional routes, such as `/daily-snow/utah`, `/weather/utah`, and
@@ -93,15 +95,15 @@ past-week history or silently import Cottonwoods archives.
 
 ## Source plan
 
-Live reconnaissance identified the following paths for the ten new resorts.
-Endpoint discovery is complete; adapters and field semantics still need fixture
-validation during implementation.
+Live reconnaissance identified the following paths for the twelve additional resorts.
+Adapters and field semantics are validated against captured fixtures; current
+coverage and limitations are recorded in [implementation notes](IMPLEMENTATION_NOTES.md).
 
 | Source approach | Resorts |
 | --- | --- |
-| Mountain Powder feeds | Palisades Tahoe, Mammoth Mountain, Winter Park, Steamboat, Crystal Mountain |
+| Mountain Powder feeds | Deer Valley, Palisades Tahoe, Mammoth Mountain, Winter Park, Steamboat, Crystal Mountain |
 | ReportPal | Big Sky |
-| Official HTML reports | Snowbasin, Telluride |
+| Official HTML reports | Park City (embedded JSON), Snowbasin, Telluride |
 | Official JSON feeds | Jackson Hole, Mt. Bachelor |
 
 The existing four Cottonwoods adapters remain the starting point for those
@@ -111,6 +113,8 @@ collection time and keep them out of logs, fixtures, and API responses.
 
 Confirmed additional endpoints include:
 
+- [Park City snow report](https://www.parkcitymountain.com/the-mountain/mountain-conditions/weather-report.aspx)
+- [Deer Valley mountain report](https://www.deervalley.com/explore-the-mountain/mountain-report)
 - [Big Sky ReportPal](https://www.bigskyresort.com/api/reportpal?resortName=bs&useReportPal=true)
 - [Jackson Hole snow report](https://jacksonhole-prod.zaneray.com/api/snow.json)
 - [Mt. Bachelor snow reports](https://api.mtbachelor.com/api/v1/dor/drupal/snow-reports?sort=date&direction=desc)
@@ -264,7 +268,7 @@ after extracting the shared factual logic. Resort camera collection remains.
 
 ## Validation and delivery
 
-- Validate all 14 resort adapters against real fixtures, including stale reports,
+- Validate all 16 resort adapters against real fixtures, including stale reports,
   missing values, zeros, ranges, and selected reporting locations.
 - Test NWS point/station failure isolation, region and forecast-area storm
   separation, local calendars, DST, channel-specific archives and images, and

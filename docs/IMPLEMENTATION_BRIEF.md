@@ -7,7 +7,7 @@ Date: 2026-10-29. Revised 2026-11-01: the product is phone/desktop-first. Revise
 
 ## Purpose and audience
 
-Build a snow/conditions dashboard read on phones and desktop browsers. It supplies evidence for people to decide where and when to ski, plus morning excitement. It does not score resorts or recommend a destination.
+Build a snow/conditions web app read on phones and desktop browsers. It supplies evidence for people to decide where and when to ski, plus morning excitement. It does not score resorts or recommend a destination.
 
 The owner is the primary audience and wants technically detailed information, including ensemble forecasts. Assume fluency with snow reports and plumes. Preserve scientific detail and precise measurement labels while making the main numbers readable on a phone.
 
@@ -20,7 +20,7 @@ Primary resorts: Alta, Snowbird, Solitude, Brighton. Include Park City, Deer Val
 - Add a scheduled handler to that same deployment for collection. OpenNext's documented custom Worker entrypoint is a researched route to combining Next.js request handling and `scheduled()`; verify the current integration before implementing.
 - One global cron, `*/5 * * * *`, collects all source categories every five minutes. This supersedes earlier 15-minute and split-frequency proposals.
 - Store the latest successful normalized data per source in Cloudflare KV. A SQL database, historical archive, separate collection microservice, and separate Pages deployment are outside v1.
-- Render the dashboard client-side. The browser fetches the stored API snapshot on initial load and every minute, independently of page navigation. Page visits and API reads do not trigger upstream collection.
+- Render the web app client-side. The browser fetches the stored API snapshot on initial load and every minute, independently of page navigation. Page visits and API reads do not trigger upstream collection.
 - Keep collection credentials server-side. The public API exposes report data, not operational secrets or private configuration.
 - Access is public without authentication; an unlisted URL is acceptable. Include only public conditions data, never a household address. Browser preferences are stored locally.
 
@@ -28,7 +28,7 @@ The user's final choice is full Next.js with backend routes, not the earlier sta
 
 ## Navigation and design
 
-The dashboard is a set of sections, each with its own page and URL, reached from a navbar that works on phones and desktops.
+The web app is a set of sections, each with its own page and URL, reached from a navbar that works on phones and desktops.
 
 Default section order (implementation may adjust ordering for readability):
 

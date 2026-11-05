@@ -2,7 +2,7 @@
 
 [← README](../README.md)
 
-Next.js exports 42 fixed dashboard pages into `out/`. Cloudflare Static Assets serves HTML, navigation payloads, scripts and styles. A plain Worker (`worker.ts`) handles APIs, share images and the five-minute collection cron. There is no request-time Next.js server.
+Next.js exports 44 fixed web app pages into `out/`. Cloudflare Static Assets serves HTML, navigation payloads, scripts and styles. A plain Worker (`worker.ts`) handles APIs, share images and the five-minute collection cron. There is no request-time Next.js server.
 
 ```text
 Browser → static pages → /api/report → source snapshot + nine publication states
@@ -13,9 +13,9 @@ Link crawler → /daily-snow[/region]/opengraph-image → channel-specific PNG
 
 ## Catalog and routes
 
-`src/lib/catalog.ts` owns the 14 favorites, eight editorial regions, time zones, 12 mountain forecast areas, reporting locations and 12 plume stations. An editorial region can span several independent forecast areas: Utah has LCC, BCC and Snowbasin; Colorado has Winter Park, Steamboat and Telluride.
+`src/lib/catalog.ts` owns the 16 favorites, eight editorial regions, time zones, 14 mountain forecast areas, reporting locations and 12 plume stations. An editorial region can span several independent forecast areas: Utah has LCC, BCC, Park City, Deer Valley and Snowbasin; Colorado has Winter Park, Steamboat and Telluride.
 
-The main navigation is Resorts, Daily Snow, Weather and Plumes. `/` always lists all 14 favorites in catalog order; each has `/<resort-id>`. Daily Snow defaults to the Western overview. The eight fixed regional children of `/daily-snow`, `/weather` and `/plumes` are statically generated. Weather and Plumes remember the last region, initially Utah; explicit paths win. Choosing Western leaves that preference intact.
+The main navigation is Resorts, Daily Snow, Weather and Plumes. `/` always lists all 16 favorites in catalog order; each has `/<resort-id>`. Daily Snow defaults to the Western overview. The eight fixed regional children of `/daily-snow`, `/weather` and `/plumes` are statically generated. Weather and Plumes remember the last region, initially Utah; explicit paths win. Choosing Western leaves that preference intact.
 
 The root AppShell polls once on load and every minute. Client navigation shares that report. Pages never collect or invoke AI. Roads, dedicated travel/highway-camera feeds, the recommendation backend and homepage teaser are removed.
 

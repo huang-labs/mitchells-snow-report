@@ -79,6 +79,7 @@ export type SourceId =
   | "snowbird"
   | "solitude"
   | "brighton"
+  | "park-city" | "deer-valley"
   | "snowbasin" | "palisades-tahoe" | "mammoth-mountain" | "jackson-hole" | "big-sky"
   | "winter-park" | "steamboat" | "telluride" | "crystal-mountain" | "mt-bachelor"
   | "plumes"

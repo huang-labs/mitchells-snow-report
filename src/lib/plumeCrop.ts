@@ -9,7 +9,7 @@ import { decode, encode } from "fast-png";
  * than hard-coded pixel offsets, so a resized figure still crops correctly; an
  * unexpected layout throws instead of producing a wrong crop. Y tick labels are
  * kept whole, including the ones overhanging the frame's top and bottom edges.
- * The UTC tick labels under each frame are cut off (the dashboard draws Mountain Time ones),
+ * The UTC tick labels under each frame are cut off (the web app draws Mountain Time ones),
  * and the frame position inside each crop is returned so the time axis can be
  * mapped: the frame's left edge is the model init time, the right edge init +
  * forecast length.

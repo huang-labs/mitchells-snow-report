@@ -103,7 +103,7 @@ try {
   const shareCheck = spawn(process.execPath, ["node_modules/tsx/dist/cli.mjs", "scripts/check-share-preview.ts", base, process.env.SITE_URL || "https://mitchells-snow-report.huang.mx"], { stdio: "inherit" });
   const [code] = await once(shareCheck, "exit");
   assert.equal(code, 0, "share metadata matches each section and deployment");
-  console.log("Worker smoke passed: 42 static pages, navigation payload, immutable JS, 404s, API methods, KV, static and Daily Snow PNGs, share metadata and HEAD.");
+  console.log(`Worker smoke passed: ${4 + RESORTS.length + REGIONS.length * 3} static pages, navigation payload, immutable JS, 404s, API methods, KV, static and Daily Snow PNGs, share metadata and HEAD.`);
 } finally {
   child.kill("SIGTERM");
   await exited;

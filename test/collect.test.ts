@@ -126,7 +126,7 @@ describe("freshness semantics", () => {
   it("never-collected sources are unavailable and required ones are reported missing", () => {
     expect(classify(def, undefined, now).freshness).toBe("unavailable");
     const report = buildReport(null, now);
-    expect(report.requiredMissing.sort()).toEqual(["alta", "big-sky", "brighton", "crystal-mountain", "jackson-hole", "mammoth-mountain", "mt-bachelor", "palisades-tahoe", "plumes", "snowbasin", "snowbird", "solitude", "steamboat", "telluride", "winter-park"]);
+    expect(report.requiredMissing.sort()).toEqual(["alta", "big-sky", "brighton", "crystal-mountain", "deer-valley", "jackson-hole", "mammoth-mountain", "mt-bachelor", "palisades-tahoe", "park-city", "plumes", "snowbasin", "snowbird", "solitude", "steamboat", "telluride", "winter-park"]);
     expect(report.sources.nws.freshness).toBe("unavailable");
     expect(report.sources.nws.payload).toBeNull();
   });

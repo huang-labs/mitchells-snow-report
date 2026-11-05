@@ -379,7 +379,7 @@ describe("activity gate",()=>{
   it("skips the off-season and needs the AI binding", () => {
     const s = snap();
     for (const p of (s.sources.nws!.payload as NwsPayload).points) { p.sixHourSnow = []; p.hourlySnow = []; }
-    for (const id of ["alta", "snowbird", "solitude", "brighton", "snowbasin"] as const) s.sources[id] = undefined;
+    for (const id of ["alta", "snowbird", "solitude", "brighton", "park-city", "deer-valley", "snowbasin"] as const) s.sources[id] = undefined;
     const { ai } = fakeAi(() => answer([]));
     expect(planDailySnow(undefined, s, { SNOW_KV: new MemoryKV(), AI: ai }, SIX_AM)).toMatchObject({ skipped: "off-season" });
     expect(planDailySnow(undefined, s, { SNOW_KV: new MemoryKV() }, SIX_AM)).toBeUndefined();
@@ -389,7 +389,7 @@ describe("activity gate",()=>{
     const quiet = () => {
       const s = snap();
       for (const p of (s.sources.nws!.payload as NwsPayload).points) { p.sixHourSnow = []; p.hourlySnow = []; }
-      for (const id of ["alta", "snowbird", "solitude", "brighton", "snowbasin"] as const) s.sources[id] = undefined;
+      for (const id of ["alta", "snowbird", "solitude", "brighton", "park-city", "deer-valley", "snowbasin"] as const) s.sources[id] = undefined;
       return s;
     };
     // Legacy six-hour-only snapshot: the only snow is in the bar covering now.
