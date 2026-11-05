@@ -8,13 +8,13 @@ The housekeeping [PR #1](https://github.com/huang-labs/mitchells-snow-report/pul
 
 GitHub Actions and Blacksmith runners are enabled. Exactly one author label selects an advisory reviewer from a different family; Codex uses `author:codex`. The encrypted OpenRouter secret is configured and the housekeeping PR received a real review.
 
-Cloudflare account access was verified through the owner's authenticated `cf` CLI. Dedicated production and preview KV, the preview parent Worker, an AI Gateway, and the SQLite publication coordinator are configured. Account ID and a dedicated account/zone-scoped deployment token are encrypted GitHub Actions secrets. The application contains no token values.
+Cloudflare account access was verified through the owner's authenticated `cf` CLI. Dedicated production and preview KV, the preview parent Worker, and an AI Gateway are configured. Account ID and a dedicated account/zone-scoped deployment token are encrypted GitHub Actions secrets. The application contains no token values.
 
 `MITCHELLS_DEPLOYMENT_ENABLED` controls the updated workflow. The inherited `DEPLOYMENT_ENABLED` remains false so older main code cannot target Cottonwoods before this feature merges. Production deployment on merge uses only Mitchell's configuration.
 
 ## Verification and boundaries
 
-The isolated preview collection succeeded for all 19 sources. Regional and Western AI output is seeded through the real collection/publication path. PR previews use modern Worker Previews because version URLs cannot host a Durable Object implementation. Each PR has its own coordinator and reads preview-only KV, without a cron.
+The isolated preview collection succeeded for all 19 sources. Regional and Western AI output is seeded through the real collection/publication path. PR previews use Worker Previews. Each PR has its own isolated preview that reads preview-only KV, without a cron.
 
 The feature PR's checks verify the deployment token, emitted preview URL, populated pages and share metadata. Production custom-domain/cron activation is deliberately left to the main deployment after merge. Production KV is not seeded and starts accumulating history naturally.
 

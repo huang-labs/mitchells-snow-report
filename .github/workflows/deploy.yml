@@ -84,8 +84,8 @@ jobs:
         run: npm run build
         env:
           SITE_URL: https://pr-${{ github.event.pull_request.number }}-mitchells-snow-report-preview.huang-inc.workers.dev
-      # Worker Previews support Durable Objects (version URLs do not). Each PR
-      # gets an isolated coordinator and reads the seeded preview-only KV.
+      # Each PR gets an isolated Worker Preview that reads the seeded
+      # preview-only KV.
       # The preview Worker has no production route or collection cron.
       - name: Deploy isolated PR preview
         id: upload

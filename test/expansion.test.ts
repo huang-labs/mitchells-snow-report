@@ -12,11 +12,9 @@ import { buildWesternInput, validateWestern } from "@/lib/dailysnow/western";
 import { localDate, zonedToUtc } from "@/lib/time";
 import { snowDayEnd, snowDayStart, forecastForDay } from "@/lib/snowlog/days";
 import { shouldRunDailySnow } from "@/lib/dailysnow/schedule";
-import { GLOBAL_CALL_CAP, LEASE_MS } from "@/lib/dailysnow/reservations";
 import { PRIMARY_MODEL, FALLBACK_MODEL } from "@/lib/ai/model";
 import type { Snapshot, NwsPayload, ResortReport, DailySnowPost, DailySnowState, PlumePayload } from "@/lib/types";
 import { createFixtureFetch, fixture } from "./fixtureFetch";
-import { MemoryCoordinator, coordinatorBinding } from "./publicationHelpers";
 import { regionalSource } from "@/lib/regionalSource";
 import { buildReport } from "@/lib/report";
 import { dailySnowActivity } from "@/lib/dailysnow/digest";
@@ -156,7 +154,7 @@ describe("partial failures and editorial eligibility", () => {
       },
     };
     await runChannels(
-      { SNOW_KV: new MemoryKV(), AI: ai, AI_ENABLED: "false", PUBLICATIONS: coordinatorBinding() },
+      { SNOW_KV: new MemoryKV(), AI: ai, AI_ENABLED: "false" },
       base,
       now,
       { channel: "utah", force: true },
@@ -285,51 +283,72 @@ describe("regional boundaries and calendars", () => {
   });
 });
 
-describe("atomic publication reservations", () => {
-  it("allows one winner for overlapping attempts on a channel", async () => {
-    const c = new MemoryCoordinator();
-    const answers = await Promise.all(
-      Array.from({ length: 10 }, () => c.reserve({ channel: "utah", date: "2026-11-05", now: +now })),
-    );
-    expect(answers.filter((a) => a.ok)).toHaveLength(1);
-    expect(c.state.calls.reduce((s, v) => s + v.count, 0)).toBe(2);
+describe("publication guards in channel state", () => {
+  const replyAi = (calls: { n: number }) => ({
+    async run() {
+      calls.n++;
+      return { response: JSON.stringify(reply()) };
+    },
   });
-  it("caps concurrent channels at four and rejects superseded completions", async () => {
-    const c = new MemoryCoordinator();
-    for (const r of REGIONS.slice(0, 4))
-      expect((await c.reserve({ channel: r.id, date: "2026-11-05", now: +now })).ok).toBe(true);
-    expect((await c.reserve({ channel: "montana", date: "2026-11-05", now: +now })).reason).toBe(
-      "generation concurrency limit",
+  it("refuses a forced run while the channel's attempt is still in flight", async () => {
+    const kv = new MemoryKV();
+    const calls = { n: 0 };
+    await kv.put(
+      channelStateKey("tahoe"),
+      JSON.stringify({ ...emptyDailySnowState(), lastAttemptAt: new Date(+now - 60000).toISOString() }),
     );
-    const old = c.state.channels.utah!.token;
-    const fresh = await c.reserve({ channel: "utah", date: "2026-11-05", now: +now + LEASE_MS });
-    expect(fresh.ok).toBe(true);
-    expect(await c.finish("utah", old)).toBe(false);
-    expect(await c.valid("utah", fresh.token!)).toBe(true);
+    const out = await runChannels({ SNOW_KV: kv, AI: replyAi(calls) }, base, now, { channel: "tahoe", force: true });
+    expect(out).toEqual([{ channel: "tahoe", skipped: "in-flight" }]);
+    expect(calls.n).toBe(0);
   });
-  it("counts manual attempts and fallback reservations toward per-channel and rolling global caps", async () => {
-    const c = new MemoryCoordinator();
-    const t = Date.parse("2026-11-05T09:00:00Z");
-    for (const channel of CHANNELS) {
-      for (let i = 0; i < 3; i++) {
-        const r = await c.reserve({ channel: channel.id, date: "2026-11-05", now: t });
-        expect(r.ok).toBe(true);
-        await c.finish(channel.id, r.token!);
-      }
-      expect((await c.reserve({ channel: channel.id, date: "2026-11-05", now: t })).reason).toBe("channel daily cap");
-    }
-    let accepted = 0;
-    for (const channel of CHANNELS) {
-      const r = await c.reserve({ channel: channel.id, date: "2026-11-06", now: t + 23 * 3600000 });
-      if (r.ok) {
-        accepted++;
-        await c.finish(channel.id, r.token!);
-      }
-    }
-    expect(accepted).toBe(5);
-    expect(c.state.calls.reduce((s, v) => s + v.count, 0)).toBe(GLOBAL_CALL_CAP);
-    const next = await c.reserve({ channel: "utah", date: "2026-11-06", now: t + 24 * 3600000 + 1 });
-    expect(next.ok).toBe(true);
+  it("counts forced Western attempts toward the channel's daily cap", async () => {
+    const kv = new MemoryKV();
+    const calls = { n: 0 };
+    const env = { SNOW_KV: kv, AI: replyAi(calls) };
+    await runChannels(env, base, now, { channel: "tahoe", force: true });
+    const westernDate = localDate(now, "America/Los_Angeles");
+    await kv.put(
+      channelStateKey("western-us"),
+      JSON.stringify({ ...emptyDailySnowState(), attempts: { date: westernDate, count: 3, calls: 6 } }),
+    );
+    calls.n = 0;
+    const out = await runChannels(env, base, now, { channel: "western-us", force: true });
+    expect(out).toEqual([{ channel: "western-us", skipped: "channel daily cap" }]);
+    expect(calls.n).toBe(0);
+  });
+  it("counts attempts still running from an earlier cron toward the concurrency limit", async () => {
+    const kv = new MemoryKV();
+    const calls = { n: 0 };
+    const at = new Date(+now - 60000).toISOString();
+    for (const r of REGIONS.slice(0, 3))
+      await kv.put(channelStateKey(r.id), JSON.stringify({ ...emptyDailySnowState(), lastAttemptAt: at }));
+    const out = await runChannels({ SNOW_KV: kv, AI: replyAi(calls) }, base, now, { force: true });
+    const limited = out.filter((o) => o.skipped === "generation concurrency limit").map((o) => o.channel);
+    expect(limited).toEqual(REGIONS.slice(4).map((r) => r.id));
+    expect(out.filter((o) => o.published || o.error).map((o) => o.channel)).toEqual([REGIONS[3].id]);
+  });
+  it("does not let a superseded run overwrite a newer attempt's state or edition", async () => {
+    const kv = new MemoryKV();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const env = {
+      SNOW_KV: kv,
+      AI: {
+        async run() {
+          await gate;
+          return { response: JSON.stringify(reply()) };
+        },
+      },
+    };
+    const slow = runChannels(env, base, now, { channel: "tahoe", force: true });
+    await new Promise((r) => setTimeout(r, 0));
+    const newer = { ...emptyDailySnowState(), lastAttemptAt: new Date(+now + 13 * 60000).toISOString() };
+    await kv.put(channelStateKey("tahoe"), JSON.stringify(newer));
+    release();
+    const out = await slow;
+    expect(out[0].error).toMatch(/superseded/);
+    expect(JSON.parse((await kv.get(channelStateKey("tahoe"), "text"))!)).toEqual(newer);
+    expect(await channelKV(kv, "tahoe").get(dailySnowKey("2026-11-05"), "text")).toBeNull();
   });
 });
 
@@ -405,13 +424,12 @@ describe("independent editions and stored artifacts", () => {
   });
   it("publishes regional editions without changing source state or another channel's archive", async () => {
     const kv = new MemoryKV();
-    const coordinator = new MemoryCoordinator();
     const ai = {
       async run() {
         return { response: JSON.stringify(reply()) };
       },
     };
-    const env = { SNOW_KV: kv, AI: ai, PUBLICATIONS: coordinatorBinding(coordinator) };
+    const env = { SNOW_KV: kv, AI: ai };
     const before = JSON.stringify(base);
     for (const channel of ["utah", "tahoe"] as const) await runChannels(env, base, now, { channel, force: true });
     const states = await readChannelStates(kv);
@@ -469,7 +487,6 @@ describe("independent editions and stored artifacts", () => {
     const calls: string[] = [];
     const env = {
       SNOW_KV: kv,
-      PUBLICATIONS: coordinatorBinding(),
       AI: {
         async run(model: string) {
           calls.push(model);
@@ -492,7 +509,6 @@ describe("independent editions and stored artifacts", () => {
     const kv = new MemoryKV();
     const env = {
       SNOW_KV: kv,
-      PUBLICATIONS: coordinatorBinding(),
       AI: {
         async run() {
           return { response: JSON.stringify(reply()) };
