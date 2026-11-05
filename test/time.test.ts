@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateFormat, denverToUtc, formatAge, formatDenver, inferYearDenver, parseDenverDateTime, parseOffsetIso } from "@/lib/time";
+import { cachedDateFormat, denverToUtc, formatAge, formatDenver, inferYearDenver, parseDenverDateTime, parseOffsetIso } from "@/lib/time";
 import { currentBlockStart } from "@/lib/sources/nws";
 
 describe("America/Denver conversions", () => {
@@ -49,11 +49,11 @@ describe("display formatting", () => {
   });
 });
 
-describe("dateFormat", () => {
+describe("cachedDateFormat", () => {
   it("shares one formatter per locale and options, keyed by zone", () => {
-    const a = dateFormat("en-US", { timeZone: "America/Los_Angeles", hour: "numeric" });
-    expect(dateFormat("en-US", { timeZone: "America/Los_Angeles", hour: "numeric" })).toBe(a);
-    const b = dateFormat("en-US", { timeZone: "America/Denver", hour: "numeric" });
+    const a = cachedDateFormat("en-US", { timeZone: "America/Los_Angeles", hour: "numeric" });
+    expect(cachedDateFormat("en-US", { timeZone: "America/Los_Angeles", hour: "numeric" })).toBe(a);
+    const b = cachedDateFormat("en-US", { timeZone: "America/Denver", hour: "numeric" });
     expect(b).not.toBe(a);
     const t = new Date("2026-11-05T15:00:00Z");
     expect([a.format(t), b.format(t)]).toEqual(["7 AM", "8 AM"]);

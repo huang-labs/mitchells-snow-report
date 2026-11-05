@@ -1,4 +1,4 @@
-import { dateFormat } from "@/lib/time";
+import { cachedDateFormat } from "@/lib/time";
 import type { SixHourSnow } from "@/lib/types";
 const HOUR = 3600000;
 const date = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Denver", year: "numeric", month: "2-digit", day: "2-digit" });
@@ -9,7 +9,7 @@ export const zonedTimeLabel = new Intl.DateTimeFormat("en-US", { timeZone: "Amer
 interface SnowfallSlot { start: string; snowIn: number | null }
 /** Preserve each UTC-aligned six-hour period; pad missing slots, never amounts. */
 export function snowfallDays(bars: SixHourSnow[], timeZone="America/Denver") {
-  const date=dateFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit"});
+  const date=cachedDateFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit"});
   if (!bars.length) return [];
   const sorted = [...bars].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
   const slots = new Map(sorted.map(b => [Date.parse(b.start), b]));

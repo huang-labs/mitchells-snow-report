@@ -1,4 +1,4 @@
-import { dateFormat, localMidnightsBetween } from "@/lib/time";
+import { cachedDateFormat, localMidnightsBetween } from "@/lib/time";
 import type { PlumePanel } from "@/lib/types";
 
 const HOUR = 3_600_000;
@@ -29,8 +29,8 @@ export interface PlumePanelSvgProps {
  * plot frame spans init to init + forecastHours, so any instant maps linearly to x.
  */
 export function PlumePanelSvg({ src, width, height, plot, initTime, forecastHours, marker, label, timeZone="America/Denver" }: PlumePanelSvgProps) {
-  const dowFmt=dateFormat("en-US",{timeZone,weekday:"short"});
-  const dateFmt=dateFormat("en-US",{timeZone,month:"numeric",day:"numeric"});
+  const dowFmt=cachedDateFormat("en-US",{timeZone,weekday:"short"});
+  const dateFmt=cachedDateFormat("en-US",{timeZone,month:"numeric",day:"numeric"});
   const start = new Date(initTime);
   const end = new Date(start.getTime() + forecastHours * HOUR);
   const x = (t: Date) => plot.left + ((t.getTime() - start.getTime()) / (end.getTime() - start.getTime())) * (plot.right - plot.left);

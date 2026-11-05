@@ -1,5 +1,5 @@
 import { addDays, forecastForDay, snowDayEnd, snowDayOf } from "@/lib/snowlog/days";
-import { dateFormat, formatLocal } from "@/lib/time";
+import { cachedDateFormat, formatLocal } from "@/lib/time";
 import type { MorningReading, SnowLogState } from "@/lib/snowlog/types";
 import type { CanyonId, Metric, PointForecast, PrimaryResortId, ResortReport } from "@/lib/types";
 
@@ -44,9 +44,9 @@ const tz = "America/Denver";
 /** A report time within a day's description: the clock time, plus the date when it falls on another day. */
 function reportAt(iso: string, key: string, zone = tz): string {
   const t = new Date(iso);
-  const time = dateFormat("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit" }).format(t);
-  const ymd = dateFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(t);
-  return ymd === key ? time : `${dateFormat("en-US", { timeZone: zone, month: "short", day: "numeric" }).format(t)}, ${time}`;
+  const time = cachedDateFormat("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit" }).format(t);
+  const ymd = cachedDateFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(t);
+  return ymd === key ? time : `${cachedDateFormat("en-US", { timeZone: zone, month: "short", day: "numeric" }).format(t)}, ${time}`;
 }
 
 /** Whole inches for bar labels: "<1" keeps a trace distinct from a reported zero. */
@@ -59,17 +59,17 @@ export function barLabel(v: number): string {
 const inches = (v: number) => `${Number.isInteger(v) ? v : v.toFixed(1)}″`;
 /** "5 AM" in winter, "6 AM" in summer: the local time a snow day ends. */
 const endsAt = (key: string, zone?: string) =>
-  dateFormat("en-US", { timeZone: zone ?? tz, hour: "numeric" }).format(snowDayEnd(key, zone)).replace(":00", "");
+  cachedDateFormat("en-US", { timeZone: zone ?? tz, hour: "numeric" }).format(snowDayEnd(key, zone)).replace(":00", "");
 
 function dayLabels(key: string, zone?:string) {
   const t = new Date(snowDayEnd(key,zone));
   const timeZone = zone ?? tz;
-  const weekday = dateFormat("en-US", { timeZone, weekday: "short" }).format(t);
+  const weekday = cachedDateFormat("en-US", { timeZone, weekday: "short" }).format(t);
   return {
     weekday,
-    dayOfMonth: dateFormat("en-US", { timeZone, day: "numeric" }).format(t),
+    dayOfMonth: cachedDateFormat("en-US", { timeZone, day: "numeric" }).format(t),
     weekend: weekday === "Sat" || weekday === "Sun",
-    date: dateFormat("en-US", { timeZone, weekday: "short", month: "short", day: "numeric" }).format(t),
+    date: cachedDateFormat("en-US", { timeZone, weekday: "short", month: "short", day: "numeric" }).format(t),
   };
 }
 
