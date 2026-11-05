@@ -2,7 +2,7 @@
 
 [← README](../README.md)
 
-Setup and manual review commands for the advisory PR workflow.
+Setup and reruns for the advisory PR workflow.
 
 The official [PR-Agent Action](https://github.com/marketplace/actions/the-pr-agent)
 runs **one advisory review per eligible PR event**. Every review uses GLM 5.3
@@ -26,8 +26,10 @@ duplicate events for a commit replace each other, and an event for a commit that
 is no longer the PR head is skipped before inference. A review already running
 for an older commit finishes, so rapid pushes can each use a request. Automatic description
 rewriting and code suggestion generation are disabled. Review findings are
-advisory: keep this workflow optional in branch protection. GitHub tests and
-preview deployment remain independent.
+advisory and never block a merge, but branch protection on `main` requires the
+`review` check to pass, alongside `test` and `preview`. A failed run (provider,
+auth or the gateway's daily limit) therefore blocks merging until a re-push
+succeeds. A review skipped for a superseded commit still passes.
 
 The `pull_request_target` workflow and review configuration come from trusted
 base/default branches, with no checkout or execution of PR code. PR-Agent reads

@@ -8,6 +8,8 @@ The housekeeping [PR #1](https://github.com/huang-labs/mitchells-snow-report/pul
 
 GitHub Actions and Blacksmith runners are enabled. Every PR receives an advisory GLM 5.3 review through the `pr-agent` AI Gateway; see [AI code review](AI_CODE_REVIEW.md).
 
+Branch protection on `main` matches Cottonwoods: changes go through a PR (no approvals required), with required checks `test`, `preview` and `review` on an up-to-date branch. It applies to admins, and force pushes and deletion are blocked.
+
 Cloudflare account access was verified through the owner's authenticated `cf` CLI. Dedicated production and preview KV, the preview parent Worker, and an AI Gateway are configured. Account ID and a dedicated account/zone-scoped deployment token are encrypted GitHub Actions secrets. The application contains no token values.
 
 `MITCHELLS_DEPLOYMENT_ENABLED` controls the updated workflow. The inherited `DEPLOYMENT_ENABLED` remains false so older main code cannot target Cottonwoods before this feature merges. Production deployment on merge uses only Mitchell's configuration.
