@@ -307,6 +307,8 @@ export interface ResortCamsPayload {
   failures: string[];
   /** YouTube video id → stream title (oEmbed), cached so unchanged pages cost no lookups. */
   streamTitles: Record<string, string>;
+  /** Failed title lookups retry after this ISO time; legacy empty titles retry immediately. */
+  streamTitleRetryAt?: Record<string, string>;
 }
 
 /** Explicit mountain forecast identity, shared by historical readings and figures. */

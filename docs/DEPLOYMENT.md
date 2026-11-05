@@ -11,7 +11,7 @@ Mitchell's deployment uses Cloudflare account **Huang Inc.**. Production starts 
 | Preview parent Worker | `mitchells-snow-report-preview`, no production routes or cron |
 | PR preview KV | One namespace per PR: `mitchells-snow-report-pr-<number>` |
 | Legacy shared preview KV | `f9e542e8a1d0405f8624beade1bba09b`; retained for older PR deployments |
-| Preview AI Gateway | `mitchells-snow-report-preview`, separate sliding 64 requests/day |
+| Preview AI Gateway | `mitchells-snow-report-preview`, separate sliding 1,000 requests/day |
 | Workers AI Gateway | `mitchells-snow-report`, logging, no cache, sliding 64 requests/day |
 | PR review AI Gateway | `pr-agent`, logging, sliding 100 requests/day; see [AI code review](AI_CODE_REVIEW.md) |
 | Production cron | `*/5 * * * *`; local publication hours evaluated in code |
@@ -52,7 +52,7 @@ See [Cloudflare's preview resource isolation documentation](https://developers.c
 
 Encrypted Actions secrets are `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `PR_AGENT_CLOUDFLARE_TOKEN` (Workers AI Read and AI Gateway Run only, for PR review). Preview preparation requires account Workers edit, KV namespace create/list/read/write/delete, and production KV read. Explicit generation also requires Workers AI and AI Gateway read/create permissions; the tooling creates the separate preview Gateway once if absent. Keep the dedicated deployment token in Actions and out of logs. Preview commands use `gh` authentication; they do not ask contributors to copy Cloudflare tokens locally.
 
-The separate Gateway limits preview generation to 64 requests per sliding day across all PRs, with caching disabled and logging enabled. Source-only refresh does not provision or call it. Do not reset a PR's channel attempts or increase production limits to work around preview caps.
+The separate Gateway limits preview generation to 1,000 requests per sliding day across all PRs, with caching disabled and logging enabled. Source-only refresh does not provision or call it. Do not reset a PR's channel attempts or increase production limits to work around preview caps.
 
 ## Manual collection or publication
 

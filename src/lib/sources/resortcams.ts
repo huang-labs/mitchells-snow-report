@@ -3,6 +3,8 @@ import type { FetchContext } from "../http";
 import { decodeEntities } from "../metric";
 import type { PrimaryResortId, ResortCam, ResortCamsPayload } from "../types";
 import { extractAltaJson } from "./alta";
+import { JACKSON_CAMS_API, parseJacksonCams, snowbasinImages, type CameraImage } from "./favorite-cams";
+import { youtubeTitle } from "./youtube-title";
 import { assertValid, type SourceDefinition } from "./types";
 
 /**
@@ -95,35 +97,19 @@ export function youtubeIds(html: string): string[] {
   return [...new Set([...html.matchAll(/youtube(?:-nocookie)?\.com\/embed\/([\w-]{11})/g)].map((m) => m[1]))];
 }
 
-interface OEmbed {
-  title?: string;
-}
-
-/**
- * Stream titles come from YouTube oEmbed, not from page layout (captions sit
- * on different sides of the player on different sites). Titles of IDs already
- * known from the previous run are reused — including lookups that failed, so a
- * private stream costs one oEmbed call ever — so a steady state costs one page
- * fetch per resort. Embeds with no public title are dropped: their players
- * only show "video unavailable".
- */
+/** Successful titles persist; missing titles have a bounded retry time. */
 async function youtubeCams(
   ctx: FetchContext,
   resort: PrimaryResortId,
   pageUrl: string,
   titles: Record<string, string>,
+  retryAt: Record<string, string>,
 ): Promise<ResortCam[]> {
   const ids = youtubeIds(await ctx.fetchText(pageUrl, { browserLike: true }));
   assertValid(ids.length > 0, `${resort}: no YouTube camera embeds found`);
   const found: Array<{ title: string; videoId: string }> = [];
   for (const id of ids) {
-    let title: string | undefined = titles[id];
-    if (title === undefined) {
-      const meta = await ctx
-        .fetchJson<OEmbed>(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}`)
-        .catch(() => null);
-      titles[id] = title = meta?.title ?? "";
-    }
+    const title = await youtubeTitle(ctx, id, titles, retryAt);
     if (title) {
       const clean = title.replace(/\s*-\s*(Brighton Ski Resort|Solitude.*)$/i, "");
       if (notExcluded(resort, clean)) found.push({ title: clean, videoId: id });
@@ -138,10 +124,11 @@ async function imageCams(
   pageUrl: string,
   parse: (html: string) => Array<{ title: string; imageUrl: string }>,
 ): Promise<ResortCam[]> {
-  const chosen = order(
-    parse(await ctx.fetchText(pageUrl, { browserLike: true })).filter((c) => notExcluded(resort, c.title)),
-    WANTED[resort]??[/snow.?stake/i,/lift/i],
-  );
+  return verifiedImages(ctx, resort, pageUrl, parse(await ctx.fetchText(pageUrl, { browserLike: true })));
+}
+
+async function verifiedImages(ctx: FetchContext, resort: ResortId, pageUrl: string, found: CameraImage[]): Promise<ResortCam[]> {
+  const chosen = order(found.filter((c) => notExcluded(resort, c.title)), WANTED[resort] ?? [/snow.?stake/i, /lift/i]);
   const cams = await Promise.all(
     chosen.map(async (c): Promise<ResortCam | null> => {
       const res = await ctx.probe(c.imageUrl, { browserLike: true }).catch(() => null);
@@ -153,20 +140,38 @@ async function imageCams(
 }
 
 /** Only publicly embedded camera hosts on the curated official webcam pages. */
-export async function embeddedCams(ctx:FetchContext,resort:ResortId,pageUrl:string,titles:Record<string,string>):Promise<ResortCam[]>{
- const html=await ctx.fetchText(pageUrl,{browserLike:true});
- const out:ResortCam[]=[];
- for(const id of youtubeIds(html)){
-   if(titles[id]===undefined){const meta=await ctx.fetchJson<OEmbed>(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}`).catch(()=>null);titles[id]=meta?.title??"";}
-   if(titles[id])out.push({resort,kind:"youtube",pageUrl,title:titles[id],videoId:id});
- }
- for(const m of html.matchAll(/<iframe[^>]+src=["'](https:\/\/[^"']+)["'][^>]*>/gi)){
-   let url:URL;
-   try{url=new URL(decodeEntities(m[1]));}catch{continue;}
-   if(!/(^|\.)(ozolio\.com|camstreamer\.com|roundshot\.com|hdrelay\.com)$/.test(url.hostname))continue;
-   out.push({resort,kind:"embed",pageUrl,title:decodeEntities(/title=["']([^"']+)/i.exec(m[0])?.[1]??"Resort live camera"),embedUrl:url.toString()});
- }
- return out;
+export async function embeddedCams(
+  ctx: FetchContext,
+  resort: ResortId,
+  pageUrl: string,
+  titles: Record<string, string>,
+  retryAt: Record<string, string> = {},
+): Promise<ResortCam[]> {
+  if (resort === "jackson-hole") {
+    return verifiedImages(ctx, resort, pageUrl, parseJacksonCams(await ctx.fetchJson(JACKSON_CAMS_API)));
+  }
+  const html = await ctx.fetchText(pageUrl, { browserLike: true });
+  assertValid(
+    !/Request unsuccessful[\s\S]*Incapsula incident ID|<title>Just a moment\.{3}<\/title>/i.test(html),
+    "Camera page blocked by upstream anti-bot protection",
+  );
+  if (resort === "snowbasin") return verifiedImages(ctx, resort, pageUrl, await snowbasinImages(ctx, html));
+  const out: ResortCam[] = [];
+  for (const id of youtubeIds(html)) {
+    const title = await youtubeTitle(ctx, id, titles, retryAt);
+    if (title) out.push({ resort, kind: "youtube", pageUrl, title, videoId: id });
+  }
+  for (const m of html.matchAll(/<iframe[^>]+src=["'](https:\/\/[^"']+)["'][^>]*>/gi)) {
+    let url: URL;
+    try { url = new URL(decodeEntities(m[1])); } catch { continue; }
+    if (!/(^|\.)(ozolio\.com|camstreamer\.com|roundshot\.com|hdrelay\.com)$/.test(url.hostname)) continue;
+    out.push({
+      resort, kind: "embed", pageUrl,
+      title: decodeEntities(/title=["']([^"']+)/i.exec(m[0])?.[1] ?? "Resort live camera"),
+      embedUrl: url.toString(),
+    });
+  }
+  return out;
 }
 
 export const resortCamsSource: SourceDefinition<ResortCamsPayload> = {
@@ -183,12 +188,13 @@ export const resortCamsSource: SourceDefinition<ResortCamsPayload> = {
     const prev = (r: PrimaryResortId) => previous.filter((c) => c.resort === r);
     // Titles resolved earlier (including streams that aren't wanted) are reused.
     const streamTitles: Record<string, string> = { ...(ctx.previous as ResortCamsPayload | null)?.streamTitles };
+    const streamTitleRetryAt: Record<string, string> = { ...(ctx.previous as ResortCamsPayload | null)?.streamTitleRetryAt };
     const jobs: Array<[PrimaryResortId, Promise<ResortCam[]>]> = [
       ["alta", imageCams(ctx, "alta", ALTA_WEATHER_URL, parseAltaCams)],
       ["snowbird", imageCams(ctx, "snowbird", SNOWBIRD_WEBCAMS_URL, parseSnowbirdCams)],
-      ["solitude", youtubeCams(ctx, "solitude", SOLITUDE_WEBCAMS_URL, streamTitles)],
-      ["brighton", youtubeCams(ctx, "brighton", BRIGHTON_CONDITIONS_URL, streamTitles)],
-      ...Object.entries(CAM_PAGES).map(([id,page])=>[id as ResortId,embeddedCams(ctx,id as ResortId,page,streamTitles)] as [ResortId,Promise<ResortCam[]>]),
+      ["solitude", youtubeCams(ctx, "solitude", SOLITUDE_WEBCAMS_URL, streamTitles, streamTitleRetryAt)],
+      ["brighton", youtubeCams(ctx, "brighton", BRIGHTON_CONDITIONS_URL, streamTitles, streamTitleRetryAt)],
+      ...Object.entries(CAM_PAGES).map(([id,page])=>[id as ResortId,embeddedCams(ctx,id as ResortId,page,streamTitles,streamTitleRetryAt)] as [ResortId,Promise<ResortCam[]>]),
     ];
     const settled = await Promise.allSettled(jobs.map(([, p]) => p));
     const cameras: ResortCam[] = [];
@@ -205,6 +211,6 @@ export const resortCamsSource: SourceDefinition<ResortCamsPayload> = {
       failures.push(`${resort}: ${r.status === "rejected" ? (r.reason instanceof Error ? r.reason.message : String(r.reason)) : "no matching cameras"}`);
     });
     assertValid(cameras.length > 0, `No resort cameras found (${failures.join("; ")})`);
-    return { payload: { cameras, failures, streamTitles }, sourceUpdatedAt: null };
+    return { payload: { cameras, failures, streamTitles, streamTitleRetryAt }, sourceUpdatedAt: null };
   },
 };
