@@ -211,7 +211,7 @@ function figureCandidates(
       describe:
         "Retained observations for this storm, with source report times. Reported storm totals and rolling-window observations are explicitly distinguished. Missing means unavailable, never zero. Not a live 24/48-hour table.",
     });
-  } else if (rows.some((r) => Object.values(r.snowfall??{}).some(m=>m.state==="reported"))) {
+  } else if (rows.some((r) => r.h24 !== null || r.h48 !== null || r.storm !== null)) {
     out.push({
       figure: { id: "resort-totals", kind: "totals", rows, caption: "Resort-reported snowfall" },
       describe: "Bar chart of resort-reported 24 h, 48 h and storm totals",
