@@ -219,11 +219,9 @@ a { color: var(--accent); }
 .resort-name__link::after { content: ""; position: absolute; inset: -8px; z-index: 1; border-radius: 8px; }
 .resort-name__link:focus-visible { outline: none; }
 .resort-name__link:focus-visible::after { outline: 2px solid var(--accent); }
-/* A visible cue that the block opens the resort page; the name's stretched link handles the click. */
-.resort-timeline__more { color: var(--accent); font-size: var(--fs-meta); font-weight: 650; }
+/* The name's stretched link opens the resort page; hovering the block highlights the name. */
 @media (hover: hover) {
   .resort-timeline .snowtl:has(.resort-name__link:hover) .resort-name__link { color: var(--accent); }
-  .resort-timeline .snowtl:has(.resort-name__link:hover) .resort-timeline__more { text-decoration: underline; }
 }
 .resort-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .legend { color: var(--muted); font-size: var(--fs-caption); line-height: 1.7; margin-top: calc(16px - var(--page-gap)); }

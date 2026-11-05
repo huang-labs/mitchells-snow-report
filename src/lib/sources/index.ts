@@ -1,3 +1,4 @@
+import { cpcSource } from "./cpc";
 import { favoriteSources } from "./favorites";
 import type { SourceId } from "../types";
 import { ensembleSource } from "./ensemble";
@@ -22,6 +23,7 @@ export const SOURCES: SourceDefinition[] = [
   resortCamsSource,
   nwsAfdSource,
   ensembleSource,
+  cpcSource,
 ] as SourceDefinition[];
 
 export const SOURCE_BY_ID = Object.fromEntries(SOURCES.map((s) => [s.id, s])) as Record<SourceId, SourceDefinition>;

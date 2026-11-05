@@ -83,7 +83,7 @@ async function previousPost(kv: KVLike, current: DailySnowPost | null, date: str
 }
 
 /** Copy each used image figure into KV so the post keeps this morning's still. Figures that fail are dropped. */
-async function storeFigures(
+export async function storeFigures(
   used: FigureCandidate[],
   date: string,
   env: DailySnowEnv,

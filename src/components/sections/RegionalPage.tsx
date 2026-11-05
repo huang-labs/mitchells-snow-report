@@ -48,11 +48,6 @@ export function RegionalPage({ report, now }: { report: ReportResponse; now: Dat
                 </div>
               }
               meta={`${r.state} · United States`}
-              footer={
-                <span className="resort-timeline__more" aria-hidden="true">
-                  View more →
-                </span>
-              }
             />
           </article>
         ))}

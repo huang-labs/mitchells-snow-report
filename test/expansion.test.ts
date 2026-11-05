@@ -14,7 +14,7 @@ import { snowDayEnd, snowDayStart, forecastForDay } from "@/lib/snowlog/days";
 import { shouldRunDailySnow } from "@/lib/dailysnow/schedule";
 import { PRIMARY_MODEL, FALLBACK_MODEL } from "@/lib/ai/model";
 import type { Snapshot, NwsPayload, ResortReport, DailySnowPost, DailySnowState, PlumePayload } from "@/lib/types";
-import { createFixtureFetch, fixture } from "./fixtureFetch";
+import { createFixtureFetch, fixture, fixtureBytes } from "./fixtureFetch";
 import { regionalSource } from "@/lib/regionalSource";
 import { buildReport } from "@/lib/report";
 import { dailySnowActivity } from "@/lib/dailysnow/digest";
@@ -27,7 +27,7 @@ import { historyEntry } from "@/lib/dailysnow/continuity";
 import { inchAmounts } from "@/lib/ai/grounding";
 import { isSnowPlume } from "@/lib/dailysnow/plume";
 import { dailySnow as dailySnowArchive } from "@/worker/daily-snow";
-import type { AfdPayload } from "@/lib/types";
+import type { AfdPayload, CpcPayload } from "@/lib/types";
 import { dailySnowPublicationStatus } from "@/lib/dailysnow/publication";
 import { recordSnowLog } from "@/lib/snowlog/record";
 const now = new Date("2026-11-05T15:00:00Z");
@@ -561,7 +561,7 @@ describe("independent editions and stored artifacts", () => {
 
 describe("West comparison figures", () => {
   it("freezes matching point windows with zeros, missing coverage and source times", () => {
-    const input: ReturnType<typeof buildWesternInput> = { asOf: now.toISOString(), asOfLocal: "Thu 7:00 AM PST", timeZone: "America/Los_Angeles", coverage: "Tracked regions", regions: [{
+    const input: ReturnType<typeof buildWesternInput> = { asOf: now.toISOString(), asOfLocal: "Thu 7:00 AM PST", timeZone: "America/Los_Angeles", coverage: "Tracked regions", patternOutlook: null, regions: [{
       id: "utah" as const, name: "Utah", edition: {} as never, observations: [],
       forecasts: [
         { area: "LCC" as const, name: "Alta / Snowbird", source: "NWS", issuedAt: now.toISOString(), issuedLocal: "7 AM PST", start: now.toISOString(), next24In: 0, next72In: 0, next7dIn: 5 },
@@ -569,7 +569,7 @@ describe("West comparison figures", () => {
       ],
     }] };
     const figures = westernFigures(input);
-    expect(Object.keys(figures)).toEqual(["west-72h", "west-168h"]);
+    expect(Object.keys(figures)).toEqual(["west-72h"]);
     const near = figures["west-72h"];
     expect(near.kind).toBe("forecast-comparison");
     if (near.kind !== "forecast-comparison") throw new Error("Expected comparison");
@@ -662,6 +662,64 @@ describe("collection and publication survive secondary write failures", () => {
     expect(state.current?.date).toBe(today);
     expect(state.lastError).toBeNull();
     expect(state.consecutiveFailures).toBe(0);
+  });
+});
+
+describe("West pattern outlook", () => {
+  const western = {
+    title: "Western Outlook",
+    summary: "Patterns vary across the tracked regions.",
+    sections: [
+      {id: "update", paragraphs: [{text: "The western pattern varies."}, {text: "Timing differs across mountain ranges."}]},
+      {id: "short-term", paragraphs: [{text: "The near-term pattern follows."}, {text: "Mountain forecasts provide details."}]},
+      {id: "extended", paragraphs: [{text: "A trough settles near the coast."}, {text: "The map shows the pattern."}]},
+    ],
+  };
+  async function publish(snapshot: Snapshot, kv: MemoryKV) {
+    const inputs: string[] = [];
+    const env = {
+      SNOW_KV: kv,
+      AI: {
+        async run(_model: string, input: unknown) {
+          const body = JSON.stringify(input);
+          if (body.includes("western_daily_snow")) inputs.push(body);
+          return { response: JSON.stringify(body.includes("western_daily_snow") ? western : reply()) };
+        },
+      },
+    };
+    await runChannels(env, snapshot, now, { channel: "tahoe", force: true });
+    await runChannels(env, snapshot, now, { channel: "western-us", force: true });
+    return { post: (await readChannelStates(kv))["western-us"]!.current!, input: inputs[0] };
+  }
+
+  it("ends the extended section with the copied NOAA map and gives the model its discussion", async () => {
+    const kv = new MemoryKV();
+    const cpc = base.sources.cpc!.payload as CpcPayload;
+    await kv.put(cpc.image.key, fixtureBytes("cpc-814day.03.gif").buffer as ArrayBuffer);
+    const { post, input } = await publish(base, kv);
+    expect(Object.keys(post.figures).sort()).toEqual(["west-72h", "west-pattern"]);
+    const extended = post.sections.find((s) => s.id === "extended")!;
+    expect(extended.paragraphs.map((p) => p.figure)).toEqual([null, "west-pattern"]);
+    const map = post.figures["west-pattern"];
+    if (map.kind !== "image") throw new Error("Expected image");
+    expect(map.url).toMatch(/channel=western-us$/);
+    expect(map.caption).toContain("8–14-day 500-mb height outlook · Nov 12–Nov 18 · issued");
+    const sent = JSON.parse(JSON.parse(input).messages[1].content);
+    expect(sent.patternOutlook).toMatchObject({ validLabel: "Nov 12–Nov 18" });
+    expect(sent.patternOutlook.discussion).toContain("trough");
+    expect(sent.patternOutlook.image).toBeUndefined();
+  });
+
+  it("publishes the extended prose without a map when the outlook is stale or the copy fails", async () => {
+    const stale = structuredClone(base);
+    stale.sources.cpc!.status = "error";
+    const { post, input } = await publish(stale, new MemoryKV());
+    expect(post.figures["west-pattern"]).toBeUndefined();
+    expect(post.sections.find((s) => s.id === "extended")!.paragraphs.every((p) => p.figure === null)).toBe(true);
+    expect(JSON.parse(JSON.parse(input).messages[1].content).patternOutlook).toBeNull();
+    // Current outlook whose stored map has expired: the figure is dropped, the post still publishes.
+    const { post: missing } = await publish(base, new MemoryKV());
+    expect(missing.figures["west-pattern"]).toBeUndefined();
   });
 });
 

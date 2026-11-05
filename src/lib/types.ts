@@ -84,6 +84,7 @@ export type SourceId =
   | "plumes"
   | "nws"
   | "resortcams"
+  | "cpc"
   | "nwsafd"
   | "ensemble";
 
@@ -357,6 +358,17 @@ export interface ReportResponse {
   areaStorms?: Snapshot["areaStorms"];
   /** Last time each resort was seen operating; feeds in-season eligibility. */
   resortLastOperatingAt?: Snapshot["resortLastOperatingAt"];
+}
+
+// ---------- NOAA extended pattern outlook ----------
+
+export interface CpcPayload {
+  issuedAt: string;
+  validFrom: string;
+  validTo: string;
+  discussion: string;
+  sourceUrl: string;
+  image: { key: string; originUrl: string; width: number; height: number };
 }
 
 // ---------- NWS Area Forecast Discussion ----------

@@ -72,7 +72,7 @@ export function regionalSnapshot(snapshot: Snapshot, region: RegionId, area?: Fo
 
 /** Independent per-channel keys keep slow publications out of source snapshot writes. */
 export function channelKV(kv: KVLike, channel: string): KVLike {
-  const key = (k: string) => (k.startsWith("plume-panel:") ? k : `channel:v1:${channel}:${k}`);
+  const key = (k: string) => ((k.startsWith("plume-panel:") || k.startsWith("cpc-map:")) ? k : `channel:v1:${channel}:${k}`);
   return {
     get: ((k: string, type: "text" | "arrayBuffer") =>
       type === "text" ? kv.get(key(k), "text") : kv.get(key(k), "arrayBuffer")) as KVLike["get"],
