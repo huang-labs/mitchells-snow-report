@@ -16,11 +16,11 @@ Cloudflare account access was verified through the owner's authenticated `cf` CL
 
 ## Verification and boundaries
 
-The isolated preview collection succeeded for all 19 sources. Regional and Western AI output is seeded through the real collection/publication path. PR previews use Worker Previews. Each PR has its own isolated preview that reads preview-only KV, without a cron.
+The isolated preview collection succeeded for all 19 sources. Regional and Western AI output is seeded through the real collection/publication path. PR previews use Worker Previews. Each PR now receives a dedicated KV namespace, seeded once from production reads and refreshed on deployment without a cron; the original shared preview namespace remains only for older workflows.
 
 The feature PR's checks verify the deployment token, emitted preview URL, populated pages and share metadata. Production custom-domain/cron activation is deliberately left to the main deployment after merge. Production KV is not seeded and starts accumulating history naturally.
 
-Temporary administrative access belongs on a disposable seed Preview. Remove the secret and delete that Preview after seeding; immutable deployment URLs otherwise retain earlier secret bindings. Never put the seed token on the PR preview or in Actions logs.
+Preview preparation is automated through disposable seed runners, deleted with all immutable deployments after use. Never put their admin token on the public PR preview or in Actions logs. Source refresh and explicit AI regeneration are documented under [preview operations](DEPLOYMENT.md#refresh-or-regenerate-a-hosted-pr-preview).
 
 See [deployment and operations](DEPLOYMENT.md) for resource IDs, manual procedures and the current workflow. CI/reviewer/provider failures must be diagnosed independently; do not change to another runner/provider without checking the actual failure.
 

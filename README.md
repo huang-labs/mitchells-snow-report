@@ -60,6 +60,18 @@ The fixed favorites are Alta, Snowbird, Solitude, Brighton, Snowbasin, Palisades
 | [Product brief](docs/IMPLEMENTATION_BRIEF.md) | Product requirements and original implementation scope |
 | [Implementation notes](docs/IMPLEMENTATION_NOTES.md) | Source findings, design decisions and known limitations |
 
+## PR previews
+
+Every PR gets its own preview KV, seeded once from production reads and refreshed from real sources on deployment. Previews run no cron and do not automatically regenerate AI articles. The PR's Preview comment reports source freshness and which commit generated each article.
+
+```sh
+npm run preview:refresh -- --pr 10
+npm run preview:dailysnow -- --pr 10 --channel western-us
+npm run preview:dailysnow -- --pr 10 --all
+```
+
+These dispatch the preview-data Action using your GitHub CLI login; no local Cloudflare credentials are required. `--all` generates regions before Western. Generation is paid, capped, and uses a separate preview AI Gateway. PR closure deletes its preview and dedicated KV. See [preview operations](docs/DEPLOYMENT.md#refresh-or-regenerate-a-hosted-pr-preview) for prerequisites, readiness, and cleanup.
+
 ## AI code review
 
 PRs get an advisory PR-Agent review from GLM 5.3 on Workers AI through the `pr-agent` AI Gateway. See [AI code review](docs/AI_CODE_REVIEW.md) for setup and how to rerun a review.

@@ -62,4 +62,4 @@ Free-prose grounding is necessarily imperfect. Schemas, amount checks and explic
 
 ## Deployment boundary
 
-Production Worker/KV/Gateway are distinct from Cottonwoods. PRs deploy as isolated Worker Previews and read only the seeded preview KV and run no crons. Use a disposable seed Preview for temporary administrative access, then delete that Preview so its immutable deployment URLs close too. Production writes outside an owner-requested operation require approval.
+Production Worker/KV/Gateway are distinct from Cottonwoods. Each PR deploys as a Worker Preview with its own persistent KV namespace, initialized from production reads and refreshed from real sources on each deployment; previews run no crons. Explicit Daily Snow generation uses a separate preview AI Gateway. Disposable seed runners target immutable deployment URLs, are checked for readiness before writes, and are deleted with all versions after use. PR closure deletes its Preview and namespace. See [preview operations](DEPLOYMENT.md#refresh-or-regenerate-a-hosted-pr-preview). Production writes outside an owner-requested operation require approval.

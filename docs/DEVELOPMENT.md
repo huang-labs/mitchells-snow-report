@@ -23,6 +23,8 @@ Use a free port per worktree. KV persists in `.wrangler/state`; worktrees do not
 | `npm run build` | Static export |
 | `npm run cf:build` | Static export and Wrangler bundle dry run |
 | `npm run smoke` | Credential-free workerd routing, assets, APIs, images and metadata checks |
+| `npm run preview:refresh -- --pr <number>` | Dispatch hosted PR source refresh without AI |
+| `npm run preview:dailysnow -- --pr <number> --channel <id>` | Refresh sources and regenerate a hosted PR edition; `--all` runs regions before Western |
 | `npm run share:render` | Regenerate the checked-in branded PNG |
 | `npm run preview:scheduled` | Local build/runtime with scheduled-event testing |
 

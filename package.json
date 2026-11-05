@@ -14,13 +14,14 @@
     "preview": "npm run build && wrangler dev --local",
     "preview:scheduled": "npm run build && wrangler dev --local --test-scheduled",
     "deploy": "npm run build && wrangler deploy",
-    "upload": "npm run build && wrangler preview --worker-name mitchells-snow-report-preview --ignore-base-config",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "collect:once": "tsx scripts/collect-once.ts",
     "dailysnow:once": "tsx scripts/dailysnow-once.ts",
     "dailysnow:replay": "tsx scripts/dailysnow-replay.ts",
     "share:render": "tsx scripts/render-share-image.ts",
-    "smoke": "tsx scripts/smoke-worker.ts"
+    "smoke": "tsx scripts/smoke-worker.ts",
+    "preview:refresh": "tsx scripts/preview-dispatch.ts refresh",
+    "preview:dailysnow": "tsx scripts/preview-dispatch.ts dailysnow"
   },
   "dependencies": {
     "@cf-wasm/og": "0.5.0",
