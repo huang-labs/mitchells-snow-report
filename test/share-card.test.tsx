@@ -46,7 +46,13 @@ describe("share preview", () => {
     expect(html).not.toContain("Western United States");
     expect(html).toContain("AI-generated forecast · GLM 5.3 Flash");
     expect(html).toContain("November 1, 2026");
-    expect(renderToStaticMarkup(<DailySnowShareCard post={null} />)).not.toContain("AI-generated");
+    const empty = renderToStaticMarkup(<DailySnowShareCard post={null} />);
+    expect(empty).not.toContain("AI-generated");
+    expect(empty).toContain("Your United States West snow forecast");
+    expect(empty).not.toContain("Western US");
+    const regionalEmpty = renderToStaticMarkup(<DailySnowShareCard post={null} channel="utah" />);
+    expect(regionalEmpty).toContain("Your Utah snow forecast");
+    expect(regionalEmpty).not.toContain("Your United States West snow forecast");
   });
 
   it.each([

@@ -9,6 +9,7 @@ const MODEL_NAME: Record<string, string> = { "glm-5.3-flash": "GLM 5.3 Flash", "
 
 /** Bounded copy keeps unusually long generated posts inside the image. */
 export function DailySnowShareCard({ post,channel="western-us" }: { post: PreviewPost | null;channel?:ChannelId }) {
+  const channelName = channelById(post?.channel ?? channel)!.name;
   const date = post ? new Intl.DateTimeFormat("en-US", {
     timeZone: "UTC", month: "long", day: "numeric", year: "numeric",
   }).format(new Date(`${post.date}T12:00:00Z`)) : "A fresh forecast every morning";
@@ -18,16 +19,16 @@ export function DailySnowShareCard({ post,channel="western-us" }: { post: Previe
       <ShareBrand />
       <div style={{ display: "flex", flexShrink: 0, alignItems: "center", justifyContent: "space-between", marginTop: 28, fontSize: 22, color: C.muted }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, color: C.accent, fontWeight: 700 }}>
-          <span>DAILY SNOW · {channelById(post?.channel??channel)!.name}</span>
+          <span>DAILY SNOW · {channelName}</span>
           {post && <span style={{ background: C.panel, borderRadius: 4, padding: "4px 8px", fontSize: 18 }}>AI</span>}
         </div>
         <span>{date}</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", flex: 1, justifyContent: "center" }}>
-        <div style={{ fontSize: 54, lineHeight: 1.12, letterSpacing: -1.5, fontWeight: 700 }}>{clipText(post?.title ?? "Your Western US snow forecast", 100)}</div>
+        <div style={{ fontSize: 54, lineHeight: 1.12, letterSpacing: -1.5, fontWeight: 700 }}>{clipText(post?.title ?? `Your ${channelName} snow forecast`, 100)}</div>
         <div style={{ marginTop: 20, fontSize: 27, lineHeight: 1.35, color: C.muted }}>{clipText(post?.summary ?? DAILY_SNOW_DESCRIPTION, 180)}</div>
       </div>
-      <ShareFooter>{model ? `AI-generated forecast · ${model}` : "United States West"}</ShareFooter>
+      <ShareFooter>{model ? `AI-generated forecast · ${model}` : channelName}</ShareFooter>
     </div>
   );
 }

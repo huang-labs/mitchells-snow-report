@@ -33,10 +33,11 @@ it("ends with the legend explaining missing data and local days", () => {
   expect(page.querySelector(".legend")?.textContent).toContain("local time");
 });
 
-it("titles the page Resorts, with its subtitle", () => {
+it("titles the page Resorts and goes directly to timelines", () => {
   render(<RegionalPage now={now} report={buildReport(null, now)} />);
   expect(document.querySelector("h1")?.textContent).toBe("Resorts");
-  expect(document.querySelector(".page__sub")?.textContent).toBe("Your Western US favorites: the past week, the last 24 h, and the NWS forecast for the week ahead.");
+  expect(document.querySelector(".page__sub")).toBeNull();
+  expect(document.querySelector(".page__header")?.nextElementSibling?.className).toBe("resort-timelines");
 });
 
 describe("summarizeFreshness", () => {
