@@ -708,6 +708,7 @@ describe("West pattern outlook", () => {
     expect(sent.patternOutlook).toMatchObject({ validLabel: "Nov 12–Nov 18" });
     expect(sent.patternOutlook.discussion).toContain("trough");
     expect(sent.patternOutlook.image).toBeUndefined();
+    expect(sent.figures).toEqual({ snowComparison: true, patternMap: true });
   });
 
   it("publishes the extended prose without a map when the outlook is stale or the copy fails", async () => {
@@ -716,10 +717,14 @@ describe("West pattern outlook", () => {
     const { post, input } = await publish(stale, new MemoryKV());
     expect(post.figures["west-pattern"]).toBeUndefined();
     expect(post.sections.find((s) => s.id === "extended")!.paragraphs.every((p) => p.figure === null)).toBe(true);
-    expect(JSON.parse(JSON.parse(input).messages[1].content).patternOutlook).toBeNull();
+    const sentStale = JSON.parse(JSON.parse(input).messages[1].content);
+    expect(sentStale.patternOutlook).toBeNull();
+    expect(sentStale.figures).toEqual({ snowComparison: true, patternMap: false });
     // Current outlook whose stored map has expired: the figure is dropped, the post still publishes.
-    const { post: missing } = await publish(base, new MemoryKV());
+    const { post: missing, input: missingInput } = await publish(base, new MemoryKV());
     expect(missing.figures["west-pattern"]).toBeUndefined();
+    // The prompt only promises figures the post will contain.
+    expect(JSON.parse(JSON.parse(missingInput).messages[1].content).figures).toEqual({ snowComparison: true, patternMap: false });
   });
 });
 

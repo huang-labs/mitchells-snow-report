@@ -363,5 +363,8 @@ it("shows the West selector before the article and renders forecast zeros separa
   const table = within(screen.getByRole("table", { name: "NWS next three days" }));
   expect(table.getByText("0.0″")).toBeTruthy();
   expect(table.getByText("—")).toBeTruthy();
+  // A row without an NWS issue time says so rather than formatting a missing timestamp.
+  expect(table.getByText("Utah · issue time not published")).toBeTruthy();
+  expect(table.getAllByText(/^Utah · issued /)).toHaveLength(1);
   expect(within(article).queryAllByRole("link").filter((a) => a.getAttribute("href")?.startsWith("/daily-snow/"))).toHaveLength(0);
 });

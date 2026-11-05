@@ -49,7 +49,7 @@ export function Figure({ figure: f, postedAt,timeZone="America/Denver" }: { figu
       body = <table className="dailysnow-totals dailysnow-outlook" aria-label={f.caption}>
         <thead><tr><th scope="col">Mountain forecast point</th><th scope="col">Snowfall</th></tr></thead>
         <tbody>{f.rows.map((r) => <tr key={`${r.region}-${r.point}`}>
-          <th scope="row">{r.point}<small>{r.region} · issued {formatLocal(r.issuedAt, new Date(postedAt), timeZone)}</small></th>
+          <th scope="row">{r.point}<small>{r.region}{r.issuedAt ? ` · issued ${formatLocal(r.issuedAt, new Date(postedAt), timeZone)}` : " · issue time not published"}</small></th>
           <td>{r.snowIn === null ? <span className="muted">—</span> : <span className="dailysnow-totals__cell">
             <span className="dailysnow-totals__bar" style={{ width: `${r.snowIn / max * 100}%` }} />
             <span>{r.snowIn.toFixed(1)}″</span>
