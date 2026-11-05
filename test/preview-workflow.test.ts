@@ -405,3 +405,99 @@ it("prefers the immutable deployment URL for writes and tracks both URL types fo
     /Missing/,
   );
 });
+
+it("waits for a newly created namespace to accept the first baseline write", async () => {
+  vi.useFakeTimers();
+  try {
+    let attempts = 0;
+    const fetchImpl = vi.fn(async () => {
+      attempts++;
+      return attempts < 3
+        ? Response.json(
+            {
+              success: false,
+              errors: [
+                {
+                  code: 10013,
+                  message: "get namespace: 'namespace not found'",
+                },
+              ],
+            },
+            { status: 404 },
+          )
+        : Response.json({ success: true });
+    });
+    const storage = new PreviewStorage(
+      new Cloudflare("account", "credential", fetchImpl as typeof fetch),
+      namespace,
+      12,
+    );
+    const assertion = expect(
+      storage.put(
+        "plume-panel:first",
+        new Uint8Array([137, 80, 78, 71]).buffer,
+      ),
+    ).resolves.toBeUndefined();
+    await Promise.all([assertion, vi.runAllTimersAsync()]);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it("stops namespace readiness retries after five delays", async () => {
+  vi.useFakeTimers();
+  try {
+    const fetchImpl = vi.fn(async () =>
+      Response.json(
+        {
+          success: false,
+          errors: [
+            { code: 10013, message: "get namespace: 'namespace not found'" },
+          ],
+        },
+        { status: 404 },
+      ),
+    );
+    const storage = new PreviewStorage(
+      new Cloudflare("account", "credential", fetchImpl as typeof fetch),
+      namespace,
+      12,
+    );
+    const outcome = storage.put("plume-panel:first", "bytes").then(
+      () => null,
+      (error) => error,
+    );
+    await vi.runAllTimersAsync();
+    expect(await outcome).toBeInstanceOf(Error);
+    expect(fetchImpl).toHaveBeenCalledTimes(6);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it.each([
+  [403, 10013, "namespace not found"],
+  [404, 10009, "key not found"],
+  [404, 10013, "a different resource is missing"],
+  [429, 10013, "namespace not found"],
+])(
+  "does not retry unrelated KV failure HTTP %s / code %s",
+  async (status, code, message) => {
+    const fetchImpl = vi.fn(async () =>
+      Response.json(
+        { success: false, errors: [{ code, message }] },
+        { status },
+      ),
+    );
+    const storage = new PreviewStorage(
+      new Cloudflare("account", "credential", fetchImpl as typeof fetch),
+      namespace,
+      12,
+    );
+    await expect(storage.put("plume-panel:first", "bytes")).rejects.toThrow(
+      `HTTP ${status}`,
+    );
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  },
+);

@@ -1,3 +1,19 @@
+export interface CloudflareApiIssue {
+  code: number;
+  message: string;
+}
+
+export class CloudflareApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly issues: CloudflareApiIssue[],
+    message: string,
+  ) {
+    super(message);
+    this.name = "CloudflareApiError";
+  }
+}
+
 /** Cloudflare control-plane access for preview tooling. Never exposed by the app. */
 export class Cloudflare {
   constructor(
@@ -26,9 +42,11 @@ export class Cloudflare {
     if (!response.ok) {
       // Report the actual status and API error, without printing request headers or credentials.
       const body = (await response.json().catch(() => ({}))) as {
-        errors?: Array<{ code: number; message: string }>;
+        errors?: CloudflareApiIssue[];
       };
-      throw new Error(
+      throw new CloudflareApiError(
+        response.status,
+        body.errors ?? [],
         `Cloudflare ${init.method ?? "GET"} ${path}: HTTP ${response.status} ${JSON.stringify(body.errors ?? [])}`,
       );
     }
