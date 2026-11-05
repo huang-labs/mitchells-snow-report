@@ -8,7 +8,7 @@ A snow and conditions dashboard for 14 favorite Western United States resorts, b
 - Select eight regions for NWS mountain weather and University of Utah plumes.
 - Read eight regional **Daily Snow** forecasts and a **Western United States** overview, labeled as AI with model attribution.
 
-Next.js builds the static frontend. A Cloudflare Worker serves the APIs and collects upstream data on a five-minute cron, storing the latest successful results in KV. Pages read that stored data; AI generation runs during collection.
+Next.js builds the static frontend. A Cloudflare Worker serves the APIs and collects upstream data on a five-minute cron, storing the latest successful results in KV. Pages read that stored data; AI generation runs during collection. Webcam collection retries failed YouTube metadata lookups and uses official Snowbasin and Jackson Hole camera feeds; blocked or unsupported pages retain their official webcam links. See [source notes](docs/IMPLEMENTATION_NOTES.md#adapters) for coverage and retry behavior.
 
 ## Quick start
 

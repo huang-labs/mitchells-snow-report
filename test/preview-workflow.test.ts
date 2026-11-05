@@ -8,6 +8,7 @@ import {
   namespaceTitle,
   parsePr,
   findNamespace,
+  ensureGateway,
 } from "../scripts/preview/cloudflare";
 import {
   baselineKey,
@@ -38,6 +39,32 @@ const encode = (value: unknown) =>
   new TextEncoder().encode(JSON.stringify(value)).buffer;
 const decode = (value: ArrayBuffer) =>
   JSON.parse(new TextDecoder().decode(value));
+
+describe("preview AI quota", () => {
+  it("accepts the separate preview gateway's 1,000-request sliding-day limit", async () => {
+    const cf = new Cloudflare("account", "test-token", (async () => Response.json({
+      success: true,
+      result: { rate_limiting_limit: 1000, rate_limiting_interval: 86400, rate_limiting_technique: "sliding" },
+    })) as typeof fetch);
+    await expect(ensureGateway(cf)).resolves.toBeUndefined();
+  });
+
+  it("provisions a missing preview gateway at 1,000 requests without touching production", async () => {
+    let created: Record<string, unknown> | undefined;
+    const cf = new Cloudflare("account", "test-token", (async (input, init) => {
+      const path = new URL(String(input)).pathname;
+      if (init?.method === "POST") {
+        expect(path).toBe("/client/v4/accounts/account/ai-gateway/gateways");
+        created = JSON.parse(String(init.body));
+        return Response.json({ success: true });
+      }
+      expect(path).toBe("/client/v4/accounts/account/ai-gateway/gateways/mitchells-snow-report-preview");
+      return created ? Response.json({ success: true, result: created }) : new Response(null, { status: 404 });
+    }) as typeof fetch);
+    await ensureGateway(cf);
+    expect(created).toMatchObject({ id: "mitchells-snow-report-preview", rate_limiting_limit: 1000 });
+  });
+});
 
 describe("preview storage ownership and baseline", () => {
   it("refuses production, shared preview and mismatched PR namespaces", () => {

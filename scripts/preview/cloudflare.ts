@@ -174,7 +174,7 @@ export async function ensureGateway(cf: Cloudflare) {
           cache_ttl: 0,
           collect_logs: true,
           rate_limiting_interval: 86400,
-          rate_limiting_limit: 64,
+          rate_limiting_limit: 1000,
           rate_limiting_technique: "sliding",
         }),
       });
@@ -189,11 +189,11 @@ export async function ensureGateway(cf: Cloudflare) {
     rate_limiting_technique: string;
   }>(path);
   if (
-    gateway.rate_limiting_limit !== 64 ||
+    gateway.rate_limiting_limit !== 1000 ||
     gateway.rate_limiting_interval !== 86400 ||
     gateway.rate_limiting_technique !== "sliding"
   )
     throw new Error(
-      "Preview AI Gateway must enforce 64 requests per sliding day before generation",
+      "Preview AI Gateway must enforce 1,000 requests per sliding day before generation",
     );
 }
