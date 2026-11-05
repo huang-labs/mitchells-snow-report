@@ -14,12 +14,13 @@ The owner builds this dashboard with several AI agents working on features in pa
 
 ## Product and design
 
+- For the Mitchell's expansion, read [docs/EXPANSION_PLAN.md](docs/EXPANSION_PLAN.md) for approved scope and [docs/REPOSITORY_SETUP.md](docs/REPOSITORY_SETUP.md) before configuring Actions or deployment.
 - The dashboard serves phones and desktop browsers. Check layout changes at phone widths and at ordinary laptop widths.
 - Long-form content is page content: no card border or panel. Use card styling only for summary cards (the resort pick, the Daily Snow teaser). Give an article one reading width and let its children fill it, so every edge lines up.
 - Label AI output wherever it appears (the `badge--ai` badge, plus a footer naming the model), and keep it visibly separate from measured or forecast data.
 - Keep resort pages consistent in structure while honoring each resort's available data. Preserve source-specific measurement windows and report/observation times. Never show missing data as zero: keep a reported zero visibly distinct from a missing value. Where space is tight, a page may show “not reported” and “not published” as a single “no data” mark; the data model keeps all three states.
 - Share data rules and reusable rendering. Scope feature styles so they don't change unrelated pages.
-- Local times are America/Denver. Cloudflare crons are UTC only, so schedule local-time work in code (see `src/lib/dailysnow/schedule.ts`) and test it across daylight-saving changes.
+- Local times follow the resort or region's IANA time zone: America/Denver or America/Los_Angeles. Preserve source reporting windows and timestamps. Cloudflare crons are UTC only, so schedule local-time work in code (see `src/lib/dailysnow/schedule.ts`) and test it across daylight-saving changes.
 - Before changing source adapters or freshness semantics, read [docs/IMPLEMENTATION_NOTES.md](docs/IMPLEMENTATION_NOTES.md) and the relevant fixtures and tests. [docs/IMPLEMENTATION_BRIEF.md](docs/IMPLEMENTATION_BRIEF.md) holds the broader product requirements.
 
 ## AI features

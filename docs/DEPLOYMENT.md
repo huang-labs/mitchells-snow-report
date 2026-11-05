@@ -17,6 +17,10 @@ Live at **https://cottonwoods-snow-report.huang.mx**. It runs as the Worker `cot
 
 **Deploys are automatic** (`.github/workflows/deploy.yml`):
 
+- In this fork, production and preview uploads require the repository Actions
+  variable `DEPLOYMENT_ENABLED` to be exactly `true`. It is `false` until isolated
+  Mitchell's resources are configured; the test job runs independently. Follow
+  [repository setup](REPOSITORY_SETUP.md) before enabling uploads.
 - Every push to `main` typechecks, tests, builds, and smoke-checks the local Worker, then runs `npm run deploy` (static export + `wrangler deploy`).
 - Every pull request from this repository passes the same checks, then is uploaded with `wrangler versions upload` as a non-deployed Worker version with a stable preview URL (`pr-<number>-cottonwoods-snow-report.huang-inc.workers.dev`), linked in a PR comment. Previews share production bindings, so they read the live KV snapshot; crons stay on the deployed version.
 
