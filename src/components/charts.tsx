@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { dateFormat } from "@/lib/time";
 
 const dayFmt = new Intl.DateTimeFormat("en-US", { timeZone: "America/Denver", weekday: "short" });
 const dayKeyFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Denver", year: "numeric", month: "2-digit", day: "2-digit" });
@@ -43,8 +44,8 @@ export interface SnowLevelSeries {
 
 /** Forecast snow level, one line per canyon (CSS colors each canyon). */
 export function SnowLevel({ series, label,timeZone="America/Denver" }: { series: SnowLevelSeries[]; label: string;timeZone?:string }) {
-  const dayFmt=new Intl.DateTimeFormat("en-US",{timeZone,weekday:"short"});
-  const keyFmt=new Intl.DateTimeFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit"});
+  const dayFmt=dateFormat("en-US",{timeZone,weekday:"short"});
+  const keyFmt=dateFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit"});
   const newDay=(xs:Array<{start:string}>,i:number)=>i===0||keyFmt.format(new Date(xs[i].start))!==keyFmt.format(new Date(xs[i-1].start));
   const h = 120;
   const gutter = 44; // "8k ft" labels

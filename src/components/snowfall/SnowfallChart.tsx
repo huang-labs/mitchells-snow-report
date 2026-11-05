@@ -1,3 +1,4 @@
+import { dateFormat } from "@/lib/time";
 import type { SixHourSnow } from "@/lib/types";
 import { dateLabel, dayLabel, snowfallDays, timeLabel, zonedTimeLabel } from "./model";
 import "./snowfall.css";
@@ -10,10 +11,10 @@ export const SNOWFALL_UNITS = "6-hour snowfall · inches";
  */
 export function SnowfallChart({ bars, label, units = true, title, timeZone="America/Denver" }: { bars: SixHourSnow[]; label: string; units?: boolean; title?: string; timeZone?:string }) {
   const days = snowfallDays(bars,timeZone);
-  const dayLabel=new Intl.DateTimeFormat("en-US",{timeZone,weekday:"short"});
-  const dateLabel=new Intl.DateTimeFormat("en-US",{timeZone,month:"numeric",day:"numeric"});
-  const timeLabel=new Intl.DateTimeFormat("en-US",{timeZone,hour:"numeric"});
-  const zonedTimeLabel=new Intl.DateTimeFormat("en-US",{timeZone,hour:"numeric",timeZoneName:"short"});
+  const dayLabel=dateFormat("en-US",{timeZone,weekday:"short"});
+  const dateLabel=dateFormat("en-US",{timeZone,month:"numeric",day:"numeric"});
+  const timeLabel=dateFormat("en-US",{timeZone,hour:"numeric"});
+  const zonedTimeLabel=dateFormat("en-US",{timeZone,hour:"numeric",timeZoneName:"short"});
   const max = Math.max(1, ...bars.map(b => b.snowIn));
   const slotsPerDay = Math.max(4, ...days.map(d => d.slots.length));
   if (!days.length) return <p className="muted">Snowfall forecast unavailable.</p>;

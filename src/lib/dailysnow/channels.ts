@@ -129,11 +129,10 @@ export async function runChannels(
       outcomes.push({ channel, error });
     }
   }
-  // Western gets its own cron once regional editions exist. Two back-to-back
-  // primary/fallback jobs could otherwise exceed the 15-minute cron deadline.
-  const westernDue =
-    (!opts.channel || opts.channel === "western-us") &&
-    (opts.force || shouldRunDailySnow(states["western-us"], now, "western-us"));
+  // Scheduled runs give Western its own cron once regional editions exist: two
+  // back-to-back primary/fallback jobs could otherwise exceed the 15-minute cron
+  // deadline. Forced runs never take this path; they run the requested channels.
+  const westernDue = !opts.force && !opts.channel && shouldRunDailySnow(states["western-us"], now, "western-us");
   if (westernDue && REGIONS.some((r) => states[r.id]?.current?.date === localDate(now, r.timeZone))) {
     await run("western-us");
     return outcomes;
@@ -153,6 +152,7 @@ export async function runChannels(
   const slots = Math.max(0, MAX_CONCURRENT_CHANNELS - running.length);
   for (const r of due.slice(slots)) outcomes.push({ channel: r.id, skipped: "generation concurrency limit" });
   await Promise.all(due.slice(0, slots).map((r) => run(r.id)));
-  if (!due.length) await run("western-us");
+  // A forced Western run follows any forced regional runs, so it sees their editions.
+  if (opts.force ? !opts.channel || opts.channel === "western-us" : !due.length) await run("western-us");
   return outcomes;
 }

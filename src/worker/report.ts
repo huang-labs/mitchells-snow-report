@@ -1,5 +1,5 @@
 import { readChannelStates } from "../lib/dailysnow/channels";
-import { CHANNELS } from "../lib/catalog";
+import { CHANNELS, REGIONS } from "../lib/catalog";
 import { publicDailySnow } from "../lib/report";
 import { dailySnowActivity } from "../lib/dailysnow/digest";
 import { dailySnowPublicationStatus } from "../lib/dailysnow/publication";
@@ -17,11 +17,14 @@ export async function report(env: CollectorEnv) {
     const [snapshot,states]=await Promise.all([readSnapshot(env.SNOW_KV),readChannelStates(env.SNOW_KV)]);
     const output=buildReport(snapshot);
     output.dailySnows={};output.publicationStatus={};
+    const now=new Date();
+    // One activity check per region; Western is expected when any region is.
+    const regional=Object.fromEntries(REGIONS.map(r=>[r.id,!!snapshot&&dailySnowActivity(regionalSnapshot(snapshot,r.id),now).publicationExpected]));
     for(const channel of CHANNELS){
-      const expected=channel.id==="western-us"?CHANNELS.some(c=>c.id!=="western-us"&&snapshot&&dailySnowActivity(regionalSnapshot(snapshot,c.id),new Date()).publicationExpected):!!snapshot&&dailySnowActivity(regionalSnapshot(snapshot,channel.id),new Date()).publicationExpected;
+      const expected=channel.id==="western-us"?Object.values(regional).some(Boolean):regional[channel.id];
       const state=states[channel.id];
-      output.dailySnows[channel.id]=publicDailySnow(state?.current,state,new Date(),expected);
-      output.publicationStatus[channel.id]=output.dailySnows[channel.id]?.publicationStatus??dailySnowPublicationStatus(state?.current?.date??null,state,new Date(),expected,channel.id);
+      output.dailySnows[channel.id]=publicDailySnow(state?.current,state,now,expected);
+      output.publicationStatus[channel.id]=output.dailySnows[channel.id]?.publicationStatus??dailySnowPublicationStatus(state?.current?.date??null,state,now,expected,channel.id);
     }
     output.dailySnow=output.dailySnows["western-us"];
     return Response.json(output, {

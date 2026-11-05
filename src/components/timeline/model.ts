@@ -1,5 +1,5 @@
 import { addDays, forecastForDay, snowDayEnd, snowDayOf } from "@/lib/snowlog/days";
-import { formatDenver, formatLocal } from "@/lib/time";
+import { dateFormat, formatLocal } from "@/lib/time";
 import type { MorningReading, SnowLogState } from "@/lib/snowlog/types";
 import type { CanyonId, Metric, PointForecast, PrimaryResortId, ResortReport } from "@/lib/types";
 
@@ -40,21 +40,14 @@ export interface SnowTimelineModel {
 }
 
 const tz = "America/Denver";
-const weekdayFmt = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" });
-const dayFmt = new Intl.DateTimeFormat("en-US", { timeZone: tz, day: "numeric" });
-const dateFmt = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric" });
-const timeFmt = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" });
-const ymdFmt = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
 
 /** A report time within a day's description: the clock time, plus the date when it falls on another day. */
-function reportAt(iso: string, key: string, zone=tz): string {
+function reportAt(iso: string, key: string, zone = tz): string {
   const t = new Date(iso);
-  const ymdFmt=new Intl.DateTimeFormat("en-CA",{timeZone:zone,year:"numeric",month:"2-digit",day:"2-digit"});
-  const timeFmt=new Intl.DateTimeFormat("en-US",{timeZone:zone,hour:"numeric",minute:"2-digit"});
-  const dateFmt=new Intl.DateTimeFormat("en-US",{timeZone:zone,month:"short",day:"numeric"});
-  return ymdFmt.format(t) === key ? timeFmt.format(t) : `${dateFmt.format(t)}, ${timeFmt.format(t)}`;
+  const time = dateFormat("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit" }).format(t);
+  const ymd = dateFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(t);
+  return ymd === key ? time : `${dateFormat("en-US", { timeZone: zone, month: "short", day: "numeric" }).format(t)}, ${time}`;
 }
-const hourFmt = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric" });
 
 /** Whole inches for bar labels: "<1" keeps a trace distinct from a reported zero. */
 export function barLabel(v: number): string {
@@ -65,15 +58,19 @@ export function barLabel(v: number): string {
 
 const inches = (v: number) => `${Number.isInteger(v) ? v : v.toFixed(1)}″`;
 /** "5 AM" in winter, "6 AM" in summer: the local time a snow day ends. */
-const endsAt = (key: string, zone?:string) => new Intl.DateTimeFormat("en-US",{timeZone:zone??tz,hour:"numeric"}).format(snowDayEnd(key,zone)).replace(":00", "");
+const endsAt = (key: string, zone?: string) =>
+  dateFormat("en-US", { timeZone: zone ?? tz, hour: "numeric" }).format(snowDayEnd(key, zone)).replace(":00", "");
 
 function dayLabels(key: string, zone?:string) {
   const t = new Date(snowDayEnd(key,zone));
-  const weekdayFmt=new Intl.DateTimeFormat("en-US",{timeZone:zone??tz,weekday:"short"});
-  const dayFmt=new Intl.DateTimeFormat("en-US",{timeZone:zone??tz,day:"numeric"});
-  const dateFmt=new Intl.DateTimeFormat("en-US",{timeZone:zone??tz,weekday:"short",month:"short",day:"numeric"});
-  const weekday = weekdayFmt.format(t);
-  return { weekday, dayOfMonth: dayFmt.format(t), weekend: weekday === "Sat" || weekday === "Sun", date: dateFmt.format(t) };
+  const timeZone = zone ?? tz;
+  const weekday = dateFormat("en-US", { timeZone, weekday: "short" }).format(t);
+  return {
+    weekday,
+    dayOfMonth: dateFormat("en-US", { timeZone, day: "numeric" }).format(t),
+    weekend: weekday === "Sat" || weekday === "Sun",
+    date: dateFormat("en-US", { timeZone, weekday: "short", month: "short", day: "numeric" }).format(t),
+  };
 }
 
 function pastDay(key: string, name: string, reading: MorningReading | undefined, forecastIn: number | null, zone?:string): TimelineDay {

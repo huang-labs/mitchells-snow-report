@@ -157,8 +157,18 @@ export function denverMidnightsBetween(start: Date, end: Date): Date[] {
 }
 
 // Destination-local calendar helpers. Denver wrappers remain for Utah source timestamps.
+
+const formatters = new Map<string, Intl.DateTimeFormat>();
+/** A shared formatter per locale and options: construction is costly and only a few zones exist. */
+export function dateFormat(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = `${locale}|${JSON.stringify(options)}`;
+  let f = formatters.get(key);
+  if (!f) formatters.set(key, (f = new Intl.DateTimeFormat(locale, options)));
+  return f;
+}
+
 export function zonedParts(date: Date, timeZone: string = TZ) {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(date).map(p => [p.type,p.value]));
+  const parts = Object.fromEntries(dateFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(date).map(p => [p.type,p.value]));
   return { year: +parts.year, month: +parts.month, day: +parts.day, hour: +parts.hour, minute: +parts.minute, second: +parts.second };
 }
 export function zonedToUtc(year: number, month: number, day: number, hour = 0, minute = 0, second = 0, timeZone: string = TZ): Date {
@@ -173,18 +183,18 @@ export function localDate(date: Date, timeZone: string = TZ): string {
 export function formatLocal(iso: string | null | undefined, now = new Date(), timeZone: string = TZ): string {
   if (!iso || !Number.isFinite(Date.parse(iso))) return "unknown";
   const d=new Date(iso);
-  return new Intl.DateTimeFormat("en-US", { timeZone, weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit", timeZoneName:"short" }).format(d);
+  return dateFormat("en-US", { timeZone, weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit", timeZoneName:"short" }).format(d);
 }
 /** "Today 5:00 PM", "Yesterday 7:00 AM" or "Mon, Oct 26, 9:00 AM" in a destination's time zone. */
 export function formatLocalRelative(iso: string | null | undefined, now = new Date(), timeZone: string = TZ): string {
   if (!iso || !Number.isFinite(Date.parse(iso))) return "unknown";
   const d = new Date(iso);
   const day = (t: Date) => localDate(t, timeZone);
-  const time = new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit" }).format(d);
+  const time = dateFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit" }).format(d);
   if (day(d) === day(now)) return `Today ${time}`;
   if (day(d) === day(new Date(now.getTime() - 86_400_000))) return `Yesterday ${time}`;
   if (day(d) === day(new Date(now.getTime() + 86_400_000))) return `Tomorrow ${time}`;
-  return new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(d);
+  return dateFormat("en-US", { timeZone, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(d);
 }
 export function parseLocalDateTime(text: string | null | undefined, timeZone: string = TZ): string | null {
   const m=text?.trim().match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);

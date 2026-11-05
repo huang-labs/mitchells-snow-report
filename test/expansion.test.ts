@@ -331,7 +331,17 @@ describe("publication guards in channel state", () => {
     const out = await runChannels({ SNOW_KV: kv, AI: replyAi(calls) }, base, now, { force: true });
     const limited = out.filter((o) => o.skipped === "generation concurrency limit").map((o) => o.channel);
     expect(limited).toEqual(REGIONS.slice(4).map((r) => r.id));
-    expect(out.filter((o) => o.published || o.error).map((o) => o.channel)).toEqual([REGIONS[3].id]);
+    // The forced Western overview follows the regional attempts.
+    expect(out.filter((o) => o.published || o.error).map((o) => o.channel)).toEqual([REGIONS[3].id, "western-us"]);
+  });
+  it("forces every requested channel, regions before the Western overview, when no channel is named", async () => {
+    const kv = new MemoryKV();
+    const calls = { n: 0 };
+    const out = await runChannels({ SNOW_KV: kv, AI: replyAi(calls) }, base, now, { force: true });
+    const attempted = out.filter((o) => o.published || o.error).map((o) => o.channel);
+    expect([...attempted.slice(0, 4)].sort()).toEqual(REGIONS.slice(0, 4).map((r) => r.id).sort());
+    expect(attempted.at(-1)).toBe("western-us");
+    expect(out.filter((o) => o.skipped === "generation concurrency limit").map((o) => o.channel)).toEqual(REGIONS.slice(4).map((r) => r.id));
   });
   it("does not let a superseded run overwrite a newer attempt's state or edition", async () => {
     const kv = new MemoryKV();
