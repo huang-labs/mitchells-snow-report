@@ -2,13 +2,13 @@
 
 [← README](../README.md)
 
-Setup and reruns for the advisory PR workflow.
+Setup, enforcement and the implementing-agent review loop.
 
 The official [PR-Agent Action](https://github.com/marketplace/actions/the-pr-agent)
-runs **one advisory review per eligible PR event**. Every review uses GLM 5.3
+runs **one required review per eligible PR event**. Every review uses GLM 5.3
 (`@cf/zai-org/glm-5.3`) on Workers AI through the dedicated `pr-agent` AI Gateway.
 PR-Agent owns inference, review formatting, persistent comments, inline findings,
-coverage and failure reporting. No labels are needed.
+coverage and failure reporting. No label is needed to request a review.
 
 Setup: the `pr-agent` gateway (Huang Inc. account) is authenticated, logs requests,
 and has a sliding limit of 100 requests per day. Actions secret
@@ -19,27 +19,114 @@ authentication. Every request sends `cf-aig-skip-cache`, so a re-push reruns
 inference. Fallbacks are disabled. Review content goes to Cloudflare Workers AI and
 is visible in the gateway's logs.
 
-Reviews run on open, reopen, ready-for-review and pushes. Drafts, forks, Dependabot
-and bot events are skipped. There is no comment command: to rerun, push a new
-commit (`git commit --allow-empty` works). Each push, reopen or ready-for-review
-event reviews the PR head once; duplicate events for a commit replace each other, and an event for a commit that
-is no longer the PR head is skipped before inference. A review already running
-for an older commit finishes, so rapid pushes can each use a request. Automatic description
-rewriting and code suggestion generation are disabled. Review findings are
-advisory and never block a merge, but branch protection on `main` requires the
-`review` check to pass, alongside `test` and `preview`. A failed run (provider,
-auth or the gateway's daily limit) therefore blocks merging until a re-push
-succeeds. A review skipped for a superseded commit still passes.
+## Review gate and override
 
-The `pull_request_target` workflow and review configuration come from trusted
-base/default branches, with no checkout or execution of PR code. PR-Agent reads
-PR data and default-branch AGENTS.md through GitHub's API.
+Reviews run on open, reopen, ready-for-review and pushes for same-repository,
+non-draft PRs. Forks, drafts and Dependabot PRs are skipped. Bot pushes to eligible
+PRs are reviewed too. There is no comment command: push a new commit to rerun
+(`git commit --allow-empty` works). Duplicate events for a commit replace each
+other; superseded or closed PR events are skipped. A review already running for
+an older commit can finish, so rapid pushes can each use a request. Automatic
+description rewriting and code suggestion generation are disabled.
+
+Branch protection on `main` requires `review`, `test` and `preview` on an
+up-to-date branch. The `review` check passes only when PR-Agent succeeds,
+returns a valid structured result, reports zero key issues, and recommends
+`no_concerns_found`. Both `needs_review` and `changes_required` block it. Missing
+or malformed output and provider/auth/rate-limit failures also block it.
+Resolving a GitHub thread alone does not turn the gate green: push to get a fresh
+review. The model writes YAML, which PR-Agent parses before exporting the `review` object
+as JSON through `GITHUB_OUTPUT` when `GITHUB_ACTION_CONFIG__ENABLE_OUTPUT` is true.
+The gate reads that JSON Action output, never the raw YAML or rendered comments.
+The regression fixture in `.github/scripts/fixtures/pr-agent-review.json` captures
+a live review exported by the pinned upstream serializer; it is not a full hosted
+Action integration test.
+
+To explicitly bypass AI review, add **`ai-review-override`** in the PR's Labels
+menu (or `gh pr edit <number> --add-label ai-review-override`). GitHub's existing
+label permissions control who can do this, including users with triage access;
+this is not an admin-only mechanism. The PR timeline records the actor, and the
+Actions summary and an automatic audit comment identify the override and commit.
+The gate requires that bot-authored audit record to match the current head, so a
+stale label cannot bypass review during concurrent events. Leave a PR comment explaining
+the reason. Adding the label cancels/replaces a pending review for that commit
+and passes without another model request; it can also bypass a provider outage.
+Removing it runs a fresh paid review and restores enforcement. Other label
+changes also rerun the gate (and a paid review when no override is present), so
+a skipped label-event job cannot accidentally supersede a failed required check.
+The workflow clears the override on each push, reopen or
+transition out of draft, so it does not authorize later commits. Agents need the
+owner's explicit authorization for that PR to apply the label. `test` and
+`preview` remain required throughout.
+
+The label can be created once with:
+
+```sh
+gh label create ai-review-override --color D93F0B --description "Explicitly bypass AI review until the next push"
+```
+
+The `pull_request_target` workflow, gate helper and review configuration come
+from trusted base/default branches. It checks out only the immutable base SHA,
+with no persisted credentials, and never checks out or executes PR code.
+PR-Agent reads PR data and default-branch AGENTS.md through GitHub's API. Label
+removal uses `GITHUB_TOKEN`, so it does not recursively trigger another workflow.
+The existing `review` check name is preserved; no branch-protection change is
+needed. The deploy workflow runs the gate's dependency-free tests:
+
+```sh
+node --test .github/scripts/review-gate.test.cjs
+```
+
+## Implementing-agent review loop
+
+Opening a PR or pushing a follow-up starts this loop automatically as part of the
+implementation task; the owner does not need to ask for review fixes.
+
+1. Link the PR to the implementing session. Read existing review summaries,
+   inline threads and check failures, and confirm which commit each concerns.
+2. Monitor the PR for the latest head's review and checks. In T3, call
+   `watch_pull_request` and yield as the tool requires; it wakes the same session
+   for new comments/reviews, failed checks, passed required checks or conflicts.
+   Keep the watch active through follow-up pushes. Other agent hosts should use
+   their supported monitoring mechanism; if none exists, report that limitation
+   and the pending checks instead of claiming automatic follow-through.
+3. On feedback, investigate every summary and inline finding. Fix actionable
+   defects, add meaningful regression coverage where appropriate, run the
+   relevant validation, update documentation and the PR description, and push to
+   the same PR. Reply to review threads with the fix and validation, then resolve
+   threads whose findings are addressed. Read the next review and repeat; a green
+   Action exit alone is insufficient if comments remain unaddressed.
+4. For a disputed finding, explain the evidence on the PR. Seek the owner's
+   decision before dismissing it or applying an override. Diagnose provider,
+   auth and rate-limit failures separately from code findings. Report blockers
+   that require owner action rather than cycling unchanged commits indefinitely.
+5. Finish only when `review`, `test` and `preview` pass for the current head and
+   all review threads are resolved, or when an owner decision/external failure
+   blocks progress. Report the PR, head, validation and any authorized override.
+   Stop the watch when handing back a completed PR; leave merging to the owner.
+
+GitHub automatically runs the reviewer. These instructions make review follow-up
+part of each implementing agent's task; they do not launch arbitrary agents from
+GitHub. Automatic session resumption requires a host such as T3 with PR watches.
+
+## Model and operational limits
 
 Policy is in `.pr_agent.toml`: high reasoning effort, a 131,072-token context
-budget and a 32,768-token completion allowance shared by reasoning and the final
-review. Each model call has up to 20 minutes; the job allows 45 minutes for
-startup and one transient-error retry. A diff over the budget is reviewed in up to
-four chunks whose findings are merged; files that still do not fit are listed in
+budget and a 65,536-token completion allowance shared by reasoning and the final
+review. The larger allowance preserves reasoning depth while giving the model
+more room to produce its final answer. Internal reasoning can exhaust the
+allowance even on a small diff: an observed request used 13,267 input tokens and
+all of the previous 32,768 output tokens, returned HTTP 200 with
+`finish_reason: length`, and had empty final content. A larger allowance reduces
+that risk but does not guarantee completion; it can increase latency and cost.
+Workers AI supports `low`, `high` and `max` for this model; `medium`, `none` and
+`minimal` alias to `max`. See the
+[Cloudflare model reference](https://developers.cloudflare.com/workers-ai/models/glm-5.3/).
+Keep the completion allowance explicit and inspect gateway request/response usage
+when diagnosing another empty response; raising context limits alone does not
+fix output exhaustion. Each model call has up to 20 minutes; the job allows 45
+minutes for startup and one transient-error retry. A diff over the budget is
+reviewed in up to four chunks whose findings are merged; files that still do not fit are listed in
 the review's coverage footer. Chunks are reviewed independently, so a chunk cannot
 see code in another chunk. Captured fixtures (`test/fixtures/**`) and
 `package-lock.json` are excluded from review. These limits are not dollar caps;
