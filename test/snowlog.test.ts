@@ -214,6 +214,26 @@ describe("recordSnowLog", () => {
 });
 
 describe("snapshot storage", () => {
+  it.each(["stored", "incoming"])("ignores removed catalog entries in the %s snapshot while preserving current history", (side) => {
+    const now = new Date("2026-12-01T15:00:00Z");
+    const current: SnowLogState = {
+      resorts: { alta: { "2026-12-01": { state: "reported", valueIn: 4, label: "24 h", windowEnd: null, collectedAt: now.toISOString() } } },
+      forecasts: { LCC: { "2026-12-01": { snowIn: 5, issuedAt: null, collectedAt: now.toISOString() } } },
+    };
+    // Persisted JSON can contain identifiers that no longer exist in the catalog.
+    const retired: SnowLogState = JSON.parse(JSON.stringify({
+      resorts: { "removed-resort": current.resorts.alta },
+      forecasts: { "removed-area": current.forecasts.LCC },
+    }));
+    const stored = side === "stored" ? retired : current;
+    const incoming = side === "incoming" ? retired : current;
+    expect(mergeSnowLog(stored, incoming, now)).toEqual(current);
+    expect(mergeSnapshot(
+      { ...snap({}), snowLog: stored },
+      { ...snap({}), writtenAt: now.toISOString(), snowLog: incoming },
+    ).snowLog).toEqual(current);
+  });
+
   it("merges concurrent runs' logs day by day", () => {
     const reading = (state: "reported" | "no_report", collectedAt: string, valueIn?: number) => ({ state, valueIn, label: "x", windowEnd: null, collectedAt });
     const a: SnowLogState = { resorts: { alta: { "2026-12-01": reading("reported", "2026-12-01T13:00:00Z", 4), "2026-11-30": reading("reported", "2026-11-30T13:00:00Z", 1) } }, forecasts: {} };
