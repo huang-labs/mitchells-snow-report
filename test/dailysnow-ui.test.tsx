@@ -375,8 +375,8 @@ it("shows the West selector before the article and renders forecast zeros separa
   render(<DailySnowPage report={report(west)} now={now} selector={<select aria-label="Region"><option>United States West</option></select>} />);
   const article = screen.getByRole("article");
   expect(article.firstElementChild).toBe(screen.getByRole("combobox", { name: "Region" }));
-  expect(screen.getByRole("heading", { name: "Summary" })).toBeTruthy();
-  expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(expect.arrayContaining(["Summary", "Short Term Forecast", "Extended Forecast"]));
+  expect(screen.getByRole("heading", { name: "Overview" })).toBeTruthy();
+  expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(expect.arrayContaining(["Overview", "Short Term Forecast", "Extended Forecast"]));
   const table = within(screen.getByRole("table", { name: "NWS this week" }));
   expect(table.getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Mountain forecast point", "Days 1–3Thu–Sun", "Days 4–7Sun–Thu"]);
   expect(table.getByText("4.5″")).toBeTruthy();
