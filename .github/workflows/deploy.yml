@@ -32,6 +32,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - run: node --test .github/scripts/review-gate.test.cjs
       - run: npm run cf:build
       - run: npm run smoke
 

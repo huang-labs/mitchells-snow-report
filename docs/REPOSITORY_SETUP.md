@@ -6,7 +6,7 @@ The housekeeping [PR #1](https://github.com/huang-labs/mitchells-snow-report/pul
 
 ## Configured resources
 
-GitHub Actions and Blacksmith runners are enabled. Every PR receives an advisory GLM 5.3 review through the `pr-agent` AI Gateway; see [AI code review](AI_CODE_REVIEW.md).
+GitHub Actions and Blacksmith runners are enabled. Eligible PRs receive a required GLM 5.3 review through the `pr-agent` AI Gateway; see [AI code review](AI_CODE_REVIEW.md).
 
 Branch protection on `main` matches Cottonwoods: changes go through a PR (no approvals required), with required checks `test`, `preview` and `review` on an up-to-date branch. It applies to admins, and force pushes and deletion are blocked.
 
