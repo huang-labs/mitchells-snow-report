@@ -10,7 +10,7 @@ import { runChannels, readChannelStates } from "@/lib/dailysnow/channels";
 import { dailySnowKey, emptyDailySnowState, planDailySnow, dailySnowFigureKey } from "@/lib/dailysnow";
 import { buildWesternInput, dayRange, validateWestern, westernFigures } from "@/lib/dailysnow/western";
 import { localDate, zonedToUtc } from "@/lib/time";
-import { snowDayEnd, snowDayStart, forecastForDay } from "@/lib/snowlog/days";
+import { snowDayWindow, forecastForDay } from "@/lib/snowlog/days";
 import { shouldRunDailySnow } from "@/lib/dailysnow/schedule";
 import { PRIMARY_MODEL, FALLBACK_MODEL } from "@/lib/ai/model";
 import type { Snapshot, NwsPayload, ResortReport, DailySnowPost, DailySnowState, PlumePayload } from "@/lib/types";
@@ -273,14 +273,14 @@ describe("regional boundaries and calendars", () => {
     expect(d.digest.ensemble).toBeUndefined();
   });
   it.each(["2026-03-08", "2026-11-01"])("keeps each snow day at local 6AM through DST (%s)", (date) => {
-    const start = snowDayStart(date, "America/Los_Angeles"),
-      end = snowDayEnd(date, "America/Los_Angeles");
+    const window = snowDayWindow(date, "America/Los_Angeles");
+    const { start, end } = window;
     expect(end - start).toBe((date.includes("03") ? 23 : 25) * 3600000);
     const series = Array.from({ length: (end - start) / 3600000 }, (_, i) => ({
       start: new Date(start + i * 3600000).toISOString(),
       snowIn: 1,
     }));
-    expect(forecastForDay(series, date, -Infinity, "America/Los_Angeles")).toBe(series.length);
+    expect(forecastForDay(series, window)).toBe(series.length);
   });
   it("starts Mountain and Pacific editions at 6AM local and the Western overview at 7AM Pacific", () => {
     expect(shouldRunDailySnow(undefined, new Date("2026-11-05T13:00:00Z"), "utah")).toBe("morning");

@@ -1,4 +1,4 @@
-import { addDays, forecastForDay, snowDayEnd, snowDayOf } from "@/lib/snowlog/days";
+import { addDays, forecastForDay, snowDayWindow, snowDayOf } from "@/lib/snowlog/days";
 import { cachedDateFormat, formatLocal } from "@/lib/time";
 import type { MorningReading, SnowLogState } from "@/lib/snowlog/types";
 import type { CanyonId, Metric, PointForecast, PrimaryResortId, ResortReport } from "@/lib/types";
@@ -36,13 +36,11 @@ export interface SnowTimelineModel {
   last24: { metric: Metric | null; reportTime: string | null; detail: string };
   canyon: CanyonId;
   /** The resort's IANA zone; report times display in it. */
-  timeZone?: string;
+  timeZone: string;
 }
 
-const tz = "America/Denver";
-
 /** A report time within a day's description: the clock time, plus the date when it falls on another day. */
-function reportAt(iso: string, key: string, zone = tz): string {
+function reportAt(iso: string, key: string, zone: string): string {
   const t = new Date(iso);
   const time = cachedDateFormat("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit" }).format(t);
   const ymd = cachedDateFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(t);
@@ -57,13 +55,13 @@ export function barLabel(v: number): string {
 }
 
 const inches = (v: number) => `${Number.isInteger(v) ? v : v.toFixed(1)}″`;
-/** "5 AM" in winter, "6 AM" in summer: the local time a snow day ends. */
-const endsAt = (key: string, zone?: string) =>
-  cachedDateFormat("en-US", { timeZone: zone ?? tz, hour: "numeric" }).format(snowDayEnd(key, zone)).replace(":00", "");
+/** The destination-local 6 AM boundary, independent of daylight saving time. */
+const boundaryAt = (instant: number, zone: string) =>
+  cachedDateFormat("en-US", { timeZone: zone, hour: "numeric" }).format(instant).replace(":00", "");
 
-function dayLabels(key: string, zone?:string) {
-  const t = new Date(snowDayEnd(key,zone));
-  const timeZone = zone ?? tz;
+function dayLabels(end: number, zone:string) {
+  const t = new Date(end);
+  const timeZone = zone;
   const weekday = cachedDateFormat("en-US", { timeZone, weekday: "short" }).format(t);
   return {
     weekday,
@@ -73,8 +71,8 @@ function dayLabels(key: string, zone?:string) {
   };
 }
 
-function pastDay(key: string, name: string, reading: MorningReading | undefined, forecastIn: number | null, zone?:string): TimelineDay {
-  const { date, ...labels } = dayLabels(key,zone);
+function pastDay(key: string, name: string, reading: MorningReading | undefined, forecastIn: number | null, zone:string): TimelineDay {
+  const { date, ...labels } = dayLabels(snowDayWindow(key, zone).end,zone);
   const ghost = forecastIn === null ? "" : ` · NWS forecast ${inches(forecastIn)}`;
   const base = { key, kind: "past" as const, ...labels, forecastIn, partial: false };
   if (!reading) return { ...base, state: "not_recorded", amountIn: null, detail: `${date} · Not recorded${ghost}` };
@@ -91,11 +89,14 @@ function pastDay(key: string, name: string, reading: MorningReading | undefined,
   }
 }
 
-function futureDay(key: string, canyon: CanyonId, hourly: PointForecast["hourlySnow"], now: Date, zone?:string): TimelineDay {
-  const { date, ...labels } = dayLabels(key,zone);
-  const partial = snowDayOf(now.getTime(),zone) === key;
-  const amountIn = hourly ? forecastForDay(hourly, key, partial ? now.getTime() : -Infinity,zone) : null;
-  const span = partial ? `now to ${endsAt(key,zone)}` : `24 h to ${endsAt(key,zone)}`;
+function futureDay(key: string, canyon: CanyonId, hourly: PointForecast["hourlySnow"], now: Date, zone:string): TimelineDay {
+  const window = snowDayWindow(key, zone);
+  const { date, ...labels } = dayLabels(window.end,zone);
+  const partial = now.getTime() >= window.start && now.getTime() < window.end;
+  const amountIn = hourly ? forecastForDay(hourly, window, partial ? now.getTime() : -Infinity) : null;
+  const span = partial
+    ? `now to ${boundaryAt(window.end,zone)}`
+    : `${boundaryAt(window.start,zone)} to ${boundaryAt(window.end,zone)} local time`;
   const base = { key, kind: "forecast" as const, ...labels, forecastIn: null, partial };
   return amountIn === null
     ? { ...base, state: "no_forecast", amountIn: null, detail: `${date} · No NWS forecast for this day` }
@@ -115,7 +116,7 @@ export function buildSnowTimeline(input: {
   log: SnowLogState | null | undefined;
   forecast: PointForecast | null;
   now: Date;
-  timeZone?: string;
+  timeZone: string;
 }): SnowTimelineModel {
   const { resort, name, canyon, report, log, forecast, now, timeZone } = input;
   const current = snowDayOf(now.getTime(),timeZone);

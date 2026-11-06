@@ -6,10 +6,10 @@ import { formatLocal } from "@/lib/time";
 import { PlumePanelSvg } from "../PlumePanelSvg";
 import { SourceLine, Unavailable } from "../ui";
 
-const utcFmt = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric", hour: "2-digit", hourCycle: "h23" });
+const utcFmt = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", hour: "2-digit", hourCycle: "h23" });
 
 function initLabel(iso: string) {
-  return `${utcFmt.format(new Date(iso)).replace(/, (\d{2})$/, " $1")}Z`;
+  return `${utcFmt.format(new Date(iso))}Z cycle (UTC)`;
 }
 
 /** One cropped panel with a Mountain Time axis and a "now" line. */
@@ -53,7 +53,7 @@ export function PlumesPage({ source, now,region="utah",selector }: { source: Api
         <h1>{regionById(region)!.name} ensemble snow plumes</h1>
         {p && (
           <p className="page__sub">
-            Run <strong>{p.runCode}</strong> · initialized <strong>{formatLocal(p.initTime,now,regionById(region)!.timeZone)}</strong> ({initLabel(p.initTime)}). Times follow the selected region (source charts use UTC); dashed lines mark midnight, the orange line is now.
+            Model initialized <strong>{formatLocal(p.initTime,now,regionById(region)!.timeZone)}</strong> · {initLabel(p.initTime)} · Run <strong>{p.runCode}</strong>. Times follow the selected region (source charts use UTC); dashed lines mark midnight, the orange line is now.
           </p>
         )}
       </header>

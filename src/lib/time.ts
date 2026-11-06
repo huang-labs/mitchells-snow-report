@@ -117,17 +117,25 @@ const dateTimeFmt = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
 });
 const timeFmt = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
-const dayKeyFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
+
+/** Compare calendar dates, not elapsed 24-hour spans across clock changes. */
+function relativeDayLabel(date: Date, now: Date, timeZone: string): string | null {
+  const report = zonedParts(date, timeZone);
+  const today = zonedParts(now, timeZone);
+  const days = (Date.UTC(report.year, report.month - 1, report.day) - Date.UTC(today.year, today.month - 1, today.day)) / 86_400_000;
+  if (days === 0) return "Today";
+  if (days === -1) return "Yesterday";
+  if (days === 1) return "Tomorrow";
+  return null;
+}
 
 /** "Today 5:00 PM", "Yesterday 7:00 AM", or "Mon, Oct 26, 9:00 AM" — always Denver time. */
 export function formatDenver(iso: string | null | undefined, now: Date = new Date()): string {
   if (!iso) return "unknown";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "unknown";
-  const key = dayKeyFmt.format(d);
-  if (key === dayKeyFmt.format(now)) return `Today ${timeFmt.format(d)}`;
-  if (key === dayKeyFmt.format(new Date(now.getTime() - 86_400_000))) return `Yesterday ${timeFmt.format(d)}`;
-  if (key === dayKeyFmt.format(new Date(now.getTime() + 86_400_000))) return `Tomorrow ${timeFmt.format(d)}`;
+  const label = relativeDayLabel(d, now, TZ);
+  if (label) return `${label} ${timeFmt.format(d)}`;
   return dateTimeFmt.format(d);
 }
 
@@ -189,11 +197,9 @@ export function formatLocal(iso: string | null | undefined, now = new Date(), ti
 export function formatLocalRelative(iso: string | null | undefined, now = new Date(), timeZone: string = TZ): string {
   if (!iso || !Number.isFinite(Date.parse(iso))) return "unknown";
   const d = new Date(iso);
-  const day = (t: Date) => localDate(t, timeZone);
   const time = cachedDateFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit" }).format(d);
-  if (day(d) === day(now)) return `Today ${time}`;
-  if (day(d) === day(new Date(now.getTime() - 86_400_000))) return `Yesterday ${time}`;
-  if (day(d) === day(new Date(now.getTime() + 86_400_000))) return `Tomorrow ${time}`;
+  const label = relativeDayLabel(d, now, timeZone);
+  if (label) return `${label} ${time}`;
   return cachedDateFormat("en-US", { timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(d);
 }
 export function parseLocalDateTime(text: string | null | undefined, timeZone: string = TZ): string | null {

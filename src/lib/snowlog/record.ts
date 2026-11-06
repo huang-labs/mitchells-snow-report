@@ -1,6 +1,6 @@
 import { RESORTS, FORECAST_AREAS, resortTimeZone, regionById, resortById } from "../catalog";
 import type { CanyonId, Metric, NwsPayload, PrimaryResortId, ResortReport, Snapshot } from "../types";
-import { addDays, forecastForDay, liquidForDay, morningOf, snowDayOf, snowDayStart } from "./days";
+import { addDays, forecastForDay, liquidForDay, morningOf, snowDayOf, snowDayWindow } from "./days";
 import type { DayAheadForecast, MorningReading, SnowDayKey, SnowLogState } from "./types";
 
 export const SNOW_LOG_RESORTS: PrimaryResortId[] = RESORTS.map(r=>r.id);
@@ -40,7 +40,8 @@ function reading(id: PrimaryResortId, report: ResortReport, collectedAt: string,
   const def=resortById(id)!;
   const reportingLocation={...(report.reportingLocation??{name:def.station,elevationFt:def.elevationFt})};
   const windowEnd = report.reportTime;
-  const fresh = windowEnd !== null && Date.parse(windowEnd) <= Date.parse(collectedAt)+120000 && Date.parse(windowEnd) >= snowDayStart(addDays(day,1),resortTimeZone(id)) - MAX_WINDOW_LEAD_MS;
+  const window = snowDayWindow(day, resortTimeZone(id));
+  const fresh = windowEnd !== null && Date.parse(windowEnd) <= Date.parse(collectedAt)+120000 && Date.parse(windowEnd) >= window.end - MAX_WINDOW_LEAD_MS;
   if (!fresh) return { state: "no_report", label: m.label, windowEnd, collectedAt, reportingLocation };
   if (m.state === "reported") return { state: "reported", valueIn: m.value, label: m.label, windowEnd, collectedAt, reportingLocation };
   return { state: m.state, label: m.label, windowEnd, collectedAt, reportingLocation };
@@ -54,6 +55,10 @@ function prune<T>(days: Record<SnowDayKey, T> | undefined, oldest: SnowDayKey): 
   return Object.fromEntries(Object.entries(days ?? {}).filter(([k]) => k >= oldest));
 }
 
+function oldestDay(now: Date, timeZone: string): SnowDayKey {
+  return addDays(snowDayOf(now.getTime(), timeZone), -SNOW_LOG_RETENTION_DAYS);
+}
+
 /**
  * Advance the log from this run's snapshot. Resorts collected during a morning window
  * record that morning's 24 h figure; every NWS collection records its whole-day snow
@@ -62,10 +67,9 @@ function prune<T>(days: Record<SnowDayKey, T> | undefined, oldest: SnowDayKey): 
  * Pure: the caller stores the result in the snapshot.
  */
 export function recordSnowLog(previous: SnowLogState | undefined, snapshot: Snapshot, now: Date): SnowLogState {
-  const oldest = addDays(snowDayOf(now.getTime()), -SNOW_LOG_RETENTION_DAYS);
   const log: SnowLogState = { resorts: {}, forecasts: {} };
   for (const id of SNOW_LOG_RESORTS) {
-    const days = prune(previous?.resorts[id], oldest);
+    const days = prune(previous?.resorts[id], oldestDay(now, resortTimeZone(id)));
     const rec = snapshot.sources[id];
     const report = rec?.payload as ResortReport | null | undefined;
     const collectedAt = rec?.lastSuccessfulFetchAt;
@@ -78,17 +82,19 @@ export function recordSnowLog(previous: SnowLogState | undefined, snapshot: Snap
   const collectedAt = nws?.lastSuccessfulFetchAt;
   for (const area of FORECAST_AREAS) {
     const canyon=area.id; const zone=regionById(area.region)!.timeZone;
-    const days = prune(previous?.forecasts[canyon], oldest);
+    const days = prune(previous?.forecasts[canyon], oldestDay(now, zone));
     const point = payload?.points.find((p) => (p.id??canyonOf(p.name)) === canyon);
     if (point?.hourlySnow && collectedAt && !point.lastError) {
       const t = Date.parse(collectedAt);
       // Days that haven't started at collection time: whole-day forecasts only.
-      for (let key = addDays(snowDayOf(t,zone), 1); snowDayStart(key,zone) - t < 8 * 86_400_000; key = addDays(key, 1)) {
-        const snowIn = forecastForDay(point.hourlySnow, key,-Infinity,zone);
+      for (let key = addDays(snowDayOf(t,zone), 1); ; key = addDays(key, 1)) {
+        const window = snowDayWindow(key, zone);
+        if (window.start - t >= 8 * 86_400_000) break;
+        const snowIn = forecastForDay(point.hourlySnow, window);
         // An incomplete day (a missing hour, or the forecast's end) is skipped; later
         // complete days are still recorded.
         if (snowIn === null) continue;
-        const liquidIn = point.hourlyLiquidIn ? liquidForDay(point.hourlySnow, point.hourlyLiquidIn, key,-Infinity,zone) : null;
+        const liquidIn = point.hourlyLiquidIn ? liquidForDay(point.hourlySnow, point.hourlyLiquidIn, window) : null;
         days[key] = preferForecast(days[key], { snowIn, ...(liquidIn === null ? {} : { liquidIn }), issuedAt: point.gridUpdatedAt, collectedAt })!;
       }
     }
@@ -99,19 +105,22 @@ export function recordSnowLog(previous: SnowLogState | undefined, snapshot: Snap
 
 /**
  * Merge two runs' logs (see store.ts): each day keeps its preferred entry, and days
- * past retention at `now` are dropped. The stored log still holds days a run has just
- * pruned, so retention must apply here too or the union would restore them.
+ * past retention at `now` and removed catalog entries are dropped. The stored log
+ * still holds days a run has just pruned, so retention must apply here too or the
+ * union would restore them.
  */
 export function mergeSnowLog(a: SnowLogState | undefined, b: SnowLogState | undefined, now: Date): SnowLogState | undefined {
   if (!a && !b) return undefined;
-  const oldest = addDays(snowDayOf(now.getTime()), -SNOW_LOG_RETENTION_DAYS);
   const out: SnowLogState = { resorts: {}, forecasts: {} };
-  for (const id of new Set([...Object.keys(a?.resorts ?? {}), ...Object.keys(b?.resorts ?? {})]) as Set<PrimaryResortId>) {
+  for (const { id } of RESORTS) {
+    const oldest = oldestDay(now, resortTimeZone(id));
     const days = prune(a?.resorts[id], oldest);
     for (const [k, v] of Object.entries(prune(b?.resorts[id], oldest))) days[k] = preferReading(days[k], v)!;
     if (Object.keys(days).length) out.resorts[id] = days;
   }
-  for (const c of new Set([...Object.keys(a?.forecasts ?? {}), ...Object.keys(b?.forecasts ?? {})]) as Set<CanyonId>) {
+  for (const area of FORECAST_AREAS) {
+    const c = area.id;
+    const oldest = oldestDay(now, regionById(area.region)!.timeZone);
     const days = prune(a?.forecasts[c], oldest);
     for (const [k, v] of Object.entries(prune(b?.forecasts[c], oldest))) days[k] = preferForecast(days[k], v)!;
     if (Object.keys(days).length) out.forecasts[c] = days;

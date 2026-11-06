@@ -10,6 +10,25 @@ import { createFixtureFetch, FIXTURE_NOW } from "./fixtureFetch";
 
 afterEach(cleanup);
 
+it.each([
+  ["2026-07-01T12:00:00Z", "utah", "6:00 AM MDT"],
+  ["2026-11-05T12:00:00Z", "utah", "5:00 AM MST"],
+  ["2026-07-01T12:00:00Z", "tahoe", "5:00 AM PDT"],
+  ["2026-11-05T12:00:00Z", "tahoe", "4:00 AM PST"],
+] as const)("identifies the local model initialization and UTC cycle (%s, %s)", (initTime, region, localTime) => {
+  const now = new Date(initTime);
+  const source = {
+    ...buildReport(null, now).sources.plumes,
+    payload: { product: "Utah Snow Ensemble", runCode: initTime.slice(0, 10).replaceAll("-", "") + "12", initTime, charts: [] },
+  };
+  const { container } = render(<PlumesPage source={source} now={now} region={region} />);
+  const header = container.querySelector(".page__sub")!.textContent;
+  expect(header).toContain("Model initialized");
+  expect(header).toContain(localTime);
+  expect(header).toContain("12Z cycle (UTC)");
+  expect(header).toContain(initTime.includes("07-01") ? "Jul 1" : "Nov 5");
+});
+
 it("shows the original chart instead of stored panels that have expired", async () => {
   const kv = new MemoryKV();
   await runCollection({ SNOW_KV: kv }, { now: FIXTURE_NOW, fetchImpl: createFixtureFetch().fetchImpl, only: ["plumes"] });
