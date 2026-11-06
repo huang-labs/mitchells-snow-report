@@ -9,10 +9,12 @@ const ratio = (v: number, scale: number) => Math.min(v, scale) / scale;
 /** A day's plot: the bar, the forecast outline behind it, and the amount just above the taller of them. */
 function Plot({ amountIn, forecastIn = null, label, scale }: { amountIn: number | null; forecastIn?: number | null; label: string; scale: number }) {
   const bar = amountIn !== null && amountIn > 0 ? ratio(amountIn, scale) : 0;
-  const ghost = forecastIn !== null ? ratio(forecastIn, scale) : 0;
+  // Sub-inch historical forecasts add clutter at the baseline; retain them in day.detail.
+  const showGhost = forecastIn !== null && forecastIn >= 1;
+  const ghost = showGhost ? ratio(forecastIn, scale) : 0;
   return (
     <span className="snowtl__plot">
-      {forecastIn !== null && <span className="snowtl__ghost" style={{ "--r": ghost } as CSSProperties} />}
+      {showGhost && <span className="snowtl__ghost" style={{ "--r": ghost } as CSSProperties} />}
       {bar > 0 && <span className={`snowtl__bar${amountIn! > scale ? " snowtl__bar--over" : ""}`} style={{ "--r": bar } as CSSProperties} />}
       {label && (
         <span className={`snowtl__amount${amountIn === 0 ? " snowtl__amount--zero" : ""}`} style={{ "--r": Math.max(bar, ghost) } as CSSProperties}>{label}</span>
