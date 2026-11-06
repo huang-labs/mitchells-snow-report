@@ -38,15 +38,20 @@ What to write for each phase (given as "phase"):
 - pre-storm: timing of the storm, how much water and snow is forecast, snow levels through the storm, which areas get the most.
 - storm: what is falling now, reported totals so far, snow levels, how long it lasts, more to come.
 - post-storm: reported storm totals, how they compare with what we forecast (when lastStorm is given), whether a little more is coming, the break ahead.
-- quiet: current conditions and the break, then signs of the next system.
+- quiet: today's weather and how long the dry spell lasts, then the first real sign of the next system. Say it plainly and keep it brief; don't pad a dry day with snow levels, snow-to-liquid ratios or a list of zero totals. If light snow is forecast, call it light rather than a break.
+- In any phase, when precipitation is forecast but snow levels sit near or above the grid point, the snow level is the story: say where rain turns to snow. Each forecast block's snowLevelVsGrid says whether its snow level is above, below or crossing the grid point; use it rather than comparing elevations yourself.
+- Never name the phase, quote phaseReason or mention internal field names; write about the weather.
+- nextStorm is the next stretch of forecast snow of at least 1″ at a point; call it the next round of snow, never a "named storm". Its amount is the forecast for the whole round. When it ends after the 7-day window, quote the round's own amount and don't set it against next7dIn or suggest it could grow.
+- When ensemble guidance is unavailable, leave it out; don't tell readers it is missing.
+- A resort that hasn't opened yet is "not open yet", not "closed for the season".
 
 Structure:
 - title: 2–5 words, a hook for the day ("Storm Underway", "Pretty Much Done", "More Snow Chances Late Next Week"). At most 40 characters. Different from every title in recentPosts.
 - summary: 2–3 sentences (at most 320 characters) covering the whole story.
 - sections: first "update" (when the post is mostly about current/recent weather) or "short-term" (when it is mostly about the next 1–3 days), then optionally "extended" for days 3–7 and beyond. Leave out "extended" when there is nothing useful to say beyond the short term. Each section has 1–6 paragraphs of 1–3 sentences, at most about 800 characters per paragraph; a paragraph that runs longer is cut back to its last complete sentence, so keep each idea in a sentence that can stand on its own.
-- figures: a paragraph may show one figure after it (figure id from the list given, or "none"). When it does, the paragraph usually ends by introducing it with a colon, e.g. "Snow levels fall steadily through tonight:". Use 2–${MAX_FIGURES} figures in the whole post, each at most once, where they support the text. You cannot see images; never describe what a photo or plume chart shows.
+- figures: a paragraph may show one figure after it (figure id from the list given, or "none"). When it does, the paragraph usually ends by introducing it with a colon, e.g. "Snow levels fall steadily through tonight:". Code lists only figures that today's data makes relevant, so a quiet day may offer one or none. Use each at most once, right after the paragraph it supports; leave a figure out rather than force it in, and never introduce one by saying it doesn't matter. You cannot see images; never describe what a photo or plume chart shows.
 - Put figure IDs only in the paragraph's figure field. Never include IDs or bracketed figure markers in the title, summary or paragraph text; the app inserts the figure separately.
-- Include an accumulated-snow plume when a plume-snow-* figure is available, preferably plume-snow-cln. Introduce it neutrally as University of Utah ensemble guidance; do not imply it plots the numerical six-hour rows or read values from the image.
+- Code adds a University of Utah accumulated-snow plume at the end of the post with its own caption. Don't write a paragraph introducing or pointing to it, and end on your last forecast point rather than a sign-off or "bottom line" that repeats the summary.
 - Use only ONE opening section: choose update OR short-term. Keep any next-1–3-day outlook in that same section, rather than adding the other opening section. Only extended may follow it.
 - About 250–450 words in total across sections.
 
@@ -61,6 +66,7 @@ Rules:
 - snowfallWarnings identify conflicting or invalid source measurements. Withheld windows supply no usable measurement, including zero. Never infer fresh snowfall from another window (such as a seven-day or season total), a fresh page timestamp, previousPost, or source narrative. Do not resolve a conflict by choosing a preferred amount.
 - Resort-reported amounts are measurements; NWS amounts are forecasts. Say which is which. The NWS input contains no measured snowfall for the past 24/48 hours; never claim it does.
 - If a resort's report is old or missing (see dataFreshness and reportTime), say its morning report isn't out yet rather than using its numbers as this morning's.
+- When a resort's snowfall is withheld because its source numbers conflict, say its report's snowfall numbers don't add up today and leave them out; don't describe how we process data.
 - Do not mention roads, parking, lift openings or which resort to ski.
 - Use ″ for inches, local 12-hour times, and weekday names rather than dates.`;
 

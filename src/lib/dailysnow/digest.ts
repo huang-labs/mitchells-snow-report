@@ -25,6 +25,7 @@ import type {
 } from "../types";
 import { buildContinuity, type ContinuityDigest } from "./continuity";
 import { stormDigest, stormForPost } from "./storms";
+import { modelPlaceable, relevantFigures, significantStorm } from "./figure-plan";
 import type { StormRecord } from "./storm-types";
 
 /**
@@ -143,6 +144,15 @@ export function snowNext(p: PointForecast, now: Date, hours: number): number | n
     sum += (bar.snowIn * (Math.min(t + HOUR, end) - Math.max(t, start))) / HOUR;
   }
   return round1(sum);
+}
+
+/** Where the block's snow level sits relative to the NWS grid elevation, so the model never compares the numbers itself. */
+export function snowLevelVsGrid(minFt: number | null, maxFt: number | null, gridFt: number | null): string | null {
+  if (minFt === null || gridFt === null) return null;
+  const max = maxFt ?? minFt;
+  if (max < gridFt) return "below the grid point all period: precipitation falls as snow there";
+  if (minFt > gridFt) return "above the grid point all period: precipitation falls as rain there";
+  return "crosses the grid point during the period: rain and snow mix there";
 }
 
 export function phaseOf(
@@ -388,19 +398,22 @@ export function buildDailyDigest(
   };
   const next12 = maxForecast((nws?.points ?? []).map((p) => snowNext(p, now, 12)));
   const next72 = maxForecast(numbers.canyons.map((c) => c.next72In));
-  const stormRecap = stormForPost(snapshot.stormTracking, now);
+  const tracked = stormForPost(snapshot.stormTracking, now);
+  // A dusting is tracked like any event but isn't written up as a storm.
+  const stormRecap = significantStorm(tracked) ? tracked : null;
   // Expired event memory must not keep sunny-day editions in post-storm mode
   // merely because a source continues publishing yesterday's rolling totals.
-  const expired = !!snapshot.stormTracking?.events.length && !stormRecap;
+  const expired = !!snapshot.stormTracking?.events.length && !tracked;
   const { phase, reason } = phaseOf(expired ? 0 : recent, expired ? 0 : recent48, next12, next72);
+  const t = now.getTime();
 
-  const figures = figureCandidates(snapshot, nws, numbers, now, stormRecap);
+  const candidates = figureCandidates(snapshot, nws, numbers, now, stormRecap);
   for (const [area, state] of Object.entries(snapshot.areaStorms ?? {})) {
     const event = stormForPost(state, now);
-    if (!event) continue;
+    if (!significantStorm(event)) continue;
     // Readers and the model see the forecast area's display name, never its internal id.
     const name = FORECAST_AREAS.find((a) => a.id === area)?.name ?? area;
-    figures.push({
+    candidates.push({
       figure: {
         id: `storm-recap-${area.toLowerCase()}`,
         kind: "storm-recap",
@@ -410,7 +423,22 @@ export function buildDailyDigest(
       describe: `Retained source observations for ${name} only. Rolling observations are not storm totals; do not add them.`,
     });
   }
-  const t = now.getTime();
+  const figures = relevantFigures(candidates, {
+    phase,
+    recentIn: expired ? 0 : recent,
+    next72In: next72,
+    points: (nws?.points ?? []).map((p) => ({
+      id: canyonOf(p).toLowerCase(),
+      // Rounded six-hour bars can understate light snow; the hourly 7-day total is the better gauge.
+      chartSnowIn: Math.max(
+        snowNext(p, now, 7 * 24) ?? 0,
+        p.sixHourSnow.filter((b) => Date.parse(b.start) + 6 * HOUR > t).reduce((sum, b) => sum + b.snowIn, 0),
+      ),
+      liquid72In: p.blocks
+        .filter((b) => Date.parse(b.end) > t && Date.parse(b.start) < t + 72 * HOUR)
+        .reduce((sum, b) => sum + (b.qpfIn ?? 0), 0),
+    })),
+  });
   const digest: DailyDigest = {
     regionName: regionById(snapshot.region ?? "utah")!.name,
     timeZone: zone,
@@ -442,7 +470,7 @@ export function buildDailyDigest(
     },
     areaStorms: Object.values(snapshot.areaStorms ?? {}).flatMap((state) => {
       const event = stormForPost(state, now);
-      return event ? [stormDigest(event, now, zone)] : [];
+      return significantStorm(event) ? [stormDigest(event, now, zone)] : [];
     }),
     discussions: offices.map((a) => ({
       office: a.office,
@@ -482,7 +510,7 @@ export function buildDailyDigest(
         next7dIn: numbers.canyons[i].next7dIn,
       },
       nextStorm: p.nextStorm
-        ? `${p.nextStorm.totalSnowIn}″ from ${localTime(p.nextStorm.start, now, zone)} to ${localTime(p.nextStorm.end, now, zone)}${p.nextStorm.minSnowLevelFt ? `, snow level down to ${p.nextStorm.minSnowLevelFt} ft` : ""}`
+        ? `Next round of snow: ${p.nextStorm.totalSnowIn}″ from ${localTime(p.nextStorm.start, now, zone)} to ${localTime(p.nextStorm.end, now, zone)}${p.nextStorm.minSnowLevelFt ? `, snow level down to ${p.nextStorm.minSnowLevelFt} ft` : ""}${Date.parse(p.nextStorm.end) > t + 7 * 24 * HOUR ? "; it ends after the 7-day window, so next7dIn holds only part of this round's total" : ""}`
         : null,
       blocks: p.blocks
         .filter((b) => Date.parse(b.end) > t)
@@ -492,6 +520,7 @@ export function buildDailyDigest(
           liquidIn: b.qpfIn,
           snowToLiquid: slrOf(b.snowIn, b.qpfIn),
           snowLevelFt: b.snowLevelMinFt === null ? null : `${b.snowLevelMinFt}–${b.snowLevelMaxFt}`,
+          snowLevelVsGrid: snowLevelVsGrid(b.snowLevelMinFt, b.snowLevelMaxFt, p.elevationFt),
           tempF: b.tempMinF === null ? null : `${b.tempMinF}–${b.tempMaxF}`,
           windMph: b.windMaxMph === null ? null : `${b.windMaxMph} gust ${b.gustMaxMph ?? "?"}`,
           precipChancePct: b.popMax,
@@ -512,7 +541,9 @@ export function buildDailyDigest(
         }
       : null,
     ...buildContinuity(previous, history, numbers, phase, date, now, zone),
-    figures: figures.map((f) => ({ id: f.figure.id, caption: f.figure.caption, shows: f.describe })),
+    figures: figures
+      .filter((f) => modelPlaceable(f.figure.id))
+      .map((f) => ({ id: f.figure.id, caption: f.figure.caption, shows: f.describe })),
   };
   return { digest, numbers, figures, worthPosting, stormRecap };
 }

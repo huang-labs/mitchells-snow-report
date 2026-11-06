@@ -26,6 +26,7 @@ import { nwsAfdSource } from "@/lib/sources/nwsafd";
 import { historyEntry } from "@/lib/dailysnow/continuity";
 import { inchAmounts } from "@/lib/ai/grounding";
 import { isSnowPlume } from "@/lib/dailysnow/plume";
+import { FIGURE_LIMIT } from "@/lib/dailysnow/figure-plan";
 import { dailySnow as dailySnowArchive } from "@/worker/daily-snow";
 import type { AfdPayload, CpcPayload } from "@/lib/types";
 import { dailySnowPublicationStatus } from "@/lib/dailysnow/publication";
@@ -388,7 +389,7 @@ describe("independent editions and stored artifacts", () => {
     expect(observation.windows.find(w=>w.window==="overnight")).toMatchObject({amountIn:6,label:"Snow overnight"});
 
   });
-  it("keeps all three Colorado storm recaps when optional figures fill the model's six slots", async () => {
+  it("keeps all three Colorado storm recaps when optional figures fill the post's slots", async () => {
     const s = structuredClone(regionalSnapshot(base, "colorado"));
     s.areaStorms = {};
     for (const r of RESORTS.filter((r) => r.region === "colorado")) {
@@ -404,7 +405,7 @@ describe("independent editions and stored artifacts", () => {
             status: "active",
             closedAt: null,
             closureReason: null,
-            resorts: [{ id: r.id, name: r.name, total: null, rolling: null }],
+            resorts: [{ id: r.id, name: r.name, total: null, rolling: { amountIn: 3, window: "24h", reportTime: now.toISOString(), collectedAt: now.toISOString(), sourceUrl: "https://example.com/" } }],
           },
         ],
       };
@@ -556,7 +557,7 @@ describe("independent editions and stored artifacts", () => {
     expect(validateWestern(raw, input).shortTerm).toHaveLength(2);
     raw.sections[1].paragraphs[0].text = "Read [Tahoe](/daily-snow/tahoe).";
     expect(() => validateWestern(raw, input)).toThrow(/links/);
-    // The new ceiling accepts 650 words but rejects 651 (well below the old 1,000).
+    // The ceiling accepts 650 words but rejects 651.
     const long = structuredClone(raw);
     for (const section of long.sections) for (const p of section.paragraphs) p.text = "Pattern ".repeat(100).trim();
     long.sections[0].paragraphs[0].text += " Pattern".repeat(50);
@@ -1013,7 +1014,7 @@ describe("channel archive, retention and figures", () => {
     expect(post.figures["plume-snow-pkcu1"]).toBeDefined();
     expect(post.sections[0].paragraphs[0].figure).toBeNull();
   });
-  it("reserves a slot for the required snow plume when six optional figures were selected", async () => {
+  it("reserves a slot for the required snow plume when the model fills every figure slot", async () => {
     const kv = new MemoryKV();
     for (const c of candidates()) if (c.source?.kind === "kv") await kv.put(c.source.key, png());
     const optional = candidates()
@@ -1023,7 +1024,7 @@ describe("channel archive, retention and figures", () => {
     expect(optional).toHaveLength(6);
     await runChannels(env(kv, optional), snowy(), now, { channel: "utah", force: true });
     const post = await utahPost(kv);
-    expect(Object.keys(post.figures)).toHaveLength(6);
+    expect(Object.keys(post.figures)).toHaveLength(FIGURE_LIMIT[post.phase]);
     expect(Object.keys(post.figures).some(isSnowPlume)).toBe(true);
     expect(post.sections[0].paragraphs.at(-1)?.figure).toBeNull();
   });

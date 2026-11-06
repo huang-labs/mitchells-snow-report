@@ -15,7 +15,7 @@ import { StatusBadge } from "../ui";
 
 const SECTION_TITLE: Record<DailySnowSectionId, string> = { update: "Today", "short-term": "Next Few Days", extended: "Extended Forecast" };
 /** West covers this week with NWS points and week two with NOAA's outlook. */
-const WEST_SECTION_TITLE: Record<DailySnowSectionId, string> = { update: "Summary", "short-term": "Short Term Forecast", extended: "Extended Forecast" };
+const WEST_SECTION_TITLE: Record<DailySnowSectionId, string> = { update: "Overview", "short-term": "Short Term Forecast", extended: "Extended Forecast" };
 /** Display names by Workers AI model id suffix. */
 const MODEL_NAME: Record<string, string> = { "glm-5.3-flash": "GLM 5.3 Flash", "gpt-oss-120b": "gpt-oss-120b" };
 const modelName = (id: string) => MODEL_NAME[id.split("/").pop() ?? ""] ?? id;
@@ -43,7 +43,9 @@ function Eyebrow({ post, now, archived }: { post: ApiDailySnow; now: Date; archi
 
 function Article({ post }: { post: ApiDailySnow }) {
   const referenced = new Set(post.sections.flatMap((s) => s.paragraphs.map((p) => p.figure)));
-  const supplemental = Object.values(post.figures).filter((f) => (isSnowPlume(f.id) || (f.kind === "storm-recap" && f.id !== "storm-recap")) && !referenced.has(f.id));
+  // Storm observations the prose didn't place lead the article; the plume closes it.
+  const recaps = Object.values(post.figures).filter((f) => f.kind === "storm-recap" && !referenced.has(f.id));
+  const supplemental = Object.values(post.figures).filter((f) => isSnowPlume(f.id) && !referenced.has(f.id));
   return (
     <div className="dailysnow__article">
       {post.sections.map((s) => (
@@ -53,7 +55,7 @@ function Article({ post }: { post: ApiDailySnow }) {
             <div key={i}>
               <p>{p.text}</p>
               {p.figure && post.figures[p.figure] && <Figure figure={post.figures[p.figure]} postedAt={post.generatedAt} timeZone={post.timeZone} />}
-              {s === post.sections[0] && i === 0 && post.figures["storm-recap"] && !referenced.has("storm-recap") && <Figure figure={post.figures["storm-recap"]} postedAt={post.generatedAt} timeZone={post.timeZone} />}
+              {s === post.sections[0] && i === 0 && recaps.map((f) => <Figure key={f.id} figure={f} postedAt={post.generatedAt} timeZone={post.timeZone} />)}
             </div>
           ))}
         </section>

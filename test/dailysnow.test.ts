@@ -2,7 +2,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { runCollection } from "@/lib/collect";
 import { dailySnowFigureKey, dailySnowKey, emptyDailySnowState, planDailySnow } from "@/lib/dailysnow";
 import { buildContinuity, historyEntry } from "@/lib/dailysnow/continuity";
-import { buildDailyDigest, dailySnowActivity, phaseOf, snowNext } from "@/lib/dailysnow/digest";
+import { buildDailyDigest, dailySnowActivity, phaseOf, snowLevelVsGrid, snowNext } from "@/lib/dailysnow/digest";
+import { significantStorm, STORM_RECAP_MIN_IN } from "@/lib/dailysnow/figure-plan";
 import { allowedAmounts, askDailySnow, buildModelInput, DAILY_SNOW_TIMEOUT_MS, SYSTEM_PROMPT, validateDailySnow } from "@/lib/dailysnow/llm";
 import { IN_FLIGHT_MS, MAX_ATTEMPTS, RETRY_AFTER_MS, shouldRunDailySnow } from "@/lib/dailysnow/schedule";
 import { inchAmountsIn, ungroundedInches } from "@/lib/ai/grounding";
@@ -122,6 +123,12 @@ describe("digest", () => {
     expect(snowNext(p, now, 24)).toBeNull();
     expect(phaseOf(0, 0, null, null).reason).toContain("unavailable snowfall forecast");
   });
+  it("states where the snow level sits against the grid point", () => {
+    expect(snowLevelVsGrid(6700, 8400, 7638)).toMatch(/^crosses/);
+    expect(snowLevelVsGrid(7800, 8400, 7638)).toMatch(/rain there/);
+    expect(snowLevelVsGrid(5600, 6600, 7638)).toMatch(/snow there/);
+    expect(snowLevelVsGrid(null, null, 7638)).toBeNull();
+  });
   it("decides the storm phase in code", () => {
     expect(phaseOf(0, 0, 5, 12).phase).toBe("storm");
     expect(phaseOf(3, 3, 2, 4).phase).toBe("storm");
@@ -157,6 +164,38 @@ describe("digest", () => {
   it("leaves out stake cams that are not this morning's", () => {
     const ids = buildDailyDigest(snap(), null, [], SIX_AM).figures.map((f) => f.figure.id);
     expect(ids.some((id) => id.startsWith("stake-"))).toBe(false);
+  });
+  it("offers only the plume on a dry day and keeps the plume out of the model's choices", () => {
+    const s = snap();
+    const cams = s.sources.resortcams!.payload as ResortCamsPayload;
+    for (const c of cams.cameras) if (c.kind === "image") c.capturedAt = "2026-11-01T12:55:00.000Z";
+    for (const p of (s.sources.nws!.payload as NwsPayload).points) {
+      p.sixHourSnow = p.sixHourSnow.map((b) => ({ ...b, snowIn: 0 }));
+      p.hourlySnow = p.hourlySnow?.map((b) => ({ ...b, snowIn: 0 }));
+      p.blocks = p.blocks.map((b) => ({ ...b, snowIn: 0, qpfIn: 0 }));
+      p.nextStorm = null;
+    }
+    for (const id of ["alta", "snowbird", "brighton", "solitude"] as const) {
+      const r = s.sources[id]?.payload as ResortReport | undefined;
+      if (r) for (const m of Object.values(r.snowfall)) if (m.state === "reported" && m.unit === "in") m.value = 0;
+    }
+    const { digest, figures } = buildDailyDigest(s, null, [], SIX_AM);
+    expect(digest.phase).toBe("quiet");
+    const ids = figures.map((f) => f.figure.id);
+    expect(ids).toContain("plume-snow-cln");
+    expect(ids.filter((id) => !id.startsWith("plume-snow-"))).toEqual([]);
+    expect(digest.figures.some((f) => f.id.startsWith("plume-snow-"))).toBe(false);
+  });
+  it("treats a tracked dusting as no storm", () => {
+    const obs = (amountIn: number) => ({ amountIn, window: "24h" as const, reportTime: null, collectedAt: SIX_AM.toISOString(), sourceUrl: "https://example.test" });
+    const storm = (amountIn: number) => ({
+      id: "x", firstObservedAt: SIX_AM.toISOString(), lastSnowAt: SIX_AM.toISOString(), updatedAt: SIX_AM.toISOString(),
+      status: "wrapping-up" as const, closedAt: null, closureReason: null,
+      resorts: [{ id: "alta" as const, name: "Alta", total: null, rolling: obs(amountIn) }, { id: "snowbird" as const, name: "Snowbird", total: null, rolling: null }],
+    });
+    expect(significantStorm(storm(1))).toBe(false);
+    expect(significantStorm(storm(STORM_RECAP_MIN_IN))).toBe(true);
+    expect(significantStorm(null)).toBe(false);
   });
 });
 
@@ -343,26 +382,26 @@ describe("validation", () => {
   it("clips over-long paragraphs at a sentence boundary and keeps the figure", () => {
     const d = withData();
     const text = `${"b".repeat(500)}. Middle sentence one. Middle sentence two. ${"c".repeat(500)}`;
-    const raw = answer([], { sections: [{ id: "update", paragraphs: [{ text, figure: "plume-snow-cln" }] }] });
+    const raw = answer([], { sections: [{ id: "update", paragraphs: [{ text, figure: "nws-snow-level" }] }] });
     const r = validateDailySnow(raw, d);
     expect(r.sections[0].paragraphs[0]).toEqual({
       // 1044 characters in; the clip ends after the last sentence that keeps
       // most of the 800-character budget, without an ellipsis.
       text: `${"b".repeat(500)}. Middle sentence one. Middle sentence two.`,
-      figure: "plume-snow-cln",
+      figure: "nws-snow-level",
     });
   });
-  it.each([['update', 'short-term'], ['short-term', 'update']])("preserves the outlook and plume when %s is followed by %s", (first, second) => {
+  it.each([['update', 'short-term'], ['short-term', 'update']])("preserves the outlook and its figures when %s is followed by %s", (first, second) => {
     const d = withData();
     const raw = answer([], { sections: [
       { id: first, paragraphs: [{ text: "Snow level outlook:", figure: "nws-snow-level" }] },
-      { id: second, paragraphs: [{ text: "The next system:", figure: "nws-snow-lcc" }, { text: "University of Utah ensemble guidance:", figure: "plume-snow-cln" }] },
+      { id: second, paragraphs: [{ text: "The next system:", figure: "nws-snow-lcc" }, { text: "Snow quality:", figure: "plume-slr-pkcu1" }] },
     ] });
     const validated = validateDailySnow(raw, d);
     expect(validated.sections).toEqual([{ id: first, paragraphs: [
       { text: "Snow level outlook:", figure: "nws-snow-level" },
       { text: "The next system:", figure: "nws-snow-lcc" },
-      { text: "University of Utah ensemble guidance:", figure: "plume-snow-cln" },
+      { text: "Snow quality:", figure: "plume-slr-pkcu1" },
     ] }]);
     // Recovered paragraphs still undergo the same amount validation.
     raw.sections[1].paragraphs[0].text = "Expect 999″ tomorrow.";
