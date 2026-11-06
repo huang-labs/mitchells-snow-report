@@ -149,3 +149,10 @@ test("the gate passes clean output and fails findings through the workflow entry
     assert.equal(f.calls.failures.length, count);
   }
 });
+
+test("live review exported by the pinned PR-Agent serializer matches the gate contract", () => {
+  const captured = require("./fixtures/pr-agent-review.json");
+  const result = evaluateReview(captured.action_output, "success");
+  assert.equal(result.pass, captured.expected_pass);
+  assert.doesNotMatch(result.message, /valid structured review output|missing findings/);
+});

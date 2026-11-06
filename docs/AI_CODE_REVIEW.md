@@ -35,7 +35,12 @@ returns a valid structured result, reports zero key issues, and recommends
 `no_concerns_found`. Both `needs_review` and `changes_required` block it. Missing
 or malformed output and provider/auth/rate-limit failures also block it.
 Resolving a GitHub thread alone does not turn the gate green: push to get a fresh
-review. The gate reads PR-Agent's JSON Action output, never its rendered comments.
+review. The model writes YAML, which PR-Agent parses before exporting the `review` object
+as JSON through `GITHUB_OUTPUT` when `GITHUB_ACTION_CONFIG__ENABLE_OUTPUT` is true.
+The gate reads that JSON Action output, never the raw YAML or rendered comments.
+The regression fixture in `.github/scripts/fixtures/pr-agent-review.json` captures
+a live review exported by the pinned upstream serializer; it is not a full hosted
+Action integration test.
 
 To explicitly bypass AI review, add **`ai-review-override`** in the PR's Labels
 menu (or `gh pr edit <number> --add-label ai-review-override`). GitHub's existing
@@ -106,21 +111,22 @@ GitHub. Automatic session resumption requires a host such as T3 with PR watches.
 
 ## Model and operational limits
 
-Policy is in `.pr_agent.toml`: low reasoning effort, a 131,072-token context
-budget and a 32,768-token completion allowance shared by reasoning and the final
-review. The output allowance includes internal reasoning, so a small diff can
-still exhaust it before producing any final answer. A captured failure on PR #21
-used 13,267 input tokens and all 32,768 output tokens, returned HTTP 200 with
-`finish_reason: length`, and had empty final content. Replaying that exact request
-with `reasoning_effort: low` produced a complete review. Workers AI supports
-`low`, `high` and `max` for this model; `medium`, `none` and `minimal` alias to
-`max`, so they are unsuitable attempts to reduce its reasoning. See the
+Policy is in `.pr_agent.toml`: high reasoning effort, a 131,072-token context
+budget and a 65,536-token completion allowance shared by reasoning and the final
+review. The larger allowance preserves reasoning depth while giving the model
+more room to produce its final answer. Internal reasoning can exhaust the
+allowance even on a small diff: an observed request used 13,267 input tokens and
+all of the previous 32,768 output tokens, returned HTTP 200 with
+`finish_reason: length`, and had empty final content. A larger allowance reduces
+that risk but does not guarantee completion; it can increase latency and cost.
+Workers AI supports `low`, `high` and `max` for this model; `medium`, `none` and
+`minimal` alias to `max`. See the
 [Cloudflare model reference](https://developers.cloudflare.com/workers-ai/models/glm-5.3/).
 Keep the completion allowance explicit and inspect gateway request/response usage
-when diagnosing another empty response; raising context limits does not fix this
-failure. Each model call has up to 20 minutes; the job allows 45 minutes for
-startup and one transient-error retry. A diff over the budget is reviewed in up to
-four chunks whose findings are merged; files that still do not fit are listed in
+when diagnosing another empty response; raising context limits alone does not
+fix output exhaustion. Each model call has up to 20 minutes; the job allows 45
+minutes for startup and one transient-error retry. A diff over the budget is
+reviewed in up to four chunks whose findings are merged; files that still do not fit are listed in
 the review's coverage footer. Chunks are reviewed independently, so a chunk cannot
 see code in another chunk. Captured fixtures (`test/fixtures/**`) and
 `package-lock.json` are excluded from review. These limits are not dollar caps;

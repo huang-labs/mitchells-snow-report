@@ -11,7 +11,7 @@ additional_reasoning_effort_models = ["cloudflare/@cf/zai-org/glm-5.3"]
 custom_model_max_tokens = 131072
 max_model_tokens = 131072
 # Completion allowance includes reasoning as well as the final review.
-max_output_tokens = 32768
+max_output_tokens = 65536
 num_retries = 1
 ai_timeout = 1200
 retry_same_model_on_timeout = false
@@ -21,10 +21,9 @@ use_global_settings_file = false
 repo_context_files = ["AGENTS.md"]
 repo_context_from_default_branch = true
 output_run_details = true
-# GLM shares this completion allowance between reasoning and the final review.
-# High can spend all 32,768 tokens reasoning with no answer, even for a small PR.
-# Use the supported low level; medium/none/minimal alias to max on Workers AI.
-reasoning_effort = "low"
+# Preserve high reasoning for review; the larger completion allowance above
+# leaves more room for a final answer after internal reasoning.
+reasoning_effort = "high"
 
 [pr_reviewer]
 # A diff over the token budget is reviewed in up to four chunks whose findings
