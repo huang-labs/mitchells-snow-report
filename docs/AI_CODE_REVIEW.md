@@ -106,9 +106,19 @@ GitHub. Automatic session resumption requires a host such as T3 with PR watches.
 
 ## Model and operational limits
 
-Policy is in `.pr_agent.toml`: high reasoning effort, a 131,072-token context
+Policy is in `.pr_agent.toml`: low reasoning effort, a 131,072-token context
 budget and a 32,768-token completion allowance shared by reasoning and the final
-review. Each model call has up to 20 minutes; the job allows 45 minutes for
+review. The output allowance includes internal reasoning, so a small diff can
+still exhaust it before producing any final answer. A captured failure on PR #21
+used 13,267 input tokens and all 32,768 output tokens, returned HTTP 200 with
+`finish_reason: length`, and had empty final content. Replaying that exact request
+with `reasoning_effort: low` produced a complete review. Workers AI supports
+`low`, `high` and `max` for this model; `medium`, `none` and `minimal` alias to
+`max`, so they are unsuitable attempts to reduce its reasoning. See the
+[Cloudflare model reference](https://developers.cloudflare.com/workers-ai/models/glm-5.3/).
+Keep the completion allowance explicit and inspect gateway request/response usage
+when diagnosing another empty response; raising context limits does not fix this
+failure. Each model call has up to 20 minutes; the job allows 45 minutes for
 startup and one transient-error retry. A diff over the budget is reviewed in up to
 four chunks whose findings are merged; files that still do not fit are listed in
 the review's coverage footer. Chunks are reviewed independently, so a chunk cannot

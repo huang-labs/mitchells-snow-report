@@ -21,7 +21,10 @@ use_global_settings_file = false
 repo_context_files = ["AGENTS.md"]
 repo_context_from_default_branch = true
 output_run_details = true
-reasoning_effort = "high"
+# GLM shares this completion allowance between reasoning and the final review.
+# High can spend all 32,768 tokens reasoning with no answer, even for a small PR.
+# Use the supported low level; medium/none/minimal alias to max on Workers AI.
+reasoning_effort = "low"
 
 [pr_reviewer]
 # A diff over the token budget is reviewed in up to four chunks whose findings
