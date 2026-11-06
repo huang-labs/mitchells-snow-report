@@ -54,6 +54,7 @@ The fixed favorites are Alta, Snowbird, Solitude, Brighton, Park City, Deer Vall
 | --- | --- |
 | [Architecture](docs/ARCHITECTURE.md) | Runtime, routes, collection, source cadences, storage and share images |
 | [AI features](docs/AI_FEATURES.md) | Regional and Western Daily Snow, validation, scheduling and archive retention |
+| [AI Gateway audit](docs/AI_GATEWAY_AUDIT.md) | Preview/production gateway settings, deployed bindings, evidence and follow-ups as of 2026-11-06 |
 | [Freshness and data semantics](docs/FRESHNESS.md) | Badges, publication status, measurement windows and missing values |
 | [Design](docs/DESIGN.md) | Layout, typography, charts, themes and phone behavior |
 | [Deployment and operations](docs/DEPLOYMENT.md) | Production setup, PR previews, secrets, manual collection and usage |

@@ -1,0 +1,1407 @@
+{
+  "checked_at": "2026-11-06T01:12:46.422391+00:00",
+  "source_commit": "419233257a0d39389342677313ca1ed9e4cdbb28",
+  "cli_version": "1.0.0-beta.26",
+  "gateways": [
+    {
+      "settings": {
+        "id": "mitchells-snow-report",
+        "created_at": "2026-11-05 06:18:00",
+        "modified_at": "2026-11-06 01:08:45",
+        "authentication": true,
+        "collect_logs": true,
+        "cache_ttl": 0,
+        "cache_invalidate_on_update": false,
+        "rate_limiting_interval": 86400,
+        "rate_limiting_limit": 64,
+        "rate_limiting_technique": "sliding",
+        "log_management": 10000000,
+        "log_management_strategy": "DELETE_OLDEST",
+        "logpush": false,
+        "zdr": false,
+        "workers_ai_billing_mode": "postpaid",
+        "retry_max_attempts": null,
+        "retry_delay": null,
+        "retry_backoff": null
+      },
+      "logs_query": {
+        "per_page": 50,
+        "page": 1,
+        "order_by": "created_at",
+        "order_by_direction": "desc"
+      },
+      "logs": [
+        {
+          "id": "01a1ad8b-9617-7452-9ba8-6f38bda6f64b",
+          "created_at": "2026-11-05T21:10:09.237Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 40405,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ad59-6607-75c2-ad2a-1320f69e549f",
+          "created_at": "2026-11-05T20:15:20.202Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 40464,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ac3a-069f-70a6-9efe-d60eeddb5f55",
+          "created_at": "2026-11-05T15:01:22.658Z",
+          "provider": "workers-ai",
+          "model": "@cf/openai/gpt-oss-120b",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 36202,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ac39-9bf1-75dc-9fdc-53fe1fa29886",
+          "created_at": "2026-11-05T15:00:46.449Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 27229,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ac02-b6a9-7238-b27e-c2d2c49e8540",
+          "created_at": "2026-11-05T14:02:15.052Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 113483,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ac02-b6b1-72d8-8acc-6ddc8778467b",
+          "created_at": "2026-11-05T14:02:11.128Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 109100,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ac02-b6b1-72d8-8acc-76c1250f9137",
+          "created_at": "2026-11-05T14:01:19.585Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 58000,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ac02-b6b1-72d8-8acc-70fb5d0d1180",
+          "created_at": "2026-11-05T14:01:17.047Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 55213,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1abcb-c543-772c-9456-560e19653cbf",
+          "created_at": "2026-11-05T13:02:06.171Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 105380,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1abcb-c546-73c2-91b2-644d96550524",
+          "created_at": "2026-11-05T13:01:14.423Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 53605,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1abcb-c546-73c2-91b2-69403f75a29a",
+          "created_at": "2026-11-05T13:01:01.093Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 40293,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1abcb-c546-73c2-91b2-6d29e96da87d",
+          "created_at": "2026-11-05T13:01:00.959Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 39893,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aacd-7ef6-74dd-9ee2-849fc49fed87",
+          "created_at": "2026-11-05T08:22:58.118Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 21486,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aac2-8586-755a-9871-4e74a8bc949a",
+          "created_at": "2026-11-05T08:11:11.737Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 34269,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aac0-dc76-759f-b68b-440a310608e2",
+          "created_at": "2026-11-05T08:09:31.102Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 42589,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aac0-dc70-7701-a038-ac5825ac5fd3",
+          "created_at": "2026-11-05T08:09:28.336Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 39828,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aac0-e0c2-7169-bebf-d074893ac2f5",
+          "created_at": "2026-11-05T08:09:14.497Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 24801,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aabd-9da2-72c4-8df8-67cc008dc5c1",
+          "created_at": "2026-11-05T08:05:59.552Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 43712,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aabd-309b-7016-b001-17732463fbba",
+          "created_at": "2026-11-05T08:05:19.162Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 31251,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aabd-27bc-76a8-9f73-ffe8f7e4279d",
+          "created_at": "2026-11-05T08:05:15.611Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 29971,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aabd-27c2-734c-acce-489318204cad",
+          "created_at": "2026-11-05T08:05:11.693Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 26046,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aabd-2fe2-7426-a7d8-70f402d059dc",
+          "created_at": "2026-11-05T08:05:11.403Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 23589,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aab1-b2a1-7538-8fbb-53627c6df14e",
+          "created_at": "2026-11-05T07:52:38.002Z",
+          "provider": "workers-ai",
+          "model": "@cf/openai/gpt-oss-120b",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 23177,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aab1-15f2-7615-a419-f2a772f5f42a",
+          "created_at": "2026-11-05T07:52:14.836Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 40097,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aaaa-b95e-72f5-98f0-ac51e3ce554f",
+          "created_at": "2026-11-05T07:44:58.776Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 20954,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa97-048f-7311-8eb9-6331892a7c72",
+          "created_at": "2026-11-05T07:23:45.763Z",
+          "provider": "workers-ai",
+          "model": "@cf/openai/gpt-oss-120b",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 39438,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa96-9e08-70a6-8e49-3528e08b52af",
+          "created_at": "2026-11-05T07:23:06.333Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 26233,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa93-cb83-721b-9bfe-d05547833491",
+          "created_at": "2026-11-05T07:20:29.602Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 54547,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa93-d601-7018-893d-368aec0260fd",
+          "created_at": "2026-11-05T07:20:04.192Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 26451,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa93-de1e-7461-96c3-97280cd0f158",
+          "created_at": "2026-11-05T07:20:04.178Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 24361,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa93-b678-709b-a79a-d2de1aeefcc0",
+          "created_at": "2026-11-05T07:19:49.879Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 20212,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa93-3d30-72c0-8fe3-27162f5de17d",
+          "created_at": "2026-11-05T07:19:35.574Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 36951,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa93-35af-72c8-bd39-be153f577e8d",
+          "created_at": "2026-11-05T07:19:33.526Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 36825,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa93-35ac-72da-bdcd-e6488dfe1bab",
+          "created_at": "2026-11-05T07:19:30.277Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 33579,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa93-35ae-7436-9cf6-783356d0c2fe",
+          "created_at": "2026-11-05T07:19:24.996Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 28215,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa89-d242-7355-8fe8-73bd28f62324",
+          "created_at": "2026-11-05T07:09:34.508Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 53084,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa89-d254-7006-9324-dad51b840e92",
+          "created_at": "2026-11-05T07:09:21.388Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 39949,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa89-d2e1-7415-86f9-7ecae8465317",
+          "created_at": "2026-11-05T07:09:14.755Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 33169,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa89-da20-73f6-9444-7bc53abc891b",
+          "created_at": "2026-11-05T07:09:07.875Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 24359,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa87-d815-7052-ae55-e582ae27b7e4",
+          "created_at": "2026-11-05T07:07:18.198Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 46318,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa87-d81a-7078-b838-7c21ff800f26",
+          "created_at": "2026-11-05T07:07:00.460Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 28611,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa87-d822-741e-b124-b87d1dd52d7e",
+          "created_at": "2026-11-05T07:06:48.621Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 16767,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aa87-d80d-70ba-b347-388af2a206e3",
+          "created_at": "2026-11-05T07:06:48.130Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 16211,
+          "metadata": null,
+          "rejection_reason": null
+        }
+      ]
+    },
+    {
+      "settings": {
+        "id": "mitchells-snow-report-preview",
+        "created_at": "2026-11-05 17:37:30",
+        "modified_at": "2026-11-05 18:27:49",
+        "authentication": true,
+        "collect_logs": true,
+        "cache_ttl": 0,
+        "cache_invalidate_on_update": true,
+        "rate_limiting_interval": 86400,
+        "rate_limiting_limit": 1000,
+        "rate_limiting_technique": "sliding",
+        "log_management": 10000000,
+        "log_management_strategy": "DELETE_OLDEST",
+        "logpush": false,
+        "zdr": false,
+        "workers_ai_billing_mode": "postpaid",
+        "retry_max_attempts": null,
+        "retry_delay": null,
+        "retry_backoff": null
+      },
+      "logs_query": {
+        "per_page": 50,
+        "page": 1,
+        "order_by": "created_at",
+        "order_by_direction": "desc"
+      },
+      "logs": [
+        {
+          "id": "01a1ad20-384e-7176-af51-ee39f692af82",
+          "created_at": "2026-11-05T19:13:11.485Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 59088,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ad15-ec57-71f6-9118-b0becedbad34",
+          "created_at": "2026-11-05T19:01:57.453Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 59841,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1acf4-a918-777d-a477-5958504dde0a",
+          "created_at": "2026-11-05T18:25:42.155Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 64349,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1accf-a321-7657-92d3-22b68639ea6a",
+          "created_at": "2026-11-05T17:44:48.809Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3-flash",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 37410,
+          "metadata": null,
+          "rejection_reason": null
+        }
+      ]
+    },
+    {
+      "settings": {
+        "id": "pr-agent",
+        "created_at": "2026-11-05 15:50:48",
+        "modified_at": "2026-11-05 15:50:48",
+        "authentication": true,
+        "collect_logs": true,
+        "cache_ttl": 0,
+        "cache_invalidate_on_update": true,
+        "rate_limiting_interval": 86400,
+        "rate_limiting_limit": 100,
+        "rate_limiting_technique": "sliding",
+        "log_management": 10000000,
+        "log_management_strategy": "DELETE_OLDEST",
+        "logpush": false,
+        "zdr": false,
+        "workers_ai_billing_mode": "postpaid",
+        "retry_max_attempts": null,
+        "retry_delay": null,
+        "retry_backoff": null
+      },
+      "logs_query": {
+        "per_page": 50,
+        "page": 1,
+        "order_by": "created_at",
+        "order_by_direction": "desc"
+      },
+      "logs": [
+        {
+          "id": "01a1ae64-dd48-7212-bd84-8812902d10fc",
+          "created_at": "2026-11-06T01:07:21.587Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 33178,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ae31-5bc8-7741-be51-8e7cfaec9ad1",
+          "created_at": "2026-11-06T00:10:57.434Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 24518,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ae2d-6ad4-725e-a31e-aa142d860cf5",
+          "created_at": "2026-11-06T00:07:24.129Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 69332,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ae29-dc5d-7575-ba8f-ca5358de12cb",
+          "created_at": "2026-11-06T00:02:51.048Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 29511,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ae26-bca1-701d-8bb0-e81e8435eb77",
+          "created_at": "2026-11-06T00:00:00.862Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 64038,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ae24-513b-72e3-be71-b4d44eb57e4a",
+          "created_at": "2026-11-05T23:57:44.920Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 86691,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ae23-be61-7317-8da8-4ca016e3484f",
+          "created_at": "2026-11-05T23:56:09.012Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 28338,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ae1f-edfb-7037-a462-e8b5c985baaf",
+          "created_at": "2026-11-05T23:52:17.965Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 47278,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ae1d-c7b7-74dd-9776-307f57d818e3",
+          "created_at": "2026-11-05T23:50:32.778Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 83012,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ae17-2926-742b-9a07-3600ee1d9b5f",
+          "created_at": "2026-11-05T23:42:11.934Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 15916,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ae13-59aa-7292-adb1-e0e39deb4193",
+          "created_at": "2026-11-05T23:38:03.796Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 17407,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1adf1-6d42-7675-8621-28035b0e82c9",
+          "created_at": "2026-11-05T23:01:07.834Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 24754,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1adec-3b5f-72f7-86d6-408761be741b",
+          "created_at": "2026-11-05T22:55:21.946Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 19423,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ade8-43a4-74e2-b9cc-0ba29d55786a",
+          "created_at": "2026-11-05T22:51:06.394Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 23838,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1adde-d6f1-7453-bb73-973f2ead280e",
+          "created_at": "2026-11-05T22:40:45.785Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 20732,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ad81-a7a5-73e8-98f4-005d909d53f2",
+          "created_at": "2026-11-05T20:58:57.235Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 19241,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ad7e-b79b-71f5-955b-6e8a3a1038ec",
+          "created_at": "2026-11-05T20:55:40.415Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 14912,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ad29-5519-7652-8039-6c1afbfcf21d",
+          "created_at": "2026-11-05T19:24:08.069Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 118351,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ad23-960b-737f-9f82-e3dadb318fd0",
+          "created_at": "2026-11-05T19:18:01.368Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 128266,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ad1f-88bb-7373-adc7-3ccd3d50b70d",
+          "created_at": "2026-11-05T19:13:18.930Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 111375,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ad1c-198d-72ee-916c-c794c0d47b35",
+          "created_at": "2026-11-05T19:09:07.964Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 85464,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ad14-43be-720f-8903-7505696580d5",
+          "created_at": "2026-11-05T19:00:28.067Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 79049,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ad12-e9d2-75ff-b11d-195867060bb0",
+          "created_at": "2026-11-05T18:59:03.993Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 83493,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1acf7-ef84-71df-9dc2-9774c5b70bd9",
+          "created_at": "2026-11-05T18:28:45.664Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 33192,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aceb-38a1-716c-aa92-307f0051b401",
+          "created_at": "2026-11-05T18:15:46.569Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 87335,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1aceb-394f-768c-9124-f62db751e579",
+          "created_at": "2026-11-05T18:14:35.067Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 15737,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ace8-56fe-7221-9a49-797c7c5fd567",
+          "created_at": "2026-11-05T18:11:58.961Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 48614,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ace6-7684-7609-b944-24649507b45d",
+          "created_at": "2026-11-05T18:09:17.794Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 10460,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1acdf-b992-7451-ad14-1ef2e3af05e6",
+          "created_at": "2026-11-05T18:02:25.534Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 39775,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1acd6-962b-7581-af9d-f15cb9d6bcd8",
+          "created_at": "2026-11-05T17:53:53.536Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 126656,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1acb4-e1ba-741d-afda-4dfae436bb4d",
+          "created_at": "2026-11-05T17:17:01.091Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 122942,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1acb1-4674-761f-a762-46a612827994",
+          "created_at": "2026-11-05T17:14:57.479Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 408,
+          "success": false,
+          "cached": false,
+          "authentication": true,
+          "duration": 235629,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ac96-a864-7210-9b3b-c560bdcf68e3",
+          "created_at": "2026-11-05T16:42:00.202Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 2958,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ac8d-f2a6-7275-8ef3-05d01c61f8fa",
+          "created_at": "2026-11-05T16:32:48.382Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 21972,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ac8b-5a51-75ab-baa2-1905efd3b2a0",
+          "created_at": "2026-11-05T16:29:42.119Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 5756,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ac89-d02e-73c2-a793-7e904ba4c49f",
+          "created_at": "2026-11-05T16:28:37.413Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 41994,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ac85-9e85-7725-bd98-4556845d2155",
+          "created_at": "2026-11-05T16:23:24.510Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 3964,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ac78-15c2-7117-9458-250770378d25",
+          "created_at": "2026-11-05T16:08:50.737Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 17102,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ac6a-558b-777e-83ac-c041c690e132",
+          "created_at": "2026-11-05T15:53:36.518Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 4125,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ac69-f28f-77ce-aec3-68beaa9b9767",
+          "created_at": "2026-11-05T15:53:16.395Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 9344,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ac68-3145-75a5-9ec2-f4a25818f4ed",
+          "created_at": "2026-11-05T15:51:11.965Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": true,
+          "authentication": true,
+          "duration": 21,
+          "metadata": null,
+          "rejection_reason": null
+        },
+        {
+          "id": "01a1ac68-24b8-7398-8108-3fbd0fc3aca1",
+          "created_at": "2026-11-05T15:51:09.793Z",
+          "provider": "workers-ai",
+          "model": "@cf/zai-org/glm-5.3",
+          "status_code": 200,
+          "success": true,
+          "cached": false,
+          "authentication": true,
+          "duration": 768,
+          "metadata": null,
+          "rejection_reason": null
+        }
+      ]
+    }
+  ],
+  "previews": [
+    {
+      "name": "pr-18",
+      "deployment_id": "0fc7f718-c476-4ad2-9bb2-03b09ef6add8",
+      "created_at": "2026-11-06T01:08:33.618102Z",
+      "bindings": {
+        "AI_ENABLED": {
+          "text": "false",
+          "type": "plain_text"
+        },
+        "AI_GATEWAY_ID": {
+          "text": "mitchells-snow-report-preview",
+          "type": "plain_text"
+        },
+        "SNOW_KV": {
+          "namespace_id": "cba4686c7a9a4379bed0ab5d47fcd010",
+          "type": "kv_namespace"
+        }
+      },
+      "admin_token_binding_present": false
+    },
+    {
+      "name": "pr-9",
+      "deployment_id": "363c9a77-af50-4c0d-aa2f-8024840b2ed7",
+      "created_at": "2026-11-05T16:42:41.374977Z",
+      "bindings": {
+        "AI": {
+          "project": "<catalog>",
+          "type": "ai"
+        },
+        "AI_GATEWAY_ID": {
+          "text": "mitchells-snow-report",
+          "type": "plain_text"
+        },
+        "SNOW_KV": {
+          "namespace_id": "f9e542e8a1d0405f8624beade1bba09b",
+          "type": "kv_namespace"
+        }
+      },
+      "admin_token_binding_present": false
+    },
+    {
+      "name": "pr-8",
+      "deployment_id": "cbb43906-7a26-42c7-8ea1-89ff6a153422",
+      "created_at": "2026-11-05T16:34:41.906818Z",
+      "bindings": {
+        "AI": {
+          "project": "<catalog>",
+          "type": "ai"
+        },
+        "AI_GATEWAY_ID": {
+          "text": "mitchells-snow-report",
+          "type": "plain_text"
+        },
+        "SNOW_KV": {
+          "namespace_id": "f9e542e8a1d0405f8624beade1bba09b",
+          "type": "kv_namespace"
+        }
+      },
+      "admin_token_binding_present": false
+    },
+    {
+      "name": "pr-6",
+      "deployment_id": "f4368589-de53-423e-ac19-3c6dad5a90c1",
+      "created_at": "2026-11-05T16:10:31.55Z",
+      "bindings": {
+        "AI": {
+          "project": "<catalog>",
+          "type": "ai"
+        },
+        "AI_GATEWAY_ID": {
+          "text": "mitchells-snow-report",
+          "type": "plain_text"
+        },
+        "SNOW_KV": {
+          "namespace_id": "f9e542e8a1d0405f8624beade1bba09b",
+          "type": "kv_namespace"
+        }
+      },
+      "admin_token_binding_present": false
+    },
+    {
+      "name": "pr-7",
+      "deployment_id": "cd6048a6-670a-4265-873d-819436746906",
+      "created_at": "2026-11-05T16:00:58.52129Z",
+      "bindings": {
+        "AI": {
+          "project": "<catalog>",
+          "type": "ai"
+        },
+        "AI_GATEWAY_ID": {
+          "text": "mitchells-snow-report",
+          "type": "plain_text"
+        },
+        "SNOW_KV": {
+          "namespace_id": "f9e542e8a1d0405f8624beade1bba09b",
+          "type": "kv_namespace"
+        }
+      },
+      "admin_token_binding_present": false
+    },
+    {
+      "name": "pr-5",
+      "deployment_id": "72677762-b1d4-4454-be9a-96d70f1fc96d",
+      "created_at": "2026-11-05T10:01:10.945871Z",
+      "bindings": {
+        "AI": {
+          "project": "<catalog>",
+          "type": "ai"
+        },
+        "AI_GATEWAY_ID": {
+          "text": "mitchells-snow-report",
+          "type": "plain_text"
+        },
+        "SNOW_KV": {
+          "namespace_id": "f9e542e8a1d0405f8624beade1bba09b",
+          "type": "kv_namespace"
+        }
+      },
+      "admin_token_binding_present": false
+    }
+  ],
+  "production": {
+    "deployment_id": "8a719d22-2392-4e37-a1d3-5d4a26e69946",
+    "deployed_at": "2026-11-06T00:22:27.190919Z",
+    "version_id": "0fe268e3-d8af-4a62-aaf2-46de71893edb",
+    "bindings": [
+      {
+        "name": "AI",
+        "project": "<catalog>",
+        "type": "ai"
+      },
+      {
+        "name": "AI_GATEWAY_ID",
+        "text": "mitchells-snow-report",
+        "type": "plain_text"
+      },
+      {
+        "name": "ASSETS",
+        "type": "assets"
+      },
+      {
+        "name": "COLLECTOR_CONTACT",
+        "text": "https://mitchells-snow-report.huang.mx",
+        "type": "plain_text"
+      },
+      {
+        "name": "SNOW_KV",
+        "namespace_id": "5fb1857843374e8ea427c2117b5f3955",
+        "type": "kv_namespace"
+      }
+    ]
+  }
+}
