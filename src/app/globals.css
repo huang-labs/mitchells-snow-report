@@ -366,14 +366,10 @@ a { color: var(--accent); }
   .dailysnow-figure--chart { padding: 12px; }
 }
 
-/* Regional navigation stays compact at phone and laptop widths. */
-.region-selector { position:relative; width:fit-content; max-width:100%; margin:0 0 24px; }
-.page > .region-selector { margin-bottom:0; }
-/* Forecast selectors belong with their headings, closer than full page sections. */
-:is(.page--weather, .page--plumes) > .region-selector {
-  margin-top: -8px;
-  margin-bottom: calc(16px - var(--page-gap));
-}
+/* Shared selector spacing across forecast pages, including Daily Snow's article. */
+.region-selector { position:relative; width:fit-content; max-width:100%; margin:-8px 0 16px; }
+/* Direct page children also receive the page's section gap. */
+.page > .region-selector { margin-bottom:calc(16px - var(--page-gap)); }
 .region-selector::after { content:""; position:absolute; right:16px; top:18px; width:7px; height:7px; border-right:2px solid var(--muted); border-bottom:2px solid var(--muted); transform:rotate(45deg); pointer-events:none; }
 .region-selector select { appearance:none; display:block; width:100%; min-height:44px; padding:10px 44px 10px 14px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); font:600 var(--fs-meta)/1.4 var(--font); cursor:pointer; }
 .region-selector select:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
