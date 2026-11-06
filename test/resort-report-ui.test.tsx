@@ -257,7 +257,7 @@ it("keeps a resort's wording only where its window differs, and lists shared sou
 it("shows each resort as a snowfall timeline: 7 recorded days, the last 24 h, 7 NWS forecast days", () => {
   const { container } = render(renderSection("regional", report, FIXTURE_NOW, null));
   const blocks = [...container.querySelectorAll(".resort-timeline")];
-  expect(blocks.map((b) => b.querySelector(".resort-name")?.textContent)).toEqual(["Alta", "Snowbird", "Solitude", "Brighton", "Snowbasin", "Palisades Tahoe", "Mammoth Mountain", "Jackson Hole", "Big Sky", "Winter Park", "Steamboat", "Telluride", "Crystal Mountain", "Mt. Bachelor"]);
+  expect(blocks.map((b) => b.querySelector(".resort-name")?.textContent)).toEqual(["Alta", "Snowbird", "Solitude", "Brighton", "Park City", "Deer Valley", "Snowbasin", "Palisades Tahoe", "Mammoth Mountain", "Jackson Hole", "Big Sky", "Winter Park", "Steamboat", "Telluride", "Crystal Mountain", "Mt. Bachelor"]);
   const alta = blocks[0];
   expect(alta.querySelectorAll(".snowtl__day--past")).toHaveLength(7);
   expect(alta.querySelectorAll(".snowtl__day--today")).toHaveLength(1);

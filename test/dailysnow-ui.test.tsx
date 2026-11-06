@@ -296,7 +296,7 @@ it("keeps the homepage focused on resort timelines", () => {
   render(<RegionalPage report={report(post)} now={now} />);
   expect(screen.queryByRole("link", { name: "Daily Snow: Storm Underway" })).toBeNull();
   expect(document.querySelector("aside.recommendation")).toBeNull();
-  expect(document.querySelectorAll(".resort-timeline")).toHaveLength(14);
+  expect(document.querySelectorAll(".resort-timeline")).toHaveLength(16);
 });
 
 it("draws plume figures like the plumes page: padded, Mountain Time axis, posting-time marker", () => {

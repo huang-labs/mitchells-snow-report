@@ -51,7 +51,7 @@ function order<T extends { title: string }>(found: T[], featured: RegExp[]): T[]
   return [...lead, ...found.filter((c) => !taken.has(c))];
 }
 
-/** Cameras the resorts publish that the dashboard does not show. */
+/** Cameras the resorts publish that the web app does not show. */
 const EXCLUDED: Partial<Record<PrimaryResortId, RegExp[]>> = {
   // A gimmick 360° panorama with no snow-information value.
   snowbird: [/^hidden peak 360$/i],

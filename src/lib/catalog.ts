@@ -57,6 +57,24 @@ export const RESORTS = [
     elevationFt: null,
   },
   {
+    id: "park-city",
+    name: "Park City",
+    region: "utah",
+    state: "Utah",
+    canyon: "park-city",
+    station: "Official resort snow report",
+    elevationFt: null,
+  },
+  {
+    id: "deer-valley",
+    name: "Deer Valley",
+    region: "utah",
+    state: "Utah",
+    canyon: "deer-valley",
+    station: "Mid-Mountain",
+    elevationFt: null,
+  },
+  {
     id: "snowbasin",
     name: "Snowbasin",
     region: "utah",
@@ -162,6 +180,8 @@ export const FORECAST_AREAS: ReadonlyArray<{
 }> = [
   { id: "LCC", name: "Alta / Snowbird (LCC)", region: "utah", latitude: 40.588, longitude: -111.638 },
   { id: "BCC", name: "Brighton / Solitude (BCC)", region: "utah", latitude: 40.599, longitude: -111.583 },
+  { id: "park-city", name: "Park City", region: "utah", latitude: 40.623, longitude: -111.535 },
+  { id: "deer-valley", name: "Deer Valley", region: "utah", latitude: 40.61, longitude: -111.493 },
   { id: "snowbasin", name: "Snowbasin", region: "utah", latitude: 41.198, longitude: -111.86 },
   { id: "palisades-tahoe", name: "Palisades Tahoe", region: "tahoe", latitude: 39.185, longitude: -120.255 },
   { id: "mammoth-mountain", name: "Mammoth Mountain", region: "mammoth", latitude: 37.638, longitude: -119.033 },
@@ -199,6 +219,8 @@ export const PLUME_LOCATIONS: ReadonlyArray<{ code: string; name: string; region
 ];
 
 export const CAM_PAGES: Partial<Record<ResortId, string>> = {
+  "park-city": "https://www.parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx",
+  "deer-valley": "https://www.deervalley.com/explore-the-mountain/mountain-report",
   snowbasin: "https://www.snowbasin.com/the-mountain/web-cams/",
   "palisades-tahoe": "https://www.palisadestahoe.com/mountain-information/webcams",
   "mammoth-mountain": "https://www.mammothmountain.com/on-the-mountain/mammoth-webcam",

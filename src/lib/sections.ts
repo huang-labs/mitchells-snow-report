@@ -1,6 +1,6 @@
 import { RESORTS } from "./catalog";
 /**
- * Dashboard sections. Each is a page, routed from the navbar. The first section
+ * Web app sections. Each is a page, routed from the navbar. The first section
  * (`/`, "Resorts") is also the parent of the resort pages: the navbar shows their
  * row beneath it on `/` and on each resort page.
  */

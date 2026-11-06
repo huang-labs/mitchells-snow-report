@@ -170,12 +170,14 @@ describe("partial failures and editorial eligibility", () => {
 });
 
 describe("fixed favorites and measured source locations", () => {
-  it("keeps exactly the approved 14 favorites and eight regions", () => {
+  it("keeps exactly the approved 16 favorites and eight regions", () => {
     expect(RESORTS.map((r) => r.name)).toEqual([
       "Alta",
       "Snowbird",
       "Solitude",
       "Brighton",
+      "Park City",
+      "Deer Valley",
       "Snowbasin",
       "Palisades Tahoe",
       "Mammoth Mountain",
@@ -243,8 +245,8 @@ describe("fixed favorites and measured source locations", () => {
     expect(r.snowfall.storm.state).toBe("unavailable");
     expect(() => parseBachelor([{ ...json("bachelor-feed.json")[0], unit_of_measurement: "cm" }])).toThrow(/units/);
   });
-  it("collects all ten new feeds with publication time and location provenance", () => {
-    expect(favoriteSources).toHaveLength(10);
+  it("collects all eleven favorite feeds with publication time and location provenance", () => {
+    expect(favoriteSources).toHaveLength(11);
     for (const source of favoriteSources) {
       const r = base.sources[source.id];
       expect(r?.status, `${source.id}: ${r?.lastError}`).toBe("ok");

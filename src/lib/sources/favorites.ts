@@ -8,6 +8,7 @@ import { liftStatusFrom } from "./snowbird";
 import { assertValid, HOUR, type SourceDefinition } from "./types";
 
 export const FAVORITE_PAGES = {
+  "deer-valley": "https://www.deervalley.com/explore-the-mountain/mountain-report",
   snowbasin: "https://www.snowbasin.com/the-mountain/mountain-report/",
   "palisades-tahoe": "https://www.palisadestahoe.com/mountain-information/mountain-report",
   "mammoth-mountain": "https://www.mammothmountain.com/on-the-mountain/mountain-report",
@@ -255,6 +256,7 @@ export function parseFavoriteHtml(id: "snowbasin" | "telluride", html: string, n
 }
 
 const MTN_SLUGS: Partial<Record<ResortId, string>> = {
+  "deer-valley": "deer-valley",
   "palisades-tahoe": "palisades-tahoe",
   "mammoth-mountain": "mammoth",
   "winter-park": "winter-park",

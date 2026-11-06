@@ -55,12 +55,13 @@ export function fixtureRoutes(): Array<[RegExp, Handler]> {
     [/cpc\.ncep\.noaa\.gov\/products\/predictions\/814day\/500mb\.php/,()=>html(fixture("cpc-500mb.html"))],
     [/cpc\.ncep\.noaa\.gov\/products\/predictions\/6-10_day\/fxus06\.html/,()=>html(fixture("cpc-fxus06.html"))],
     [/cpc\.ncep\.noaa\.gov\/products\/predictions\/814day\/814day\.03\.gif/,()=>new Response(fixtureBytes("cpc-814day.03.gif"),{headers:{"content-type":"image/gif"}})],
+    [/parkcitymountain\.com\/the-mountain\/mountain-conditions\/weather-report\.aspx/,()=>html(fixture("park-city-snow-report.html"))],
     [/snowbasin\.com\/the-mountain\/mountain-report/ ,()=>html(fixture("snowbasin-mountain-report.html"))],
     [/tellurideskiresort\.com\/snow-report/,()=>html(fixture("telluride-snow-report.html"))],
     [/jacksonhole-prod\.zaneray\.com\/api\/snow\.json/,()=>json(fixture("jackson-feed.json"))],
     [/api\.mtbachelor\.com\/api\/v1\/dor\/drupal\/snow-reports/,()=>json(fixture("bachelor-feed.json"))],
     [/bigskyresort\.com\/api\/reportpal/,()=>json(fixture("bigsky_reportpal.json"))],
-    [/v4\.mtnfeed\.com\/resorts\/(palisades-tahoe|mammoth|winter-park|steamboat|crystal-mountain)\.json/,(u)=>{const slug=u.pathname.split("/").pop()!.replace(".json","");const ids:Record<string,number>={"palisades-tahoe":61,mammoth:60,"winter-park":5,steamboat:6,"crystal-mountain":80};return json({resortIds:[ids[slug]],bearerToken:`TEST_${slug}`});}],
+    [/v4\.mtnfeed\.com\/resorts\/(deer-valley|palisades-tahoe|mammoth|winter-park|steamboat|crystal-mountain)\.json/,(u)=>{const slug=u.pathname.split("/").pop()!.replace(".json","");const ids:Record<string,number>={"deer-valley":49,"palisades-tahoe":61,mammoth:60,"winter-park":5,steamboat:6,"crystal-mountain":80};return json({resortIds:[ids[slug]],bearerToken:`TEST_${slug}`});}],
     [/weather\.utah\.edu\/text\/ensgefsdslccforecast\.html/, () => html(fixture("utah-ensemble-CLN-2026110112.html"))],
     [/alta\.com\/lift-terrain-status/, () => html(fixture("alta-lift-terrain-status.html"))],
     [/api\.snowbird\.com\/api\/v1\/dor\/drupal\/snow-reports/, () => json(fixture("snowbird-snow-reports.json"))],
@@ -73,7 +74,7 @@ export function fixtureRoutes(): Array<[RegExp, Handler]> {
       const id = u.searchParams.get("resortId[]");
       const token = u.searchParams.get("bearer_token");
       if (id === "65" && token === FAKE_TOKENS.solitude) return json(fixture("mtnpowder-solitude.json"));
-      const slugs:Record<string,string>={"61":"palisades-tahoe","60":"mammoth","5":"winter-park","6":"steamboat","80":"crystal-mountain"};
+      const slugs:Record<string,string>={"49":"deer-valley","61":"palisades-tahoe","60":"mammoth","5":"winter-park","6":"steamboat","80":"crystal-mountain"};
       const slug=slugs[id??""];if(slug&&token===`TEST_${slug}`)return json(fixture(`mtnpowder-${slug}.json`));
       return new Response("forbidden", { status: 403 });
     }],

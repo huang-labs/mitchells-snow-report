@@ -1,3 +1,4 @@
+import { parkCitySource } from "./park-city";
 import { cpcSource } from "./cpc";
 import { favoriteSources } from "./favorites";
 import type { SourceId } from "../types";
@@ -17,6 +18,7 @@ export const SOURCES: SourceDefinition[] = [
   snowbirdSource,
   solitudeSource,
   brightonSource,
+  parkCitySource,
   ...favoriteSources,
   plumesSource,
   nwsSource,

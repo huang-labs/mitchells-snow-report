@@ -14,6 +14,8 @@ Prefer one fixed official mid-mountain series; never select the snowiest station
 | Snowbird | Official Primary; explicit published report time separate from rolling computations |
 | Solitude | Mid-Mountain, explicitly selected even if the upstream preference changes |
 | Brighton | Official resort report; elevation not established |
+| Park City | Official resort snow report; station elevation not published |
+| Deer Valley | Mid-Mountain; elevation not established |
 | Snowbasin | Official mountain report; elevation not established |
 | Palisades Tahoe | Palisades Mid-Mountain, 8,000 ft |
 | Mammoth Mountain | McCoy Station, 9,600 ft |
@@ -28,8 +30,9 @@ Prefer one fixed official mid-mountain series; never select the snowiest station
 ## Adapters
 
 - **Alta:** parses `window.Alta` on lift/terrain status. `conditions.dated_at` is Denver local. The source supplies 12-hour/24-hour/storm/base/season values and independently timed weather/lifts/terrain/alerts. It does not publish every normalized snow window.
+- **Park City:** parses official `FR.snowReportData` and visibility settings from the weather page. Hidden windows remain unavailable; measured inch totals and the explicit MST/MDT publication time stay separate from forecasts. Reporting elevation is unknown. An HTTP 200 CDN error page triggers one retry with a query parameter; a response without the report fails collection and retains the previous payload. Lift, terrain and observation feeds are not integrated.
 - **Snowbird:** public Drupal/API snow, lifts, terrain, sensors and parking feeds. `updated` is publication time; `computed` rolling totals refer to fetch time, from published reports. Overnight is the latest Primary report. A fresh rolling zero does not prove a new morning publication. Optional subfeeds degrade independently. Sensor times without a year are interpreted locally.
-- **Mountain Powder:** Solitude plus Palisades, Mammoth, Winter Park, Steamboat and Crystal. Read public widget config at collection time; credentials are redacted and excluded from fixtures. Use `SnowReport.LastUpdate`, not the resort-wide update. Explicitly choose Mid-Mountain. Selected station depth is scalar; mountain-wide ranges such as 12–20″ remain separate ranges. Preserve published lift counts, which can differ from row counts; reconcile duplicate rows without inventing totals.
+- **Mountain Powder:** Solitude and Deer Valley plus Palisades, Mammoth, Winter Park, Steamboat and Crystal. Read public widget config at collection time; credentials are redacted and excluded from fixtures. Use `SnowReport.LastUpdate`, not the resort-wide update. Explicitly choose Mid-Mountain. Selected station depth is scalar; mountain-wide ranges such as 12–20″ remain separate ranges. Preserve published lift counts, which can differ from row counts; reconcile duplicate rows without inventing totals.
 - **ReportPal:** Brighton and Big Sky; preserve published windows/counts and unknown fields. Big Sky remains an explicit official-composite exception.
 - **Snowbasin / Telluride:** parse measured official HTML sections, publication times and lift rows. Exclude editorial forecast embeds and unrelated footer/phone labels. Local timestamps are Denver; source dates are not fetch dates.
 - **Jackson Hole:** `/api/snow.json` provides mid-mountain amounts. Empty objects are unavailable. Use `lastModified`, not `respTimestamp`; do not trust inconsistent altitude metadata. Its optional trail/lift feed supplies official counts, named statuses and a separate update time.
@@ -40,7 +43,7 @@ Captured fixtures retain real field values and source structure. Tests cover mis
 
 ## Weather and plumes
 
-Each of 12 catalog mountain coordinates resolves through NWS `/points`. Grid elevation is shown explicitly and is not relabeled as the resort base or reporting station. Palisades' higher mountain point resolves to STO; Mammoth remains REV. The nine issuing offices are SLC, STO, REV, RIW, TFX, BOU, GJT, SEW and PDT; discussions deduplicate shared offices.
+Each of 14 catalog mountain coordinates resolves through NWS `/points`. Grid elevation is shown explicitly and is not relabeled as the resort base or reporting station. Palisades' higher mountain point resolves to STO; Mammoth remains REV. The nine issuing offices are SLC, STO, REV, RIW, TFX, BOU, GJT, SEW and PDT; discussions deduplicate shared offices.
 
 NWS interval accumulations are uniformly allocated to hours. Complete hourly coverage is required for comparable rolling totals and historical whole-day forecasts. Day/night blocks follow destination 6 AM/6 PM; missing values remain missing. Point failures keep their own previous forecast, check time and error.
 

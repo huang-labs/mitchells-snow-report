@@ -22,7 +22,7 @@ export function useDashboard(): DashboardData {
   return ctx;
 }
 
-/** Notices about the dashboard's own data path, shown under the navbar. */
+/** Notices about the web app's own data path, shown under the navbar. */
 export function DataBanners({ data }: { data: DashboardData }) {
   const { report, loadedAt, error, now } = data;
   const apiStale = loadedAt !== null && now.getTime() - loadedAt > 3 * 60_000;
@@ -30,7 +30,7 @@ export function DataBanners({ data }: { data: DashboardData }) {
     <>
       {(error || apiStale) && report && (
         <div className="banner banner--offline" role="status">
-          Dashboard can’t reach its server ({error ?? "no response"}). Showing data loaded {formatAge(new Date(loadedAt!).toISOString(), now)}.
+          Web app can’t reach its server ({error ?? "no response"}). Showing data loaded {formatAge(new Date(loadedAt!).toISOString(), now)}.
         </div>
       )}
       {report && report.requiredMissing.length > 0 && (

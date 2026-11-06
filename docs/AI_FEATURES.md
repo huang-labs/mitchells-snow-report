@@ -28,7 +28,7 @@ Western lists omitted regions explicitly and distinguishes missing editions from
 
 ## Storms, figures and archives
 
-Storm memory is separate for all 12 forecast areas. Reported storm totals survive source resets; earlier 24/48-hour observations keep their window and timestamp and never become storm totals. New counter segments remain separate. Tracking wraps up after 12 hours without increases plus a dry, complete near-term forecast, closes after 24 such hours, or expires after 48 hours without new evidence. Recap context lasts 36 hours after closure. These are editorial grouping rules, not measured storm onset/end.
+Storm memory is separate for all 14 forecast areas. Reported storm totals survive source resets; earlier 24/48-hour observations keep their window and timestamp and never become storm totals. New counter segments remain separate. Tracking wraps up after 12 hours without increases plus a dry, complete near-term forecast, closes after 24 such hours, or expires after 48 hours without new evidence. Recap context lasts 36 hours after closure. These are editorial grouping rules, not measured storm onset/end.
 
 Each article freezes its event records and figures. Mandatory per-area recaps and an available accumulated-snow plume take precedence within six figure slots. Code renders omitted supporting recaps/plumes after the prose. No image availability is invented.
 

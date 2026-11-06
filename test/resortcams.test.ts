@@ -51,7 +51,7 @@ describe("resort webcam collection", () => {
     const { fetchImpl } = createFixtureFetch();
     const { rec, payload } = await collect(new MemoryKV(), fetchImpl);
     expect(rec.status).toBe("ok");
-    expect(payload.failures).toHaveLength(10);
+    expect(payload.failures).toHaveLength(12);
     expect(payload.failures.every(f=>!/^alta:|^snowbird:|^solitude:|^brighton:/.test(f))).toBe(true);
     const summary = payload.cameras.map((c) => [c.resort, c.title, c.kind === "youtube" ? c.videoId : c.kind==="image"?c.capturedAt:null]);
     expect(summary).toEqual([
@@ -108,7 +108,7 @@ describe("resort webcam collection", () => {
     const { fetchImpl } = createFixtureFetch([[/snowbird\.com\/the-mountain\/webcams/, () => new Response("down", { status: 503 })]]);
     const { rec, payload } = await collect(kv, fetchImpl);
     expect(rec.status).toBe("ok");
-    expect(payload.failures).toHaveLength(11);
+    expect(payload.failures).toHaveLength(13);
     expect(payload.failures).toContainEqual(expect.stringMatching(/^snowbird: .*503/));
     expect(payload.cameras.filter((c) => c.resort === "snowbird").map((c) => c.title)).toEqual([
       "Snowstake",
