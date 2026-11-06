@@ -8,7 +8,7 @@ A snow and conditions web app for 16 favorite Western United States resorts, bui
 - Select eight regions for NWS mountain weather and University of Utah plumes.
 - Read eight regional **Daily Snow** forecasts and a standalone **United States West** article covering this week (NWS mountain snowfall for days 1–3 and 4–7) and week two (the NOAA 8–14-day pattern map), labeled as AI with model attribution.
 
-Next.js builds the static frontend. A Cloudflare Worker serves the APIs and collects upstream data on a five-minute cron, storing the latest successful results in KV. Pages read that stored data; AI generation runs during collection. Webcam collection retries failed YouTube metadata lookups and uses official Snowbasin and Jackson Hole camera feeds; blocked or unsupported pages retain their official webcam links. See [source notes](docs/IMPLEMENTATION_NOTES.md#adapters) for coverage and retry behavior.
+Next.js builds the static frontend. A Cloudflare Worker serves the APIs and collects upstream data on a five-minute cron, storing the latest successful results in KV. Pages read that stored data; AI generation runs during collection. Regional Daily Snow attempts start at 7 AM local time with an 11 AM cutoff; United States West starts at 8 AM Pacific with a noon cutoff. Webcam collection retries failed YouTube metadata lookups and uses official Snowbasin and Jackson Hole camera feeds; blocked or unsupported pages retain their official webcam links. See [source notes](docs/IMPLEMENTATION_NOTES.md#adapters) for coverage and retry behavior.
 
 ## Quick start
 
@@ -62,7 +62,7 @@ The fixed favorites are Alta, Snowbird, Solitude, Brighton, Park City, Deer Vall
 
 ## PR previews
 
-Every PR gets its own preview KV, seeded once from production reads and refreshed from real sources on deployment. Previews run no cron and do not automatically regenerate AI articles. The PR's Preview comment reports source freshness and which commit generated each article.
+Every PR gets its own preview KV, seeded once from production reads and refreshed from real sources on deployment. Previews run no cron and do not automatically regenerate AI articles. The PR's Preview comment reports source freshness and which commit generated each article. Temporary runner cleanup waits for deletion visibility before continuing; see [preview operations](docs/DEPLOYMENT.md#refresh-or-regenerate-a-hosted-pr-preview).
 
 ```sh
 npm run preview:refresh -- --pr 10

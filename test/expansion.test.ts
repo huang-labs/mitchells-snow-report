@@ -282,12 +282,12 @@ describe("regional boundaries and calendars", () => {
     }));
     expect(forecastForDay(series, window)).toBe(series.length);
   });
-  it("starts Mountain and Pacific editions at 6AM local and the Western overview at 7AM Pacific", () => {
-    expect(shouldRunDailySnow(undefined, new Date("2026-11-05T13:00:00Z"), "utah")).toBe("morning");
-    expect(shouldRunDailySnow(undefined, new Date("2026-11-05T13:00:00Z"), "tahoe")).toBeNull();
-    expect(shouldRunDailySnow(undefined, new Date("2026-11-05T14:00:00Z"), "tahoe")).toBe("morning");
-    expect(shouldRunDailySnow(undefined, new Date("2026-11-05T14:00:00Z"), "western-us")).toBeNull();
-    expect(shouldRunDailySnow(undefined, new Date("2026-11-05T15:00:00Z"), "western-us")).toBe("morning");
+  it("starts Mountain and Pacific editions at 7AM local and the Western overview at 8AM Pacific", () => {
+    expect(shouldRunDailySnow(undefined, new Date("2026-11-05T14:00:00Z"), "utah")).toBe("morning");
+    expect(shouldRunDailySnow(undefined, new Date("2026-11-05T14:00:00Z"), "tahoe")).toBeNull();
+    expect(shouldRunDailySnow(undefined, new Date("2026-11-05T15:00:00Z"), "tahoe")).toBe("morning");
+    expect(shouldRunDailySnow(undefined, new Date("2026-11-05T15:00:00Z"), "western-us")).toBeNull();
+    expect(shouldRunDailySnow(undefined, new Date("2026-11-05T16:00:00Z"), "western-us")).toBe("morning");
   });
 });
 
