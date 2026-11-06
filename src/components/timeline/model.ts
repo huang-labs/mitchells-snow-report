@@ -1,3 +1,4 @@
+import { snowfallIssues, usableSnowReport } from "@/lib/snowfall-quality";
 import { addDays, forecastForDay, snowDayWindow, snowDayOf } from "@/lib/snowlog/days";
 import { cachedDateFormat, formatLocal } from "@/lib/time";
 import type { MorningReading, SnowLogState } from "@/lib/snowlog/types";
@@ -33,7 +34,7 @@ export interface TimelineDay {
 export interface SnowTimelineModel {
   past: TimelineDay[];
   future: TimelineDay[];
-  last24: { metric: Metric | null; reportTime: string | null; detail: string };
+  last24: { metric: Metric | null; reportTime: string | null; detail: string; warning?: string };
   canyon: CanyonId;
   /** The resort's IANA zone; report times display in it. */
   timeZone: string;
@@ -83,7 +84,7 @@ function pastDay(key: string, name: string, reading: MorningReading | undefined,
     case "not_reported":
       return { ...base, state: "not_reported", amountIn: null, detail: `${date} · ${name} left its 24 h total empty${ghost}` };
     case "unavailable":
-      return { ...base, state: "unavailable", amountIn: null, detail: `${date} · ${name} doesn’t publish a 24 h total${ghost}` };
+      return { ...base, state: "unavailable", amountIn: null, detail: `${date} · ${reading.qualityNote ? reading.qualityNote : `${name} doesn’t publish a 24 h total`}${ghost}` };
     default:
       return { ...base, state: "no_report", amountIn: null, detail: `${date} · No new morning report from ${name}${ghost}` };
   }
@@ -127,7 +128,7 @@ export function buildSnowTimeline(input: {
     return pastDay(key, name, readings[key], ghosts[key]?.snowIn ?? null,timeZone);
   });
   const future = Array.from({ length: TIMELINE_DAYS }, (_, i) => futureDay(addDays(current, i), canyon, forecast?.hourlySnow, now,timeZone));
-  const metric = report?.snowfall.h24 ?? null;
+  const metric = usableSnowReport(report)?.snowfall.h24 ?? null;
   // The date matters here: an old report would otherwise read like today's.
   const at = report?.reportTime ? `, report ${formatLocal(report.reportTime, now,timeZone)}` : "";
   const detail = !metric
@@ -136,8 +137,8 @@ export function buildSnowTimeline(input: {
       ? `Last 24 h · ${inches(metric.value)} reported by ${name} (“${metric.label}”${at})`
       : metric.state === "not_reported"
         ? `Last 24 h · ${name} left its 24 h total empty${at}`
-        : `Last 24 h · ${name} doesn’t publish a 24 h total`;
-  return { past, future, last24: { metric, reportTime: report?.reportTime ?? null, detail }, canyon, timeZone };
+        : `Last 24 h · ${metric.note?.startsWith("Withheld:") ? metric.note : `${name} doesn’t publish a 24 h total`}`;
+  return { past, future, last24: { metric, reportTime: report?.reportTime ?? null, detail, ...(report && snowfallIssues(report.snowfall).length ? { warning: "Resort snowfall data warning: affected totals are withheld. See the resort report for published figures." } : {}) }, canyon, timeZone };
 }
 
 /** One scale for timelines shown together, so equal amounts draw equal bars. */

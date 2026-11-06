@@ -1,3 +1,4 @@
+import { usableSnowReport } from "../snowfall-quality";
 import { RESORTS, FORECAST_AREAS, resortTimeZone, regionById, resortById } from "../catalog";
 import type { CanyonId, Metric, NwsPayload, PrimaryResortId, ResortReport, Snapshot } from "../types";
 import { addDays, forecastForDay, liquidForDay, morningOf, snowDayOf, snowDayWindow } from "./days";
@@ -44,7 +45,7 @@ function reading(id: PrimaryResortId, report: ResortReport, collectedAt: string,
   const fresh = windowEnd !== null && Date.parse(windowEnd) <= Date.parse(collectedAt)+120000 && Date.parse(windowEnd) >= window.end - MAX_WINDOW_LEAD_MS;
   if (!fresh) return { state: "no_report", label: m.label, windowEnd, collectedAt, reportingLocation };
   if (m.state === "reported") return { state: "reported", valueIn: m.value, label: m.label, windowEnd, collectedAt, reportingLocation };
-  return { state: m.state, label: m.label, windowEnd, collectedAt, reportingLocation };
+  return { state: m.state, label: m.label, ...(m.note?.startsWith("Withheld:") ? { qualityNote: m.note } : {}), windowEnd, collectedAt, reportingLocation };
 }
 
 function canyonOf(name: string): CanyonId | null {
@@ -71,7 +72,7 @@ export function recordSnowLog(previous: SnowLogState | undefined, snapshot: Snap
   for (const id of SNOW_LOG_RESORTS) {
     const days = prune(previous?.resorts[id], oldestDay(now, resortTimeZone(id)));
     const rec = snapshot.sources[id];
-    const report = rec?.payload as ResortReport | null | undefined;
+    const report = usableSnowReport(rec?.payload as ResortReport | null | undefined);
     const collectedAt = rec?.lastSuccessfulFetchAt;
     const day = collectedAt ? morningOf(Date.parse(collectedAt),resortTimeZone(id)) : null;
     if (report && collectedAt && day) days[day] = preferReading(days[day], reading(id, report, collectedAt, day))!;

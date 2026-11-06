@@ -1,3 +1,4 @@
+import { snowfallIssues, usableSnowReport } from "../snowfall-quality";
 import { RESORTS, regionById, type TimeZone } from "../catalog";
 import { ensembleGuidance } from "../ensemble";
 import { classify } from "../report";
@@ -32,12 +33,14 @@ export interface ResortDigest {
   snowfall: Record<string, string>;
   conditions: string | null;
   weatherNow: string | null;
+  snowfallWarnings?: string[];
 }
 export function buildDigest(snapshot: Snapshot, lastOperating: Partial<Record<PrimaryResortId, string>>, now: Date) {
   const zone = regionById(snapshot.region ?? "utah")!.timeZone;
   const resorts: ResortDigest[] = RESORTS.filter((r) => snapshot.sources[r.id]).map((def) => {
     const record = snapshot.sources[def.id],
-      r = record?.payload as ResortReport | null;
+      raw = record?.payload as ResortReport | null,
+      r = usableSnowReport(raw);
     const freshness = classify(SOURCE_BY_ID[def.id], record, now);
     const usable =
       record?.status === "ok" && (freshness.freshness === "current" || freshness.freshness === "time-unknown");
@@ -71,6 +74,7 @@ export function buildDigest(snapshot: Snapshot, lastOperating: Partial<Record<Pr
         : {},
       conditions: usable ? (r?.narrative?.slice(0, 1400) ?? null) : null,
       weatherNow: null,
+      ...(raw ? { snowfallWarnings: snowfallIssues(raw.snowfall).map(issue => issue.message) } : {}),
     };
   });
   return {

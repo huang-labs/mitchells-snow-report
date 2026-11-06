@@ -1,3 +1,4 @@
+import { snowfallIssues } from "@/lib/snowfall-quality";
 import { resortTimeZone, resortById } from "@/lib/catalog";
 import Link from "next/link";
 import type { ApiSource, Metric, ResortReport, SnowfallSet } from "@/lib/types";
@@ -99,6 +100,7 @@ export function ResortReportPage({
     );
 
   const snow = snowSlots(r.snowfall);
+  const issues = snowfallIssues(r.snowfall);
   const location=r.reportingLocation??{name:resortById(source.id)?.station,elevationFt:resortById(source.id)?.elevationFt,note:undefined};
   const observations = r.observations.filter(
     (observation) =>
@@ -164,6 +166,12 @@ export function ResortReportPage({
           <h2 id="resort-snow-heading">Snowfall</h2>
           <span>Reported by {r.resort}</span>
         </div>
+        {issues.length > 0 && (
+          <p className="resort-report__gap" role="note">
+            Snowfall data warning: the resort publishes conflicting or invalid amounts.
+            Figures below are shown as published; affected values are withheld from the timeline, Daily Snow and storm tracking.
+          </p>
+        )}
         <div className="resort-snow__headline">
           {snow.hero.map((s) => (
             <SnowMetric key={s.key} label={s.label} metric={s.metric} qualifier={s.qualifier} hero />
