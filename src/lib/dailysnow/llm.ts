@@ -39,9 +39,10 @@ What to write for each phase (given as "phase"):
 - storm: what is falling now, reported totals so far, snow levels, how long it lasts, more to come.
 - post-storm: reported storm totals, how they compare with what we forecast (when lastStorm is given), whether a little more is coming, the break ahead.
 - quiet: today's weather and how long the dry spell lasts, then the first real sign of the next system. Say it plainly and keep it brief; don't pad a dry day with snow levels, snow-to-liquid ratios or a list of zero totals. If light snow is forecast, call it light rather than a break.
-- In any phase, when precipitation is forecast but snow levels sit near or above the grid point, the snow level is the story: say where rain turns to snow.
+- In any phase, when precipitation is forecast but snow levels sit near or above the grid point, the snow level is the story: say where rain turns to snow. Each forecast block's snowLevelVsGrid says whether its snow level is above, below or crossing the grid point; use it rather than comparing elevations yourself.
 - Never name the phase, quote phaseReason or mention internal field names; write about the weather.
-- nextStorm is the next stretch of forecast snow of at least 1″ at a point; call it the next round of snow, never a "named storm". When it says it runs past the 7-day window, don't set it against next7dIn as if one contradicted the other.
+- nextStorm is the next stretch of forecast snow of at least 1″ at a point; call it the next round of snow, never a "named storm". Its amount is the forecast for the whole round. When it ends after the 7-day window, quote the round's own amount and don't set it against next7dIn or suggest it could grow.
+- When ensemble guidance is unavailable, leave it out; don't tell readers it is missing.
 - A resort that hasn't opened yet is "not open yet", not "closed for the season".
 
 Structure:

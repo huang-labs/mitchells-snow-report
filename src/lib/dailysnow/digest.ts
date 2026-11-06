@@ -146,6 +146,15 @@ export function snowNext(p: PointForecast, now: Date, hours: number): number | n
   return round1(sum);
 }
 
+/** Where the block's snow level sits relative to the NWS grid elevation, so the model never compares the numbers itself. */
+export function snowLevelVsGrid(minFt: number | null, maxFt: number | null, gridFt: number | null): string | null {
+  if (minFt === null || gridFt === null) return null;
+  const max = maxFt ?? minFt;
+  if (max < gridFt) return "below the grid point all period: precipitation falls as snow there";
+  if (minFt > gridFt) return "above the grid point all period: precipitation falls as rain there";
+  return "crosses the grid point during the period: rain and snow mix there";
+}
+
 export function phaseOf(
   recentIn: number,
   recent48In: number,
@@ -501,7 +510,7 @@ export function buildDailyDigest(
         next7dIn: numbers.canyons[i].next7dIn,
       },
       nextStorm: p.nextStorm
-        ? `Next round of snow: ${p.nextStorm.totalSnowIn}″ from ${localTime(p.nextStorm.start, now, zone)} to ${localTime(p.nextStorm.end, now, zone)}${p.nextStorm.minSnowLevelFt ? `, snow level down to ${p.nextStorm.minSnowLevelFt} ft` : ""}${Date.parse(p.nextStorm.end) > t + 7 * 24 * HOUR ? "; it runs past the 7-day window, so it is not part of next7dIn and may exceed it" : ""}`
+        ? `Next round of snow: ${p.nextStorm.totalSnowIn}″ from ${localTime(p.nextStorm.start, now, zone)} to ${localTime(p.nextStorm.end, now, zone)}${p.nextStorm.minSnowLevelFt ? `, snow level down to ${p.nextStorm.minSnowLevelFt} ft` : ""}${Date.parse(p.nextStorm.end) > t + 7 * 24 * HOUR ? "; it ends after the 7-day window, so next7dIn holds only part of this round's total" : ""}`
         : null,
       blocks: p.blocks
         .filter((b) => Date.parse(b.end) > t)
@@ -511,6 +520,7 @@ export function buildDailyDigest(
           liquidIn: b.qpfIn,
           snowToLiquid: slrOf(b.snowIn, b.qpfIn),
           snowLevelFt: b.snowLevelMinFt === null ? null : `${b.snowLevelMinFt}–${b.snowLevelMaxFt}`,
+          snowLevelVsGrid: snowLevelVsGrid(b.snowLevelMinFt, b.snowLevelMaxFt, p.elevationFt),
           tempF: b.tempMinF === null ? null : `${b.tempMinF}–${b.tempMaxF}`,
           windMph: b.windMaxMph === null ? null : `${b.windMaxMph} gust ${b.gustMaxMph ?? "?"}`,
           precipChancePct: b.popMax,

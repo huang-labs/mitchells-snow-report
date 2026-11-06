@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { runCollection } from "@/lib/collect";
 import { dailySnowFigureKey, dailySnowKey, emptyDailySnowState, planDailySnow } from "@/lib/dailysnow";
 import { buildContinuity, historyEntry } from "@/lib/dailysnow/continuity";
-import { buildDailyDigest, dailySnowActivity, phaseOf, snowNext } from "@/lib/dailysnow/digest";
+import { buildDailyDigest, dailySnowActivity, phaseOf, snowLevelVsGrid, snowNext } from "@/lib/dailysnow/digest";
 import { significantStorm, STORM_RECAP_MIN_IN } from "@/lib/dailysnow/figure-plan";
 import { allowedAmounts, askDailySnow, buildModelInput, DAILY_SNOW_TIMEOUT_MS, SYSTEM_PROMPT, validateDailySnow } from "@/lib/dailysnow/llm";
 import { IN_FLIGHT_MS, MAX_ATTEMPTS, RETRY_AFTER_MS, shouldRunDailySnow } from "@/lib/dailysnow/schedule";
@@ -122,6 +122,12 @@ describe("digest", () => {
     p.hourlySnow = [];
     expect(snowNext(p, now, 24)).toBeNull();
     expect(phaseOf(0, 0, null, null).reason).toContain("unavailable snowfall forecast");
+  });
+  it("states where the snow level sits against the grid point", () => {
+    expect(snowLevelVsGrid(6700, 8400, 7638)).toMatch(/^crosses/);
+    expect(snowLevelVsGrid(7800, 8400, 7638)).toMatch(/rain there/);
+    expect(snowLevelVsGrid(5600, 6600, 7638)).toMatch(/snow there/);
+    expect(snowLevelVsGrid(null, null, 7638)).toBeNull();
   });
   it("decides the storm phase in code", () => {
     expect(phaseOf(0, 0, 5, 12).phase).toBe("storm");
