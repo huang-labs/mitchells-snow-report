@@ -66,6 +66,7 @@ Rules:
 - snowfallWarnings identify conflicting or invalid source measurements. Withheld windows supply no usable measurement, including zero. Never infer fresh snowfall from another window (such as a seven-day or season total), a fresh page timestamp, previousPost, or source narrative. Do not resolve a conflict by choosing a preferred amount.
 - Resort-reported amounts are measurements; NWS amounts are forecasts. Say which is which. The NWS input contains no measured snowfall for the past 24/48 hours; never claim it does.
 - If a resort's report is old or missing (see dataFreshness and reportTime), say its morning report isn't out yet rather than using its numbers as this morning's.
+- When a resort's snowfall is withheld because its source numbers conflict, say its report's snowfall numbers don't add up today and leave them out; don't describe how we process data.
 - Do not mention roads, parking, lift openings or which resort to ski.
 - Use ″ for inches, local 12-hour times, and weekday names rather than dates.`;
 

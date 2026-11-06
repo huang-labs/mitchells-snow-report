@@ -20,7 +20,7 @@ import type { FigureCandidate } from "./digest";
 
 const CPC_DISCUSSION_CHARS = 4000;
 /** The national overview runs longer than regional editions; past the ceiling the fallback model gets a turn. */
-export const WEST_WORDS = { min: 350, max: 550, ceiling: 600 };
+export const WEST_WORDS = { min: 350, max: 550, ceiling: 650 };
 const words = (texts: string[]) => texts.join(" ").split(/\s+/).filter(Boolean).length;
 
 /** "Nov 12–18", or "Nov 30–Dec 6" across a month boundary. */
