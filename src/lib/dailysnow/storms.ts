@@ -1,3 +1,4 @@
+import { usableSnowReport } from "../snowfall-quality";
 import { RESORTS } from "../catalog";
 import { forecastPointFresh } from "../forecastFreshness";
 import { HOUR } from "../sources/types";
@@ -140,7 +141,7 @@ export function advanceStormTracking(previous: StormTrackingState | undefined, s
   const observations: Array<{ id: PrimaryResortId; cursor: StormCursor; sourceUrl: string; increased: boolean; first: boolean; lateReport: boolean }> = [];
   for (const { id } of RESORTS) {
     const s = snapshot.sources[id];
-    const r = s?.payload as ResortReport | null;
+    const r = usableSnowReport(s?.payload as ResortReport | null);
     if (s?.status !== "ok" || !r?.snowfall || !s.lastSuccessfulFetchAt || !r.reportTime) continue;
     if (now.getTime() - ms(s.lastSuccessfulFetchAt) > FETCH_MAX_AGE || now.getTime() - ms(r.reportTime) > REPORT_MAX_AGE || ms(r.reportTime) > now.getTime() + 5 * 60_000) continue;
     const c: StormCursor = {

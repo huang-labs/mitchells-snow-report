@@ -102,6 +102,7 @@ export function SnowTimeline({
         </li>
         {model.future.map((day) => <Day key={day.key} day={day} scale={scale} />)}
       </ol>
+      {model.last24.warning && <p className="snowtl__footer" role="note">{model.last24.warning}</p>}
       {footer && <div className="snowtl__footer">{footer}</div>}
     </div>
   );

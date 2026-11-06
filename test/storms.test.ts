@@ -28,6 +28,8 @@ function snapshot(hours: number, snow: Partial<Record<PrimaryResortId, Snow>> = 
     source.lastAttemptAt = source.lastSuccessfulFetchAt = at(hours).toISOString();
     const r = source.payload as ResortReport;
     r.reportTime = source.sourceUpdatedAt = amounts.reportTime ?? at(hours).toISOString();
+    // Keep unrelated captured windows out of these synthetic storm observations.
+    for (const key of ["overnight", "h12", "h72", "d7"] as const) r.snowfall[key] = { state: "unavailable", label: key };
     for (const key of ["storm", "h24", "h48", "season"] as const) {
       r.snowfall[key] = amounts[key] === undefined ? { state: "unavailable", label: key }
         : { state: "reported", label: key, unit: "in", value: amounts[key]! };

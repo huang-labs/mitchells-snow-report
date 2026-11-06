@@ -19,6 +19,8 @@ export interface MorningReading {
   valueIn?: number;
   /** The resort's own label for the window ("Last 24 hrs", "24 Hour"). */
   label: string;
+  /** Why a published measurement was withheld from derived history. */
+  qualityNote?: string;
   /** When the resort's window ends: its report time, or the fetch for sources that compute it then. */
   windowEnd: string | null;
   collectedAt: string;

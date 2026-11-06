@@ -375,9 +375,11 @@ describe("independent editions and stored artifacts", () => {
     const s=structuredClone(regionalSnapshot(base,"colorado"));
     const report=s.sources.telluride!.payload as ResortReport;
     report.snowfall.overnight={state:"reported",value:6,unit:"in",label:"Snow overnight"};
+    report.snowfall.h24={state:"reported",value:6,unit:"in",label:"Last 24 hours"};
+    report.snowfall.h48={state:"reported",value:6,unit:"in",label:"Last 48 hours"};
     const totals=buildDailyDigest(s,null,[],now).figures.find(f=>f.figure.id==="resort-totals")?.figure;
     expect(totals?.kind).toBe("totals");
-    if(totals?.kind==="totals")expect(totals.rows.find(r=>r.name==="Telluride")?.h24).toBe(0);
+    if(totals?.kind==="totals")expect(totals.rows.find(r=>r.name==="Telluride")?.h24).toBe(6);
     const state=await planDailySnow(undefined,s,{SNOW_KV:new MemoryKV(),DAILY_SNOW_CHANNEL:"colorado",AI:{async run(){return {response:JSON.stringify(reply())};}}},now,{force:true})!.run!();
     report.snowfall.overnight={state:"reported",value:0,unit:"in",label:"Snow overnight"};
     const input=buildWesternInput(base,{colorado:state.current!},now);

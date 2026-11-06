@@ -1,3 +1,4 @@
+import { usableSnowReport } from "../snowfall-quality";
 import { forecastPointFresh } from "../forecastFreshness";
 import { regionalSnapshot } from "./regions";
 import { RESORTS as CATALOG, FORECAST_AREAS, regionById } from "../catalog";
@@ -73,6 +74,7 @@ export interface DailyDigest extends ContinuityDigest {
       | "operatingStatus"
       | "lifts"
       | "snowfall"
+      | "snowfallWarnings"
       | "conditions"
       | "weatherNow"
     >
@@ -279,7 +281,7 @@ export function dailySnowActivity(snapshot: Snapshot, now: Date, base?: ReturnTy
   const reports = selected.map((r) => {
     const source = snapshot.sources[r.id];
     return source?.status === "ok" && classify(SOURCE_BY_ID[r.id], source, now).freshness === "current"
-      ? (source.payload as ResortReport)
+      ? usableSnowReport(source.payload as ResortReport)
       : null;
   });
   const recent = maxOf(
@@ -363,7 +365,7 @@ export function buildDailyDigest(
       const record = snapshot.sources[r.id];
       const rep =
         record?.status === "ok" && classify(SOURCE_BY_ID[r.id], record, now).freshness === "current"
-          ? (record.payload as ResortReport)
+          ? usableSnowReport(record.payload as ResortReport)
           : null;
       return {
         id: r.id,
@@ -463,6 +465,7 @@ export function buildDailyDigest(
       operatingStatus: r.operatingStatus,
       lifts: r.lifts,
       snowfall: r.snowfall,
+      snowfallWarnings: r.snowfallWarnings,
       conditions: r.conditions,
       weatherNow: r.weatherNow,
     })),

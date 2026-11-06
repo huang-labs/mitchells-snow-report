@@ -318,3 +318,15 @@ it("describes every day for screen readers, with no interactive controls", () =>
   expect(alta.querySelectorAll("button, [tabindex]")).toHaveLength(0);
   expect(alta.querySelector(".snowtl__detail")).toBeNull();
 });
+
+it("discloses conflicting source snowfall while retaining the published amounts", () => {
+  const source = structuredClone(report.sources.telluride);
+  const payload = source.payload as ResortReport;
+  payload.snowfall.overnight = { state: "reported", value: 6, unit: "in", label: "Snow overnight" };
+  payload.snowfall.h24 = { state: "reported", value: 0, unit: "in", label: "Last 24 hours" };
+  const { container } = render(<ResortReportPage source={source} now={FIXTURE_NOW} />);
+  expect(screen.getByRole("note").textContent).toContain("Snowfall data warning");
+  expect(screen.getByRole("note").textContent).toContain("shown as published");
+  expect(container.querySelector(".resort-snow__headline")?.textContent).toContain("6");
+  expect(payload.snowfall.overnight).toMatchObject({ state: "reported", value: 6 });
+});
