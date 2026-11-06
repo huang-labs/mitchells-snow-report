@@ -378,12 +378,13 @@ describe("validation", () => {
 
 describe("activity gate",()=>{
   it("skips the off-season and needs the AI binding", () => {
+    const now = new Date("2026-11-01T14:00:00Z"); // 7 AM MST, inside the publication window.
     const s = snap();
     for (const p of (s.sources.nws!.payload as NwsPayload).points) { p.sixHourSnow = []; p.hourlySnow = []; }
     for (const id of ["alta", "snowbird", "solitude", "brighton", "park-city", "deer-valley", "snowbasin"] as const) s.sources[id] = undefined;
     const { ai } = fakeAi(() => answer([]));
-    expect(planDailySnow(undefined, s, { SNOW_KV: new MemoryKV(), AI: ai }, new Date("2026-11-01T14:00:00Z"))).toMatchObject({ skipped: "off-season" });
-    expect(planDailySnow(undefined, s, { SNOW_KV: new MemoryKV() }, SIX_AM)).toBeUndefined();
+    expect(planDailySnow(undefined, s, { SNOW_KV: new MemoryKV(), AI: ai }, now)).toMatchObject({ skipped: "off-season" });
+    expect(planDailySnow(undefined, s, { SNOW_KV: new MemoryKV() }, now)).toBeUndefined();
   });
   it("counts the forecast bar in progress at posting time as activity", () => {
     const h = 3_600_000;
