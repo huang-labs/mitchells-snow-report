@@ -64,6 +64,30 @@ it.each(["24h", "48h"] as const)("shows a compact frozen storm recap with qualif
   expect(document.querySelectorAll(".dailysnow-storm")).toHaveLength(1);
 });
 
+it("leads with storm observations the prose didn't place and closes with the plume", () => {
+  const at = "2026-11-01T12:00:00Z";
+  const storm: StormRecord = {
+    id: "LCC", firstObservedAt: at, lastSnowAt: at, updatedAt: at, status: "active", closedAt: null, closureReason: null,
+    resorts: [{ id: "alta", name: "Alta", total: { amountIn: 8, window: "storm", reportTime: at, collectedAt: at, sourceUrl: "https://www.alta.com/" }, rolling: null }],
+  };
+  const withFigures: ApiDailySnow = {
+    ...post,
+    figures: {
+      ...post.figures,
+      "storm-recap-lcc": { id: "storm-recap-lcc", kind: "storm-recap", caption: "Storm observations · Little Cottonwood", storm },
+      "plume-snow-cln": { id: "plume-snow-cln", kind: "image", caption: "University of Utah ensemble plume · Accumulated Snow", url: "/api/daily-snow/figure/2026-11-01/plume-snow-cln", originUrl: "https://example.com/plume.png", width: null, height: null },
+    },
+  };
+  render(<DailySnowPage report={report(withFigures)} now={now} />);
+  const captions = [...document.querySelectorAll(".dailysnow__article figcaption")].map((c) => c.textContent);
+  expect(captions.at(-1)).toContain("University of Utah ensemble plume");
+  const first = screen.getByText("Snow levels fall through tonight:");
+  const recap = screen.getByText("Storm observations · Little Cottonwood", { selector: "figcaption" });
+  const second = screen.getByText("Stakes are filling in:");
+  expect(first.compareDocumentPosition(recap) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(recap.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
 it.each([undefined, "utah"] as const)("uses the article header while Daily Snow loads for %s", (region) => {
   render(<ReportLoading sectionId="daily-snow" region={region} />);
   expect(screen.getByRole("status").textContent).toBe("Loading Daily Snow…");

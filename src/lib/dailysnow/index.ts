@@ -7,7 +7,8 @@ import type { KVLike } from "../store";
 import type { DailySnowFigure, DailySnowLink, DailySnowPost, DailySnowState, Snapshot } from "../types";
 import { historyEntry } from "./continuity";
 import { buildDailyDigest, type FigureCandidate } from "./digest";
-import { askDailySnow, MAX_FIGURES } from "./llm";
+import { askDailySnow } from "./llm";
+import { FIGURE_LIMIT, significantStorm } from "./figure-plan";
 import { isSnowPlume } from "./plume";
 import { stormForPost } from "./storms";
 import { attemptsToday, DAILY_CALL_CAP, shouldRunDailySnow } from "./schedule";
@@ -188,7 +189,10 @@ export function planDailySnow(
         required.add("storm-recap");
       }
       for (const id of required) wanted.add(id);
-      while (wanted.size > MAX_FIGURES) {
+      // One slot stays free for the accumulated-snow plume code adds below.
+      const limit = FIGURE_LIMIT[digest.phase];
+      const plumeSlot = candidates.some((c) => isSnowPlume(c.figure.id)) ? 1 : 0;
+      while (wanted.size > limit - plumeSlot) {
         const optional = [...wanted].reverse().find((id) => !required.has(id));
         if (!optional) break;
         wanted.delete(optional);
@@ -210,8 +214,8 @@ export function planDailySnow(
         for (const candidate of plumes) {
           const copied = await storeFigures([candidate], date, env, now, opts.fetchImpl);
           if (!copied[candidate.figure.id]) continue;
-          // Reserve one of the six figure slots for the required plume.
-          if (Object.keys(figures).length >= MAX_FIGURES) {
+          // Reserve one of the phase's figure slots for the required plume.
+          if (Object.keys(figures).length >= limit) {
             const lastOptional = [...wanted].reverse().find((id) => !required.has(id) && figures[id]);
             if (lastOptional) delete figures[lastOptional];
           }
@@ -226,7 +230,7 @@ export function planDailySnow(
         timeZone: channelById(env.DAILY_SNOW_CHANNEL ?? "utah")!.timeZone,
         areaStormRecaps: Object.values(snapshot.areaStorms ?? {}).flatMap((s) => {
           const event = stormForPost(s, now);
-          return event ? [event] : [];
+          return significantStorm(event) ? [event] : [];
         }),
         phase: digest.phase,
         title: r.title,
