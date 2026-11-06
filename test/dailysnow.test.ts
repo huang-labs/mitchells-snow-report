@@ -222,14 +222,15 @@ describe("continuity with earlier posts", () => {
 });
 
 describe("schedule", () => {
+  const SEVEN_AM = new Date("2026-11-01T14:00:00Z");
   const posted = (date: string): DailySnowState => ({ ...emptyDailySnowState(), current: { date } as DailySnowState["current"] });
-  it("posts from 6 AM Denver time, across the daylight-saving change", () => {
-    expect(shouldRunDailySnow(undefined, at("2026-11-01T12:55:00Z"))).toBeNull(); // 5:55 AM MST
+  it("posts from 7 AM Denver time, across the daylight-saving change", () => {
+    expect(shouldRunDailySnow(undefined, at("2026-11-01T13:55:00Z"))).toBeNull(); // 6:55 AM MST
     // 12:00 UTC was 6 AM yesterday (MDT) but is 5 AM today (MST).
     expect(shouldRunDailySnow(undefined, at("2026-11-01T12:00:00Z"))).toBeNull();
-    expect(shouldRunDailySnow(undefined, SIX_AM)).toBe("morning");
-    expect(shouldRunDailySnow(undefined, at("2026-07-01T12:00:00Z"))).toBe("morning"); // 6 AM MDT
-    expect(shouldRunDailySnow(undefined, at("2026-11-01T17:00:00Z"))).toBeNull(); // 10 AM: too late
+    expect(shouldRunDailySnow(undefined, SEVEN_AM)).toBe("morning");
+    expect(shouldRunDailySnow(undefined, at("2026-07-01T13:00:00Z"))).toBe("morning"); // 7 AM MDT
+    expect(shouldRunDailySnow(undefined, at("2026-11-01T18:00:00Z"))).toBeNull(); // 11 AM: too late
   });
   it("posts once a day", () => {
     expect(shouldRunDailySnow(posted("2026-11-01"), at("2026-11-01T14:00:00Z"))).toBeNull();
@@ -242,20 +243,20 @@ describe("schedule", () => {
     expect(IN_FLIGHT_MS).toBeLessThanOrEqual(15 * 60_000);
   });
   it("does not start a second attempt while one is running", () => {
-    const running: DailySnowState = { ...emptyDailySnowState(), lastAttemptAt: SIX_AM.toISOString(), attempts: { date: "2026-11-01", count: 1, calls: 2 } };
-    expect(shouldRunDailySnow(running, at("2026-11-01T13:05:00Z"))).toBeNull();
+    const running: DailySnowState = { ...emptyDailySnowState(), lastAttemptAt: SEVEN_AM.toISOString(), attempts: { date: "2026-11-01", count: 1, calls: 2 } };
+    expect(shouldRunDailySnow(running, at("2026-11-01T14:05:00Z"))).toBeNull();
     // Two 5-minute model timeouts: later crons still see the attempt as running.
-    expect(shouldRunDailySnow(running, at("2026-11-01T13:10:00Z"))).toBeNull();
+    expect(shouldRunDailySnow(running, at("2026-11-01T14:10:00Z"))).toBeNull();
     // Cut off without finishing: tried again once the in-flight window has passed.
-    expect(shouldRunDailySnow(running, new Date(SIX_AM.getTime() + IN_FLIGHT_MS))).toBe("morning");
+    expect(shouldRunDailySnow(running, new Date(SEVEN_AM.getTime() + IN_FLIGHT_MS))).toBe("morning");
   });
   it("retries failures after 10 minutes, a few times a day", () => {
-    const failed: DailySnowState = { ...emptyDailySnowState(), lastAttemptAt: SIX_AM.toISOString(), lastFinishedAt: "2026-11-01T13:01:00.000Z", lastError: "timeout", consecutiveFailures: 1, attempts: { date: "2026-11-01", count: 1, calls: 2 } };
-    expect(shouldRunDailySnow(failed, at("2026-11-01T13:05:00Z"))).toBeNull();
-    expect(shouldRunDailySnow(failed, new Date(SIX_AM.getTime() + RETRY_AFTER_MS))).toBe("retry");
+    const failed: DailySnowState = { ...emptyDailySnowState(), lastAttemptAt: SEVEN_AM.toISOString(), lastFinishedAt: "2026-11-01T14:01:00.000Z", lastError: "timeout", consecutiveFailures: 1, attempts: { date: "2026-11-01", count: 1, calls: 2 } };
+    expect(shouldRunDailySnow(failed, at("2026-11-01T14:05:00Z"))).toBeNull();
+    expect(shouldRunDailySnow(failed, new Date(SEVEN_AM.getTime() + RETRY_AFTER_MS))).toBe("retry");
     expect(shouldRunDailySnow({ ...failed, attempts: { date: "2026-11-01", count: MAX_ATTEMPTS, calls: 6 } }, at("2026-11-01T14:00:00Z"))).toBeNull();
     // The count resets the next day.
-    expect(shouldRunDailySnow({ ...failed, attempts: { date: "2026-10-31", count: MAX_ATTEMPTS, calls: 6 } }, SIX_AM)).toBe("morning");
+    expect(shouldRunDailySnow({ ...failed, attempts: { date: "2026-10-31", count: MAX_ATTEMPTS, calls: 6 } }, SEVEN_AM)).toBe("morning");
   });
 });
 
@@ -381,7 +382,7 @@ describe("activity gate",()=>{
     for (const p of (s.sources.nws!.payload as NwsPayload).points) { p.sixHourSnow = []; p.hourlySnow = []; }
     for (const id of ["alta", "snowbird", "solitude", "brighton", "park-city", "deer-valley", "snowbasin"] as const) s.sources[id] = undefined;
     const { ai } = fakeAi(() => answer([]));
-    expect(planDailySnow(undefined, s, { SNOW_KV: new MemoryKV(), AI: ai }, SIX_AM)).toMatchObject({ skipped: "off-season" });
+    expect(planDailySnow(undefined, s, { SNOW_KV: new MemoryKV(), AI: ai }, new Date("2026-11-01T14:00:00Z"))).toMatchObject({ skipped: "off-season" });
     expect(planDailySnow(undefined, s, { SNOW_KV: new MemoryKV() }, SIX_AM)).toBeUndefined();
   });
   it("counts the forecast bar in progress at posting time as activity", () => {

@@ -7,16 +7,18 @@ import type { DailySnowState } from "../types";
 
 /**
  * When to write the Daily Snow. Checked on every collection cron (5 min) so
- * the post uses sources collected the same minute; working in Denver local
- * time keeps it at 6 AM across daylight-saving changes (Cloudflare crons are UTC).
+ * the post uses sources collected the same minute; working in each channel’s local
+ * time keeps its start hour stable across daylight-saving changes (Cloudflare crons are UTC).
  *
- *  - From 6:00 AM Denver, once per day.
+ *  - From 7:00 AM region local time (8 AM Pacific for Western), once per day.
  *  - A failed attempt retries after 10 minutes, at most 3 attempts a day.
  *  - An attempt still running (or cut off) blocks new ones for IN_FLIGHT_MS.
- *  - After 10 AM no new attempts: the last edition stays up with a publication-delay notice when an edition is expected.
+ *  - From 11 AM local (noon Pacific for Western), no new attempts: the last edition stays up with a publication-delay notice when an edition is expected.
  */
-export const POST_HOUR = 6;
-export const LAST_ATTEMPT_HOUR = 10;
+export const POST_HOUR = 7;
+export const LAST_ATTEMPT_HOUR = 11;
+export const WESTERN_POST_HOUR = 8;
+export const WESTERN_LAST_ATTEMPT_HOUR = 12;
 export const RETRY_AFTER_MS = 10 * 60_000;
 export const MAX_ATTEMPTS = 3;
 /** Model requests reserved per day (two per attempt, manual runs included). */
@@ -40,9 +42,10 @@ export function inFlight(state: DailySnowState | undefined, now: Date): boolean 
 export function shouldRunDailySnow(state: DailySnowState | undefined, now: Date, channel?:ChannelId): string | null {
   const zone=channelById(channel??"utah")!.timeZone;
   const p = zonedParts(now,zone);
-  const postHour=channel==="western-us"?7:POST_HOUR;
+  const postHour=channel==="western-us"?WESTERN_POST_HOUR:POST_HOUR;
+  const lastAttemptHour=channel==="western-us"?WESTERN_LAST_ATTEMPT_HOUR:LAST_ATTEMPT_HOUR;
   const minutes = p.hour * 60 + p.minute;
-  if (minutes < postHour * 60 || minutes >= (postHour+4) * 60) return null;
+  if (minutes < postHour * 60 || minutes >= lastAttemptHour * 60) return null;
   if (state?.current?.date === denverDate(now,zone)) return null;
   if (inFlight(state, now)) return null;
   const used = attemptsToday(state, now,channel);

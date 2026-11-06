@@ -18,6 +18,6 @@ Reported **0** is distinct from **not reported** (published field empty) and **u
 
 Source metadata and reporting location appear quietly on detail pages. Lift-feed timestamps are independent of snow-report time where supplied. Resort camera stills older than three hours say “not updating”; capture time unknown and live-player status remain explicit.
 
-Latest Daily Snow always displays its edition date and posting time. Publication status is current, scheduled, pending, delayed or paused. Regional windows are 6–10 AM local; Western is 7–11 AM Pacific. A running final attempt can finish after cutoff. A missed expected edition retains the last good post and shows “Latest edition delayed”; an established quiet off-season pause does not. Missing inputs cannot establish a pause. Archive responses omit the current-publication warning.
+Latest Daily Snow always displays its edition date and posting time. Publication status is current, scheduled, pending, delayed or paused. Regional windows are 7–11 AM local; Western is 8 AM–noon Pacific. A running final attempt can finish after cutoff. A missed expected edition retains the last good post and shows “Latest edition delayed”; an established quiet off-season pause does not. Missing inputs cannot establish a pause. Archive responses omit the current-publication warning.
 
 The homepage shows report times and a shared value legend. Required unavailable/delayed feeds raise the global banner; API polling errors retain the last report with a connection notice. No API read collects data or generates AI.

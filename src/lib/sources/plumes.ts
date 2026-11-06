@@ -96,7 +96,7 @@ export const plumesSource: SourceDefinition<PlumePayload> = {
   label: "Utah ensemble plumes",
   category: "plume",
   required: true,
-  attribution: "University of Utah Atmospheric Sciences — Utah Snow Ensemble (NCEP GEFS + ECMWF ENS)",
+  attribution: "University of Utah Atmospheric Sciences",
   sourceUrl: plumePageUrl("CLN"),
   // Runs are produced every 12 h; flag as old when a newer cycle should exist.
   reportMaxAgeMs: 30 * HOUR,
