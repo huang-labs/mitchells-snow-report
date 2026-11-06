@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { barLabel, buildSnowTimeline, timelineScale } from "@/components/timeline/model";
 import { runCollection } from "@/lib/collect";
-import { addDays, forecastForDay, liquidForDay, morningOf, snowDayOf, snowDayEnd, snowDayStart } from "@/lib/snowlog/days";
+import { addDays, forecastForDay, liquidForDay, morningOf, snowDayOf, snowDayWindow } from "@/lib/snowlog/days";
 import { mergeSnowLog, recordSnowLog } from "@/lib/snowlog/record";
 import type { SnowLogState } from "@/lib/snowlog/types";
 import { mergeSnapshot, MemoryKV, readSnapshot, writeSnapshot } from "@/lib/store";
@@ -30,10 +30,25 @@ function nwsRecord(collectedAt: string, lcc: Array<{ start: string; snowIn: numb
 const snap = (sources: Snapshot["sources"]): Snapshot => ({ schemaVersion: 1, writtenAt: "2026-12-01T13:00:00Z", sources });
 
 describe("snow days", () => {
+  it.each([
+    ["2026-11-06", "America/Denver", "2026-11-05T13:00:00Z", "2026-11-06T13:00:00Z"],
+    ["2026-11-06", "America/Los_Angeles", "2026-11-05T14:00:00Z", "2026-11-06T14:00:00Z"],
+    ["2026-03-08", "America/Denver", "2026-03-07T13:00:00Z", "2026-03-08T12:00:00Z"],
+    ["2026-03-08", "America/Los_Angeles", "2026-03-07T14:00:00Z", "2026-03-08T13:00:00Z"],
+    ["2026-11-01", "America/Denver", "2026-10-31T12:00:00Z", "2026-11-01T13:00:00Z"],
+    ["2026-11-01", "America/Los_Angeles", "2026-10-31T13:00:00Z", "2026-11-01T14:00:00Z"],
+  ])("resolves %s in %s to UTC boundaries", (key, zone, start, end) => {
+    const window = snowDayWindow(key, zone);
+    expect(window).toEqual({ start: Date.parse(start), end: Date.parse(end) });
+    const series = hourly(start, (window.end - window.start) / HOUR, 1);
+    // Snow and liquid consume the same UTC window, with no calendar or zone input.
+    expect(forecastForDay(series, window)).toBe(series.length);
+    expect(liquidForDay(series, series.map(() => 0.1), window)).toBe(series.length / 10);
+  });
+
   describe.each(["America/Denver", "America/Los_Angeles"])("DST boundaries in %s", (zone) => {
     it.each([["2026-03-08", 23], ["2026-11-01", 25]] as const)("keeps the local morning boundary on %s", (day, hours) => {
-      const start = snowDayStart(day, zone);
-      const end = snowDayEnd(day, zone);
+      const { start, end } = snowDayWindow(day, zone);
       expect(end - start).toBe(hours * HOUR);
       expect(snowDayOf(end - 1, zone)).toBe(day);
       expect(snowDayOf(end, zone)).toBe(addDays(day, 1));
@@ -71,21 +86,21 @@ describe("snow days", () => {
 
   it("totals a forecast only over a fully covered day, from now when the day is under way", () => {
     const h = hourly("2026-11-30T13:00:00Z", 48);
-    expect(forecastForDay(h, "2026-12-01", -Infinity, ZONE)).toBe(2.4);
+    expect(forecastForDay(h, snowDayWindow("2026-12-01", ZONE))).toBe(2.4);
     // From 06:45 the 06:00 hour counts only its last quarter: 0.025 + 6 × 0.1.
-    expect(forecastForDay(h, "2026-12-01", Date.parse("2026-12-01T06:45:00Z"), ZONE)).toBe(0.6);
+    expect(forecastForDay(h, snowDayWindow("2026-12-01", ZONE), Date.parse("2026-12-01T06:45:00Z"))).toBe(0.6);
     // A minute before the day ends, the remaining minute is all that's left.
-    expect(forecastForDay(hourly("2026-11-30T13:00:00Z", 24, 1), "2026-12-01", Date.parse("2026-12-01T12:59:00Z"), ZONE)).toBe(0);
-    expect(forecastForDay(h.slice(0, 40), "2026-12-02", -Infinity, ZONE)).toBeNull();
+    expect(forecastForDay(hourly("2026-11-30T13:00:00Z", 24, 1), snowDayWindow("2026-12-01", ZONE), Date.parse("2026-12-01T12:59:00Z"))).toBe(0);
+    expect(forecastForDay(h.slice(0, 40), snowDayWindow("2026-12-02", ZONE))).toBeNull();
   });
 
   it("totals liquid the same way, and needs every hour of it", () => {
     const h = hourly("2026-11-30T13:00:00Z", 48);
     const liquid = h.map(() => 0.0125);
-    expect(liquidForDay(h, liquid, "2026-12-01", -Infinity, ZONE)).toBe(0.3);
-    expect(liquidForDay(h, liquid, "2026-12-01", Date.parse("2026-12-01T06:45:00Z"), ZONE)).toBe(0.08);
-    expect(liquidForDay(h, liquid.map((v, i) => (i === 5 ? null : v)), "2026-12-01", -Infinity, ZONE)).toBeNull();
-    expect(liquidForDay(h, liquid.slice(1), "2026-12-01", -Infinity, ZONE)).toBeNull();
+    expect(liquidForDay(h, liquid, snowDayWindow("2026-12-01", ZONE))).toBe(0.3);
+    expect(liquidForDay(h, liquid, snowDayWindow("2026-12-01", ZONE), Date.parse("2026-12-01T06:45:00Z"))).toBe(0.08);
+    expect(liquidForDay(h, liquid.map((v, i) => (i === 5 ? null : v)), snowDayWindow("2026-12-01", ZONE))).toBeNull();
+    expect(liquidForDay(h, liquid.slice(1), snowDayWindow("2026-12-01", ZONE))).toBeNull();
   });
 });
 

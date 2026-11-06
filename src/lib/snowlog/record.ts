@@ -1,6 +1,6 @@
 import { RESORTS, FORECAST_AREAS, resortTimeZone, regionById, resortById } from "../catalog";
 import type { CanyonId, Metric, NwsPayload, PrimaryResortId, ResortReport, Snapshot } from "../types";
-import { addDays, forecastForDay, liquidForDay, morningOf, snowDayOf, snowDayStart } from "./days";
+import { addDays, forecastForDay, liquidForDay, morningOf, snowDayOf, snowDayWindow } from "./days";
 import type { DayAheadForecast, MorningReading, SnowDayKey, SnowLogState } from "./types";
 
 export const SNOW_LOG_RESORTS: PrimaryResortId[] = RESORTS.map(r=>r.id);
@@ -40,7 +40,8 @@ function reading(id: PrimaryResortId, report: ResortReport, collectedAt: string,
   const def=resortById(id)!;
   const reportingLocation={...(report.reportingLocation??{name:def.station,elevationFt:def.elevationFt})};
   const windowEnd = report.reportTime;
-  const fresh = windowEnd !== null && Date.parse(windowEnd) <= Date.parse(collectedAt)+120000 && Date.parse(windowEnd) >= snowDayStart(addDays(day,1),resortTimeZone(id)) - MAX_WINDOW_LEAD_MS;
+  const window = snowDayWindow(day, resortTimeZone(id));
+  const fresh = windowEnd !== null && Date.parse(windowEnd) <= Date.parse(collectedAt)+120000 && Date.parse(windowEnd) >= window.end - MAX_WINDOW_LEAD_MS;
   if (!fresh) return { state: "no_report", label: m.label, windowEnd, collectedAt, reportingLocation };
   if (m.state === "reported") return { state: "reported", valueIn: m.value, label: m.label, windowEnd, collectedAt, reportingLocation };
   return { state: m.state, label: m.label, windowEnd, collectedAt, reportingLocation };
@@ -86,12 +87,14 @@ export function recordSnowLog(previous: SnowLogState | undefined, snapshot: Snap
     if (point?.hourlySnow && collectedAt && !point.lastError) {
       const t = Date.parse(collectedAt);
       // Days that haven't started at collection time: whole-day forecasts only.
-      for (let key = addDays(snowDayOf(t,zone), 1); snowDayStart(key,zone) - t < 8 * 86_400_000; key = addDays(key, 1)) {
-        const snowIn = forecastForDay(point.hourlySnow, key,-Infinity,zone);
+      for (let key = addDays(snowDayOf(t,zone), 1); ; key = addDays(key, 1)) {
+        const window = snowDayWindow(key, zone);
+        if (window.start - t >= 8 * 86_400_000) break;
+        const snowIn = forecastForDay(point.hourlySnow, window);
         // An incomplete day (a missing hour, or the forecast's end) is skipped; later
         // complete days are still recorded.
         if (snowIn === null) continue;
-        const liquidIn = point.hourlyLiquidIn ? liquidForDay(point.hourlySnow, point.hourlyLiquidIn, key,-Infinity,zone) : null;
+        const liquidIn = point.hourlyLiquidIn ? liquidForDay(point.hourlySnow, point.hourlyLiquidIn, window) : null;
         days[key] = preferForecast(days[key], { snowIn, ...(liquidIn === null ? {} : { liquidIn }), issuedAt: point.gridUpdatedAt, collectedAt })!;
       }
     }

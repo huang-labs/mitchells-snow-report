@@ -1,4 +1,4 @@
-import { addDays, forecastForDay, snowDayEnd, snowDayOf } from "@/lib/snowlog/days";
+import { addDays, forecastForDay, snowDayWindow, snowDayOf } from "@/lib/snowlog/days";
 import { cachedDateFormat, formatLocal } from "@/lib/time";
 import type { MorningReading, SnowLogState } from "@/lib/snowlog/types";
 import type { CanyonId, Metric, PointForecast, PrimaryResortId, ResortReport } from "@/lib/types";
@@ -56,11 +56,11 @@ export function barLabel(v: number): string {
 
 const inches = (v: number) => `${Number.isInteger(v) ? v : v.toFixed(1)}″`;
 /** The destination-local 6 AM boundary, independent of daylight saving time. */
-const endsAt = (key: string, zone: string) =>
-  cachedDateFormat("en-US", { timeZone: zone, hour: "numeric" }).format(snowDayEnd(key, zone)).replace(":00", "");
+const boundaryAt = (instant: number, zone: string) =>
+  cachedDateFormat("en-US", { timeZone: zone, hour: "numeric" }).format(instant).replace(":00", "");
 
-function dayLabels(key: string, zone:string) {
-  const t = new Date(snowDayEnd(key,zone));
+function dayLabels(end: number, zone:string) {
+  const t = new Date(end);
   const timeZone = zone;
   const weekday = cachedDateFormat("en-US", { timeZone, weekday: "short" }).format(t);
   return {
@@ -72,7 +72,7 @@ function dayLabels(key: string, zone:string) {
 }
 
 function pastDay(key: string, name: string, reading: MorningReading | undefined, forecastIn: number | null, zone:string): TimelineDay {
-  const { date, ...labels } = dayLabels(key,zone);
+  const { date, ...labels } = dayLabels(snowDayWindow(key, zone).end,zone);
   const ghost = forecastIn === null ? "" : ` · NWS forecast ${inches(forecastIn)}`;
   const base = { key, kind: "past" as const, ...labels, forecastIn, partial: false };
   if (!reading) return { ...base, state: "not_recorded", amountIn: null, detail: `${date} · Not recorded${ghost}` };
@@ -90,12 +90,13 @@ function pastDay(key: string, name: string, reading: MorningReading | undefined,
 }
 
 function futureDay(key: string, canyon: CanyonId, hourly: PointForecast["hourlySnow"], now: Date, zone:string): TimelineDay {
-  const { date, ...labels } = dayLabels(key,zone);
-  const partial = snowDayOf(now.getTime(),zone) === key;
-  const amountIn = hourly ? forecastForDay(hourly, key, partial ? now.getTime() : -Infinity,zone) : null;
+  const window = snowDayWindow(key, zone);
+  const { date, ...labels } = dayLabels(window.end,zone);
+  const partial = now.getTime() >= window.start && now.getTime() < window.end;
+  const amountIn = hourly ? forecastForDay(hourly, window, partial ? now.getTime() : -Infinity) : null;
   const span = partial
-    ? `now to ${endsAt(key,zone)}`
-    : `${endsAt(addDays(key, -1),zone)} to ${endsAt(key,zone)} local time`;
+    ? `now to ${boundaryAt(window.end,zone)}`
+    : `${boundaryAt(window.start,zone)} to ${boundaryAt(window.end,zone)} local time`;
   const base = { key, kind: "forecast" as const, ...labels, forecastIn: null, partial };
   return amountIn === null
     ? { ...base, state: "no_forecast", amountIn: null, detail: `${date} · No NWS forecast for this day` }

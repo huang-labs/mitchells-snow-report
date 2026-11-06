@@ -4,6 +4,12 @@ import type { SnowDayKey } from "./types";
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
+/** UTC epoch-millisecond boundaries, start inclusive and end exclusive. */
+export interface SnowDayWindow {
+  readonly start: number;
+  readonly end: number;
+}
+
 /** A snow day runs from the previous morning's 6 AM to its key's 6 AM, locally. */
 export function snowDayOf(t: number, timeZone: string): SnowDayKey {
   const key = localDate(new Date(t), timeZone);
@@ -11,13 +17,17 @@ export function snowDayOf(t: number, timeZone: string): SnowDayKey {
 }
 
 /** End of a snow day at 6 AM in the destination zone, epoch ms. */
-export function snowDayEnd(key: SnowDayKey, timeZone: string): number {
+function snowDayEnd(key: SnowDayKey, timeZone: string): number {
   const [year, month, day] = key.split("-").map(Number);
   return zonedToUtc(year, month, day, 6, 0, 0, timeZone).getTime();
 }
 
-export function snowDayStart(key: SnowDayKey, timeZone: string): number {
-  return snowDayEnd(addDays(key, -1), timeZone);
+/** Resolve the local calendar rule once; consumers aggregate using UTC instants. */
+export function snowDayWindow(key: SnowDayKey, timeZone: string): SnowDayWindow {
+  return {
+    start: snowDayEnd(addDays(key, -1), timeZone),
+    end: snowDayEnd(key, timeZone),
+  };
 }
 
 export function addDays(key: SnowDayKey, n: number): SnowDayKey {
@@ -41,10 +51,10 @@ export function morningOf(t: number, timeZone: string): SnowDayKey | null {
  * spread evenly over their hours). Only a fully covered window is a total: a forecast
  * that ends mid-day, or a missing (null) hour, gives null.
  */
-function sumForDay(hours: Array<{ start: string; value: number | null }>, key: SnowDayKey, fromMs: number, timeZone: string): number | null {
-  const from = Math.max(snowDayStart(key,timeZone), fromMs);
+function sumForDay(hours: Array<{ start: string; value: number | null }>, window: SnowDayWindow, fromMs: number): number | null {
+  const from = Math.max(window.start, fromMs);
   const start = Math.floor(from / HOUR) * HOUR;
-  const end = snowDayEnd(key,timeZone);
+  const end = window.end;
   if (from >= end) return null;
   let total = 0;
   let count = 0;
@@ -61,11 +71,10 @@ function sumForDay(hours: Array<{ start: string; value: number | null }>, key: S
 /** NWS snow-day total (inches, to 0.1) from hourly amounts, including DST days. */
 export function forecastForDay(
   hourly: Array<{ start: string; snowIn: number }>,
-  key: SnowDayKey,
-  fromMs: number,
-  timeZone: string,
+  window: SnowDayWindow,
+  fromMs = -Infinity,
 ): number | null {
-  const total = sumForDay(hourly.map((h) => ({ start: h.start, value: h.snowIn })), key, fromMs,timeZone);
+  const total = sumForDay(hourly.map((h) => ({ start: h.start, value: h.snowIn })), window, fromMs);
   return total === null ? null : Math.round(total * 10) / 10;
 }
 
@@ -73,11 +82,10 @@ export function forecastForDay(
 export function liquidForDay(
   hourly: Array<{ start: string }>,
   liquid: Array<number | null>,
-  key: SnowDayKey,
-  fromMs: number,
-  timeZone: string,
+  window: SnowDayWindow,
+  fromMs = -Infinity,
 ): number | null {
   if (liquid.length !== hourly.length) return null;
-  const total = sumForDay(hourly.map((h, i) => ({ start: h.start, value: liquid[i] })), key, fromMs,timeZone);
+  const total = sumForDay(hourly.map((h, i) => ({ start: h.start, value: liquid[i] })), window, fromMs);
   return total === null ? null : Math.round(total * 100) / 100;
 }
