@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { barLabel, buildSnowTimeline, timelineScale } from "@/components/timeline/model";
 import { runCollection } from "@/lib/collect";
-import { addDays, forecastForDay, liquidForDay, morningOf, snowDayOf } from "@/lib/snowlog/days";
+import { addDays, forecastForDay, liquidForDay, morningOf, snowDayOf, snowDayEnd, snowDayStart } from "@/lib/snowlog/days";
 import { mergeSnowLog, recordSnowLog } from "@/lib/snowlog/record";
 import type { SnowLogState } from "@/lib/snowlog/types";
 import { mergeSnapshot, MemoryKV, readSnapshot, writeSnapshot } from "@/lib/store";
@@ -9,6 +9,7 @@ import type { Metric, NwsPayload, PrimaryResortId, ResortReport, Snapshot, Sourc
 import { createFixtureFetch, FIXTURE_NOW } from "./fixtureFetch";
 
 const HOUR = 3_600_000;
+const ZONE = "America/Denver";
 const inches = (value: number, label = "Last 24 hrs"): Metric => ({ state: "reported", value, unit: "in", label });
 
 function resortRecord(id: PrimaryResortId, collectedAt: string, reportTime: string | null, h24: Metric): SourceRecord {
@@ -29,42 +30,85 @@ function nwsRecord(collectedAt: string, lcc: Array<{ start: string; snowIn: numb
 const snap = (sources: Snapshot["sources"]): Snapshot => ({ schemaVersion: 1, writtenAt: "2026-12-01T13:00:00Z", sources });
 
 describe("snow days", () => {
-  it("end at 12:00 UTC, keyed by that morning", () => {
-    expect(snowDayOf(Date.parse("2026-12-01T11:59:00Z"))).toBe("2026-12-01");
-    expect(snowDayOf(Date.parse("2026-12-01T12:00:00Z"))).toBe("2026-12-02");
+  describe.each(["America/Denver", "America/Los_Angeles"])("DST boundaries in %s", (zone) => {
+    it.each([["2026-03-08", 23], ["2026-11-01", 25]] as const)("keeps the local morning boundary on %s", (day, hours) => {
+      const start = snowDayStart(day, zone);
+      const end = snowDayEnd(day, zone);
+      expect(end - start).toBe(hours * HOUR);
+      expect(snowDayOf(end - 1, zone)).toBe(day);
+      expect(snowDayOf(end, zone)).toBe(addDays(day, 1));
+      expect(morningOf(end - 1, zone)).toBeNull();
+      expect(morningOf(end, zone)).toBe(day);
+      expect(morningOf(end + 5 * HOUR - 1, zone)).toBe(day);
+      expect(morningOf(end + 5 * HOUR, zone)).toBeNull();
+      const series = hourly(new Date(start).toISOString(), hours, 1);
+      const model = buildSnowTimeline({
+        resort: "alta", name: "Alta", canyon: "LCC", timeZone: zone,
+        report: null, log: null, now: new Date(start - HOUR),
+        forecast: { hourlySnow: series } as unknown as NwsPayload["points"][number],
+      });
+      const forecast = model.future.find((d) => d.key === day)!;
+      expect(forecast.amountIn).toBe(hours);
+      expect(forecast.detail).toContain("6 AM to 6 AM local time");
+      expect(forecast.detail).not.toMatch(/\b(?:23|24|25) h\b/);
+    });
+  });
+
+  it("end at 6 AM destination time, keyed by that morning", () => {
+    expect(snowDayOf(Date.parse("2026-12-01T12:59:00Z"), ZONE)).toBe("2026-12-01");
+    expect(snowDayOf(Date.parse("2026-12-01T13:00:00Z"), ZONE)).toBe("2026-12-02");
     expect(addDays("2026-12-31", 1)).toBe("2027-01-01");
   });
 
   it("read morning reports for five hours after a day ends, in winter and summer time", () => {
-    // 5 AM MST (12:00Z) and 6 AM MDT (12:00Z) alike.
-    expect(morningOf(Date.parse("2026-12-01T12:00:00Z"))).toBe("2026-12-01");
-    expect(morningOf(Date.parse("2026-12-01T16:59:00Z"))).toBe("2026-12-01");
-    expect(morningOf(Date.parse("2026-12-01T17:00:00Z"))).toBeNull();
-    expect(morningOf(Date.parse("2026-12-01T11:59:00Z"))).toBeNull();
-    expect(morningOf(Date.parse("2027-03-15T13:00:00Z"))).toBe("2027-03-15");
+    // The window is 6–11 AM local in both winter and summer.
+    expect(morningOf(Date.parse("2026-12-01T13:00:00Z"), ZONE)).toBe("2026-12-01");
+    expect(morningOf(Date.parse("2026-12-01T17:59:00Z"), ZONE)).toBe("2026-12-01");
+    expect(morningOf(Date.parse("2026-12-01T18:00:00Z"), ZONE)).toBeNull();
+    expect(morningOf(Date.parse("2026-12-01T12:59:00Z"), ZONE)).toBeNull();
+    expect(morningOf(Date.parse("2027-03-15T13:00:00Z"), ZONE)).toBe("2027-03-15");
   });
 
   it("totals a forecast only over a fully covered day, from now when the day is under way", () => {
-    const h = hourly("2026-11-30T12:00:00Z", 48);
-    expect(forecastForDay(h, "2026-12-01")).toBe(2.4);
-    // From 06:45 the 06:00 hour counts only its last quarter: 0.025 + 5 × 0.1.
-    expect(forecastForDay(h, "2026-12-01", Date.parse("2026-12-01T06:45:00Z"))).toBe(0.5);
+    const h = hourly("2026-11-30T13:00:00Z", 48);
+    expect(forecastForDay(h, "2026-12-01", -Infinity, ZONE)).toBe(2.4);
+    // From 06:45 the 06:00 hour counts only its last quarter: 0.025 + 6 × 0.1.
+    expect(forecastForDay(h, "2026-12-01", Date.parse("2026-12-01T06:45:00Z"), ZONE)).toBe(0.6);
     // A minute before the day ends, the remaining minute is all that's left.
-    expect(forecastForDay(hourly("2026-11-30T12:00:00Z", 24, 1), "2026-12-01", Date.parse("2026-12-01T11:59:00Z"))).toBe(0);
-    expect(forecastForDay(h.slice(0, 40), "2026-12-02")).toBeNull();
+    expect(forecastForDay(hourly("2026-11-30T13:00:00Z", 24, 1), "2026-12-01", Date.parse("2026-12-01T12:59:00Z"), ZONE)).toBe(0);
+    expect(forecastForDay(h.slice(0, 40), "2026-12-02", -Infinity, ZONE)).toBeNull();
   });
 
   it("totals liquid the same way, and needs every hour of it", () => {
-    const h = hourly("2026-11-30T12:00:00Z", 48);
+    const h = hourly("2026-11-30T13:00:00Z", 48);
     const liquid = h.map(() => 0.0125);
-    expect(liquidForDay(h, liquid, "2026-12-01")).toBe(0.3);
-    expect(liquidForDay(h, liquid, "2026-12-01", Date.parse("2026-12-01T06:45:00Z"))).toBe(0.07);
-    expect(liquidForDay(h, liquid.map((v, i) => (i === 5 ? null : v)), "2026-12-01")).toBeNull();
-    expect(liquidForDay(h, liquid.slice(1), "2026-12-01")).toBeNull();
+    expect(liquidForDay(h, liquid, "2026-12-01", -Infinity, ZONE)).toBe(0.3);
+    expect(liquidForDay(h, liquid, "2026-12-01", Date.parse("2026-12-01T06:45:00Z"), ZONE)).toBe(0.08);
+    expect(liquidForDay(h, liquid.map((v, i) => (i === 5 ? null : v)), "2026-12-01", -Infinity, ZONE)).toBeNull();
+    expect(liquidForDay(h, liquid.slice(1), "2026-12-01", -Infinity, ZONE)).toBeNull();
   });
 });
 
 describe("recordSnowLog", () => {
+  it("prunes each resort and forecast history at its own local morning boundary", () => {
+    // 5:30 AM MST / 4:30 AM PST: neither destination has crossed 6 AM yet.
+    const now = new Date("2026-12-01T12:30:00Z");
+    const reading = { state: "reported" as const, valueIn: 1, label: "24 h", windowEnd: null, collectedAt: now.toISOString() };
+    const forecast = { snowIn: 1, issuedAt: null, collectedAt: now.toISOString() };
+    const previous: SnowLogState = {
+      resorts: { alta: { "2026-11-17": reading }, "mammoth-mountain": { "2026-11-17": reading } },
+      forecasts: { LCC: { "2026-11-17": forecast }, "mammoth-mountain": { "2026-11-17": forecast } },
+    };
+    const recorded = recordSnowLog(previous, snap({}), now);
+    expect(recorded).toEqual(previous);
+    expect(mergeSnowLog(previous, undefined, now)).toEqual(previous);
+    // Mountain has crossed its boundary; Pacific still has half an hour to go.
+    const later = new Date("2026-12-01T13:30:00Z");
+    const expected = { resorts: { "mammoth-mountain": previous.resorts["mammoth-mountain"] }, forecasts: { "mammoth-mountain": previous.forecasts["mammoth-mountain"] } };
+    expect(recordSnowLog(previous, snap({}), later)).toEqual(expected);
+    expect(mergeSnowLog(previous, undefined, later)).toEqual(expected);
+  });
+
   it("records a morning's 24 h report and lets a later morning correction replace it", () => {
     let log = recordSnowLog(undefined, snap({ alta: resortRecord("alta", "2026-12-01T13:00:00Z", "2026-12-01T08:00:00Z", inches(5)) }), new Date("2026-12-01T13:00:00Z"));
     expect(log.resorts.alta?.["2026-12-01"]).toMatchObject({ state: "reported", valueIn: 5, label: "Last 24 hrs", windowEnd: "2026-12-01T08:00:00Z" });
@@ -203,7 +247,7 @@ describe("timeline model", () => {
     forecasts: { LCC: { "2026-11-01": { snowIn: 9.5, issuedAt: null, collectedAt: "2026-10-31T11:00:00Z" } } },
   };
   const model = buildSnowTimeline({
-    resort: "alta", name: "Alta", canyon: "LCC", log, now,
+    resort: "alta", name: "Alta", canyon: "LCC", timeZone: ZONE, log, now,
     report: { reportTime: "2026-11-01T22:00:00Z", snowfall: { h24: inches(3) } } as unknown as ResortReport,
     forecast: { hourlySnow: hourly("2026-11-02T03:00:00Z", 6 * 24, 0.05) } as unknown as NwsPayload["points"][number],
   });
@@ -220,7 +264,7 @@ describe("timeline model", () => {
 
   it("dates a morning reading whose report came the evening before", () => {
     const evening = buildSnowTimeline({
-      resort: "alta", name: "Alta", canyon: "LCC", now, forecast: null, report: null,
+      resort: "alta", name: "Alta", canyon: "LCC", timeZone: ZONE, now, forecast: null, report: null,
       log: { resorts: { alta: { "2026-11-01": { state: "reported", valueIn: 5, label: "Last 24 hrs", windowEnd: "2026-11-01T03:00:00Z", collectedAt: "2026-11-01T13:00:00Z" } } }, forecasts: {} },
     });
     // 9 PM MDT on Oct 31, stored under the Nov 1 morning.
@@ -228,10 +272,10 @@ describe("timeline model", () => {
   });
 
   it("names the day boundary in local time across the daylight-saving change", () => {
-    // Nov 2's snow day ends at 5 AM MST; the evening before DST ended it would have been 6 AM.
+    // The boundary stays at 6 AM local after DST ends.
     expect(model.future[0]).toMatchObject({ partial: true, state: "forecast", amountIn: 0.5 });
-    expect(model.future[0].detail).toBe("Mon, Nov 2 · 0.5″ NWS forecast, now to 5 AM (LCC grid point)");
-    expect(model.future[1].detail).toMatch(/1\.2″ NWS forecast, 24 h to 5 AM/);
+    expect(model.future[0].detail).toBe("Mon, Nov 2 · 0.5″ NWS forecast, now to 6 AM (LCC grid point)");
+    expect(model.future[1].detail).toMatch(/1\.2″ NWS forecast, 6 AM to 6 AM local time/);
     // This forecast ends 6 days out, partway through the last day: no partial total.
     expect(model.future.at(-1)).toMatchObject({ state: "no_forecast", amountIn: null });
     expect(model.last24.detail).toBe("Last 24 h · 3″ reported by Alta (“Last 24 hrs”, report Sun, Nov 1, 3:00 PM MST)");
@@ -239,7 +283,7 @@ describe("timeline model", () => {
 
   it("dates an old report in the screen-reader description, so it can't pass for today's", () => {
     const stale = buildSnowTimeline({
-      resort: "alta", name: "Alta", canyon: "LCC", log, now, forecast: null,
+      resort: "alta", name: "Alta", canyon: "LCC", timeZone: ZONE, log, now, forecast: null,
       report: { reportTime: "2026-10-29T22:00:00Z", snowfall: { h24: inches(3) } } as unknown as ResortReport,
     });
     expect(stale.last24.detail).toMatch(/report Thu, Oct 29, 4:00 PM MDT\)$/);

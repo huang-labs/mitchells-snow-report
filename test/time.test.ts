@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cachedDateFormat, denverToUtc, formatAge, formatDenver, inferYearDenver, parseDenverDateTime, parseOffsetIso } from "@/lib/time";
+import { cachedDateFormat, denverToUtc, formatAge, formatDenver, formatLocalRelative, inferYearDenver, parseDenverDateTime, parseOffsetIso, zonedToUtc } from "@/lib/time";
 import { currentBlockStart } from "@/lib/sources/nws";
 
 describe("America/Denver conversions", () => {
@@ -57,5 +57,28 @@ describe("cachedDateFormat", () => {
     expect(b).not.toBe(a);
     const t = new Date("2026-11-05T15:00:00Z");
     expect([a.format(t), b.format(t)]).toEqual(["7 AM", "8 AM"]);
+  });
+});
+
+describe.each(["America/Denver", "America/Los_Angeles"])("relative calendar dates in %s", (zone) => {
+  it.each([
+    [2026, 11, 1, 23, 30, 2026, 10, 31, "Yesterday"],
+    [2026, 3, 7, 23, 30, 2026, 3, 8, "Tomorrow"],
+    [2026, 3, 9, 0, 30, 2026, 3, 8, "Yesterday"],
+    [2026, 11, 1, 0, 30, 2026, 11, 2, "Tomorrow"],
+    [2027, 1, 1, 0, 30, 2026, 12, 31, "Yesterday"],
+    [2026, 12, 31, 23, 30, 2027, 1, 1, "Tomorrow"],
+  ] as const)("keeps adjacent dates relative at %i-%i-%i %i:%i", (y, m, d, h, min, ry, rm, rd, label) => {
+    const now = zonedToUtc(y, m, d, h, min, 0, zone);
+    const report = zonedToUtc(ry, rm, rd, 12, 0, 0, zone).toISOString();
+    expect(formatLocalRelative(report, now, zone)).toBe(`${label} 12:00 PM`);
+    if (zone === "America/Denver") expect(formatDenver(report, now)).toBe(`${label} 12:00 PM`);
+  });
+
+  it("keeps today's label, older dates and missing timestamps", () => {
+    const now = zonedToUtc(2026, 11, 1, 23, 30, 0, zone);
+    expect(formatLocalRelative(zonedToUtc(2026, 11, 1, 12, 0, 0, zone).toISOString(), now, zone)).toBe("Today 12:00 PM");
+    expect(formatLocalRelative(zonedToUtc(2026, 10, 29, 12, 0, 0, zone).toISOString(), now, zone)).toBe("Oct 29, 12:00 PM");
+    expect(formatLocalRelative(null, now, zone)).toBe("unknown");
   });
 });

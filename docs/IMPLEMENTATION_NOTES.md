@@ -53,7 +53,7 @@ Numerical ensemble tables are verified only for CLN: six tables, seven ordered p
 
 ## History, publication and limits
 
-History begins with this deployment. Each destination uses a 6 AM local snow day, with source reporting windows preserved. A published report before the prior evening cutoff is not reused as a new morning reading; future timestamps cannot become history. Local days can be 23 or 25 hours.
+History begins with this deployment. Each destination uses a 6 AM local snow day, with source reporting windows preserved. Snow-day helpers and timeline models require an explicit destination zone, including when pruning history. A published report before the prior evening cutoff is not reused as a new morning reading; future timestamps cannot become history. Local days can be 23 or 25 hours; forecast descriptions state the 6 AM-to-6 AM local window without a fixed duration. Relative report labels compare local calendar dates so “Yesterday” and “Tomorrow” remain correct across clock changes. Plume initialization labels show the selected region's local date/time followed by the UTC model cycle; collection check time remains separate.
 
 Storm observations persist independently for each forecast area and are archived on material changes. A tracking or archive failure in one area keeps that area's previous memory and never blocks source collection or publication; archives are written after the snapshot and retried on the next run. Earlier rolling observations never become event totals; source counters can reset into separately labeled segments. New resort participants join an existing event when their reports arrive later.
 
