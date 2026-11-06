@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { unstable_readConfig } from "wrangler";
 import {
   Cloudflare,
@@ -9,6 +9,7 @@ import {
   parsePr,
   findNamespace,
   ensureGateway,
+  deletePreview,
 } from "../scripts/preview/cloudflare";
 import {
   baselineKey,
@@ -39,6 +40,54 @@ const encode = (value: unknown) =>
   new TextEncoder().encode(JSON.stringify(value)).buffer;
 const decode = (value: ArrayBuffer) =>
   JSON.parse(new TextDecoder().decode(value));
+
+describe("preview deletion propagation", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("waits for a deleted temporary runner to disappear from the control plane", async () => {
+    const methods: string[] = [];
+    let reads = 0;
+    const cf = new Cloudflare("account", "test-token", (async (_input, init) => {
+      methods.push(init?.method ?? "GET");
+      if (init?.method === "DELETE") return Response.json({ success: true });
+      return ++reads <= 2
+        ? Response.json({ success: true, result: { id: "seed-pr-18" } })
+        : new Response(null, { status: 404 });
+    }) as typeof fetch);
+    await Promise.all([
+      expect(deletePreview(cf, "seed-pr-18")).resolves.toBeUndefined(),
+      vi.runAllTimersAsync(),
+    ]);
+    expect(methods).toEqual(["DELETE", "GET", "GET", "GET"]);
+  });
+
+  it("fails after bounded checks when deletion never becomes visible", async () => {
+    const mock = vi.fn(async () => Response.json({ success: true }));
+    const cf = new Cloudflare("account", "test-token", mock);
+    await Promise.all([
+      expect(deletePreview(cf, "seed-pr-18")).rejects.toThrow(/still exists after deletion/),
+      vi.runAllTimersAsync(),
+    ]);
+    expect(mock).toHaveBeenCalledTimes(13); // One DELETE, twelve GETs.
+  });
+
+  it("accepts an already absent preview without polling", async () => {
+    const mock = vi.fn(async () => new Response(null, { status: 404 }));
+    await expect(deletePreview(new Cloudflare("account", "test-token", mock), "seed-pr-18")).resolves.toBeUndefined();
+    expect(mock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([401, 429, 500])("propagates HTTP %i without retrying or claiming cleanup succeeded", async (status) => {
+    const mock = vi.fn(async (_input, init?: RequestInit) => init?.method === "DELETE"
+      ? Response.json({ success: true })
+      : Response.json({ errors: [{ code: 1, message: "API failure" }] }, { status }));
+    const cf = new Cloudflare("account", "test-token", mock);
+    await expect(deletePreview(cf, "seed-pr-18")).rejects.toThrow(`HTTP ${status}`);
+    expect(mock).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
 
 describe("preview AI quota", () => {
   it("accepts the separate preview gateway's 1,000-request sliding-day limit", async () => {

@@ -154,11 +154,14 @@ export async function deletePreview(cf: Cloudflare, name: string) {
     { method: "DELETE" },
     true,
   );
-  if (
-    response.status !== 404 &&
-    (await cf.response(previewPath(name), {}, true)).status !== 404
-  )
-    throw new Error(`Preview ${name} still exists after deletion`);
+  if (response.status === 404) return;
+  // A successful DELETE can remain visible to GET briefly. Confirm removal
+  // before reusing the runner name; do not mask API/authentication failures.
+  for (let attempt = 0; attempt < 12; attempt++) {
+    if ((await cf.response(previewPath(name), {}, true)).status === 404) return;
+    if (attempt < 11) await new Promise((r) => setTimeout(r, 5_000));
+  }
+  throw new Error(`Preview ${name} still exists after deletion (12 checks)`);
 }
 
 export async function ensureGateway(cf: Cloudflare) {

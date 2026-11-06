@@ -62,7 +62,7 @@ The fixed favorites are Alta, Snowbird, Solitude, Brighton, Park City, Deer Vall
 
 ## PR previews
 
-Every PR gets its own preview KV, seeded once from production reads and refreshed from real sources on deployment. Previews run no cron and do not automatically regenerate AI articles. The PR's Preview comment reports source freshness and which commit generated each article.
+Every PR gets its own preview KV, seeded once from production reads and refreshed from real sources on deployment. Previews run no cron and do not automatically regenerate AI articles. The PR's Preview comment reports source freshness and which commit generated each article. Temporary runner cleanup waits for deletion visibility before continuing; see [preview operations](docs/DEPLOYMENT.md#refresh-or-regenerate-a-hosted-pr-preview).
 
 ```sh
 npm run preview:refresh -- --pr 10
