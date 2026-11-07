@@ -281,7 +281,7 @@ export async function runPreview(
   sha: string,
   channels: ChannelId[],
 ) {
-  // Generation uses a token scoped to Workers AI and Gateway runs, not the deploy token.
+  // Model calls use a token scoped to Workers AI and Gateway runs, never the deploy token.
   const aiToken = process.env.WORKERS_AI_TOKEN;
   if (channels.length && !aiToken)
     throw new Error("WORKERS_AI_TOKEN is required to generate Daily Snow");

@@ -57,6 +57,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # Workers AI Read and AI Gateway Run only; the deploy token has no Workers AI access.
+          # Workers AI Read and AI Gateway Run only, so model calls never carry the deploy token.
           WORKERS_AI_TOKEN: ${{ inputs.channel != 'none' && secrets.PR_AGENT_CLOUDFLARE_TOKEN || '' }}
         run: npx tsx scripts/preview-run.ts data --pr "$PR" --channel "$CHANNEL"
