@@ -281,10 +281,6 @@ export async function runPreview(
   sha: string,
   channels: ChannelId[],
 ) {
-  // Model calls use a token scoped to Workers AI and Gateway runs, never the deploy token.
-  const aiToken = process.env.WORKERS_AI_TOKEN;
-  if (channels.length && !aiToken)
-    throw new Error("WORKERS_AI_TOKEN is required to generate Daily Snow");
   if (channels.length) await ensureGateway(cf);
   const kv = await PreviewKV.open(storage);
   if (kv.copied !== null)
@@ -294,7 +290,7 @@ export async function runPreview(
     sha,
     channels,
     ai: channels.length
-      ? gatewayAi(cf.account, aiToken!, PREVIEW_GATEWAY)
+      ? gatewayAi(cf.account, cf.token, PREVIEW_GATEWAY)
       : undefined,
   });
   const current = (await (
