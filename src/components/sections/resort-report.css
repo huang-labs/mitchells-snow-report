@@ -342,7 +342,7 @@
     align-items: center;
     gap: 8px 12px;
   }
-  /* Three tiles across and a 3 × 2 grid below: the same slots as on a laptop. */
+  /* Three tiles across and one row of five below: the same slots as on a laptop. */
   .resort-snow__headline {
     gap: 8px;
   }
@@ -353,11 +353,10 @@
     font-size: 30px;
   }
   .resort-snow__history {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 20px 12px;
+    gap: 8px;
   }
   .resort-snow__history .metric--lg {
-    font-size: 24px;
+    font-size: 20px;
   }
   .status-list,
   .resort-cams {
