@@ -20,7 +20,7 @@ The isolated preview collection succeeded for all 19 sources. Regional and Weste
 
 The feature PR's checks verify the deployment token, emitted preview URL, populated pages and share metadata. Production custom-domain/cron activation is deliberately left to the main deployment after merge. Production KV is not seeded and starts accumulating history naturally.
 
-Preview preparation is automated through disposable seed runners, deleted with all immutable deployments after use. Never put their admin token on the public PR preview or in Actions logs. Source refresh and explicit AI regeneration are documented under [preview operations](DEPLOYMENT.md#refresh-or-regenerate-a-hosted-pr-preview).
+Preview preparation runs the branch's collection code inside the Action and deploys a public preview with no admin token. Source refresh and explicit AI regeneration are documented under [preview operations](DEPLOYMENT.md#refresh-or-regenerate-a-hosted-pr-preview).
 
 See [deployment and operations](DEPLOYMENT.md) for resource IDs, manual procedures and the current workflow. CI/reviewer/provider failures must be diagnosed independently; do not change to another runner/provider without checking the actual failure.
 

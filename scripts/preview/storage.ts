@@ -1,6 +1,6 @@
 import { CHANNELS } from "../../src/lib/catalog";
 import { emptyDailySnowState } from "../../src/lib/dailysnow";
-import { SNAPSHOT_KEY } from "../../src/lib/store";
+import { SNAPSHOT_KEY, type KVLike } from "../../src/lib/store";
 import type { DailySnowState } from "../../src/lib/types";
 import {
   Cloudflare,
@@ -15,6 +15,13 @@ export interface Key {
   name: string;
   expiration?: number;
 }
+/** A value held in memory until `PreviewKV.flush`; `expiration` is absolute Unix seconds. */
+interface Entry {
+  value: ArrayBuffer;
+  expiration?: number;
+}
+/** KV's REST API rejects expirations less than 60 s away. */
+const MIN_EXPIRATION_S = 60;
 
 export function baselineKey(key: string): boolean {
   return (
@@ -43,6 +50,12 @@ export function baselineValue(key: string, bytes: ArrayBuffer): ArrayBuffer {
   ).buffer;
 }
 
+const encode = (value: string) =>
+  new TextEncoder().encode(value).buffer as ArrayBuffer;
+const live = (expiration: number | undefined, nowMs: number) =>
+  !expiration || expiration > nowMs / 1000 + MIN_EXPIRATION_S;
+
+/** REST access to one PR's namespace. Production is only ever read. */
 export class PreviewStorage {
   constructor(
     private cf: Cloudflare,
@@ -51,17 +64,13 @@ export class PreviewStorage {
   ) {
     assertPreviewNamespace(namespace, pr);
   }
-  async get(key: string): Promise<ArrayBuffer | null> {
+  async get(key: string, namespace = this.namespace.id) {
     const response = await this.cf.response(
-      `/storage/kv/namespaces/${this.namespace.id}/values/${encodeURIComponent(key)}`,
+      `/storage/kv/namespaces/${namespace}/values/${encodeURIComponent(key)}`,
       {},
       true,
     );
     return response.status === 404 ? null : response.arrayBuffer();
-  }
-  async json<T>(key: string): Promise<T | null> {
-    const value = await this.get(key);
-    return value ? (JSON.parse(new TextDecoder().decode(value)) as T) : null;
   }
   async put(key: string, value: ArrayBuffer | string, expiration?: number) {
     const query = expiration ? `?expiration=${expiration}` : "";
@@ -94,9 +103,9 @@ export class PreviewStorage {
       }
     }
   }
-  async seed(now = Date.now()): Promise<number> {
-    if (await this.get(SEED_KEY)) return 0;
-    let copied = 0;
+  /** The allowlisted production baseline, read into memory. Nothing is written. */
+  async baseline(now = Date.now()): Promise<Map<string, Entry>> {
+    const entries = new Map<string, Entry>();
     let cursor = "";
     do {
       const response = await this.cf.response(
@@ -109,43 +118,108 @@ export class PreviewStorage {
       };
       if (!page.success)
         throw new Error("Production baseline key listing failed");
-      // Bounded API concurrency; finish all writes before committing the seed marker.
       const keys = page.result.filter(
-        (k) =>
-          baselineKey(k.name) &&
-          (!k.expiration || k.expiration * 1000 > now + 60_000),
+        (k) => baselineKey(k.name) && live(k.expiration, now),
       );
       for (let i = 0; i < keys.length; i += 4) {
-        const results = await Promise.allSettled(
+        await Promise.all(
           keys.slice(i, i + 4).map(async (key) => {
-            // Resume interrupted initialization without overwriting already copied/edited preview data.
-            if (await this.get(key.name)) return;
-            const source = await this.cf.response(
-              `/storage/kv/namespaces/${PRODUCTION_KV}/values/${encodeURIComponent(key.name)}`,
-              {},
-              true,
-            );
-            if (source.status === 404) return; // May expire while copying.
-            const bytes = await source.arrayBuffer();
-            if (key.expiration && key.expiration * 1000 <= Date.now() + 60_000)
-              return;
-            await this.put(
-              key.name,
-              baselineValue(key.name, bytes),
-              key.expiration,
-            );
-            copied++;
+            const bytes = await this.get(key.name, PRODUCTION_KV);
+            if (!bytes) return; // Expired while listing.
+            entries.set(key.name, {
+              value: baselineValue(key.name, bytes),
+              expiration: key.expiration,
+            });
           }),
         );
-        const failed = results.find((r) => r.status === "rejected");
-        if (failed?.status === "rejected") throw failed.reason;
       }
       cursor = page.result_info.cursor ?? "";
     } while (cursor);
-    await this.put(
-      SEED_KEY,
-      JSON.stringify({ seededAt: new Date(now).toISOString(), copied }),
+    return entries;
+  }
+}
+
+/**
+ * The KV a preview run collects into. Reads fall through to the PR namespace
+ * over REST; writes stay in memory until `flush` stores them once. Everything
+ * this run reads and writes goes through the same REST store, so nothing
+ * depends on when an edge location sees a write.
+ */
+export class PreviewKV implements KVLike {
+  private cache = new Map<string, Entry | null>();
+  private dirty = new Set<string>();
+  /** Production values copied into this run, or null when the namespace was already seeded. */
+  readonly copied: number | null = null;
+  private constructor(private storage: PreviewStorage) {}
+
+  /** A never-seeded PR namespace starts from the production baseline. */
+  static async open(storage: PreviewStorage, now = Date.now()) {
+    const kv = new PreviewKV(storage);
+    if ((await storage.get(SEED_KEY)) !== null) return kv;
+    const baseline = await storage.baseline(now);
+    for (const [key, entry] of baseline) kv.set(key, entry);
+    return Object.assign(kv, { copied: baseline.size });
+  }
+
+  private set(key: string, entry: Entry) {
+    this.cache.set(key, entry);
+    this.dirty.add(key);
+  }
+  private async entry(key: string) {
+    if (!this.cache.has(key)) {
+      const value = await this.storage.get(key);
+      this.cache.set(key, value ? { value } : null);
+    }
+    return this.cache.get(key)!;
+  }
+
+  get(key: string, type: "text"): Promise<string | null>;
+  get(key: string, type: "arrayBuffer"): Promise<ArrayBuffer | null>;
+  async get(key: string, type: "text" | "arrayBuffer") {
+    const entry = await this.entry(key);
+    if (!entry) return null;
+    return type === "text"
+      ? new TextDecoder().decode(entry.value)
+      : entry.value.slice(0);
+  }
+  async put(
+    key: string,
+    value: string | ArrayBuffer,
+    options?: { expirationTtl?: number },
+  ) {
+    this.set(key, {
+      value: typeof value === "string" ? encode(value) : value.slice(0),
+      expiration: options?.expirationTtl
+        ? Math.floor(Date.now() / 1000) + options.expirationTtl
+        : undefined,
+    });
+  }
+  async json<T>(key: string): Promise<T | null> {
+    const text = await this.get(key, "text");
+    return text ? (JSON.parse(text) as T) : null;
+  }
+
+  /** Store every changed value, then the status, then (first run only) the seed marker. */
+  async flush(status: unknown, now = Date.now()) {
+    const keys = [...this.dirty].filter((k) =>
+      live(this.cache.get(k)!.expiration, now),
     );
-    return copied;
+    for (let i = 0; i < keys.length; i += 4)
+      await Promise.all(
+        keys.slice(i, i + 4).map((key) => {
+          const { value, expiration } = this.cache.get(key)!;
+          return this.storage.put(key, value, expiration);
+        }),
+      );
+    await this.storage.put(STATUS_KEY, JSON.stringify(status));
+    // Without the marker, a later run re-seeds from production rather than
+    // trusting a partially written namespace.
+    if (this.copied !== null)
+      await this.storage.put(
+        SEED_KEY,
+        JSON.stringify({ seededAt: new Date(now).toISOString(), copied: this.copied }),
+      );
+    this.dirty.clear();
+    return keys.length;
   }
 }
