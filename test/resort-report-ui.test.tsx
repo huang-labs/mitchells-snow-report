@@ -148,17 +148,21 @@ it("preserves Alta's own snow windows and distinguishes zero, empty and unsuppor
   expect(
     container.querySelector(".resort-snow__headline")?.textContent,
   ).toContain("12 h");
-  expect(
-    container.querySelector(".resort-snow__headline .metric--not_reported")
-      ?.textContent,
-  ).toContain("not reported");
+  // An empty field and an unpublished window share one "no data" mark.
+  const empty = container.querySelector(".resort-snow__headline .metric--not_reported")!;
+  expect(empty.textContent).toBe("—");
+  expect(empty.querySelector("[aria-label='no data']")!.getAttribute("title")).toBe("Not reported in this update");
+  expect(container.querySelector(".resort-snow__history .metric--unavailable")!.textContent).toBe("—");
+  expect(container.textContent).not.toContain("not reported");
   expect(
     container.querySelector(".resort-snow__headline .metric__value--zero")
       ?.textContent,
   ).toContain("0");
-  expect(
-    container.querySelector(".resort-snow__unavailable")?.textContent,
-  ).toContain("Not provided by Alta");
+  // One line names every missing value, empty or unpublished.
+  const missing = container.querySelector(".resort-snow__unavailable")!.textContent!;
+  expect(missing).toMatch(/^No data from Alta: /);
+  expect(missing).toContain("24 h");
+  expect(missing).toContain("Overnight");
 });
 
 it("explains Brighton's missing observations and handles a completely unavailable resort", () => {
