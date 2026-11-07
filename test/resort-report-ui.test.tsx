@@ -244,6 +244,32 @@ it("captions Alta's Overnight tile with its 12-hour window and doesn't list over
   expect(container.querySelector(".resort-snow__unavailable")?.textContent ?? "").not.toMatch(/Overnight|12 h/);
 });
 
+it("fills the Overnight tile with a published 12 h figure when overnight is empty", () => {
+  const base = report.sources.brighton.payload as ResortReport;
+  const source: ApiSource<ResortReport> = {
+    ...report.sources.brighton,
+    payload: {
+      ...base,
+      snowfall: {
+        ...base.snowfall,
+        overnight: { state: "not_reported", label: "Snow Overnight" },
+        h12: { state: "reported", value: 4, unit: "in", label: "Snow 12 Hrs." },
+      },
+    },
+  };
+  const { container, unmount } = render(<ResortReportPage source={source} now={FIXTURE_NOW} />);
+  const first = container.querySelector(".resort-snow__headline .resort-metric")!;
+  expect(first.querySelector(".resort-metric__label")!.textContent).toBe("Overnight");
+  expect(first.querySelector(".metric__value")!.textContent).toBe("4″");
+  expect(first.querySelector(".resort-metric__qualifier")!.textContent).toBe("Snow 12 Hrs.");
+  unmount();
+  // With overnight published, the tile keeps it.
+  const both = structuredClone(source);
+  (both.payload as ResortReport).snowfall.overnight = { state: "reported", value: 2, unit: "in", label: "Snow Overnight" };
+  const view = render(<ResortReportPage source={both} now={FIXTURE_NOW} />);
+  expect(view.container.querySelector(".resort-snow__headline .metric__value")!.textContent).toBe("2″");
+});
+
 it("keeps a resort's wording only where its window differs, and lists shared source notes once", () => {
   const base = report.sources.solitude.payload as ResortReport;
   const note = "Mid-Mountain measurement location";
