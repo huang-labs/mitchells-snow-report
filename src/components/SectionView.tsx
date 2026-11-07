@@ -8,9 +8,15 @@ import { PlumesPage } from "./sections/PlumesPage";
 import { RegionalPage } from "./sections/RegionalPage";
 import { ResortReportPage } from "./sections/ResortReportPage";
 import { RegionSelector } from "./RegionSelector";
-import type { RegionId } from "@/lib/catalog";
+import { resortById, type RegionId } from "@/lib/catalog";
 import { regionalSource } from "@/lib/regionalSource";
 import { WeatherPage } from "./sections/WeatherPage";
+
+/** A resort's regional Daily Snow edition, if any. */
+function resortDailySnow(report: ReportResponse, id: string) {
+  const region = resortById(id)?.region;
+  return region ? report.dailySnows?.[region] ?? null : null;
+}
 
 export function renderSection(
   id: string,
@@ -63,6 +69,7 @@ export function renderSection(
           now={now}
           cams={report.sources.resortcams}
           loadedAt={loadedAt}
+          dailySnow={resortDailySnow(report, id)}
         />
       );
   }
