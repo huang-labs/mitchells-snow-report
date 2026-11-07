@@ -99,6 +99,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Pages are static assets and share cards render without an article,
+      # so this check doesn't wait for the just-written KV to reach the edge.
       - name: Verify deployed share previews
         run: npx tsx scripts/check-share-preview.ts "$PREVIEW_URL"
         env:

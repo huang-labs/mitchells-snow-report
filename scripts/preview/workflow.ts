@@ -304,6 +304,9 @@ export async function runPreview(
   assertPullRequest(await github<PullRequest>(`/pulls/${pr}`), sha);
   console.log(`Stored ${await kv.flush(status)} changed values`);
   deployPreview(pr, sha, storage.namespace.id);
+  // No propagation wait: nothing reads this KV back before writing, the comment
+  // comes from `current`, and the share-preview check needs no KV data (pages are
+  // static assets; share cards render without an article).
   await comment(pr, readinessComment(pr, sha, status, current, failures));
   if (failures.length || current.requiredMissing.length)
     throw new ReportedPreviewError(

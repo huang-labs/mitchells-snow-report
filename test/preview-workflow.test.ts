@@ -163,7 +163,8 @@ describe("preview Workers AI over REST", () => {
     const ai = gatewayAi("account", "credential", "mitchells-snow-report-preview", fetchImpl as typeof fetch);
     expect(await ai.run("@cf/zai-org/glm-5.3-flash", { messages: [] })).toEqual({ response: "{}" });
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("https://gateway.ai.cloudflare.com/v1/account/mitchells-snow-report-preview/workers-ai/@cf/zai-org/glm-5.3-flash");
+    expect(url).toBe("https://api.cloudflare.com/client/v4/accounts/account/ai/run/@cf/zai-org/glm-5.3-flash");
+    expect(new Headers(init.headers).get("cf-aig-gateway-id")).toBe("mitchells-snow-report-preview");
     expect(new Headers(init.headers).get("cf-aig-skip-cache")).toBe("true");
   });
 
