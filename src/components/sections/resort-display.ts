@@ -49,7 +49,13 @@ export function snowQualifier(key: keyof SnowfallSet, label: string): string | n
   return SAME_WINDOW[key].test(label) ? null : label;
 }
 
-/** The "new snow" window: overnight where the resort reports it, else its 12-hour total (Alta). */
+/**
+ * The window behind the Overnight tile: the resort's overnight figure, or its 12-hour
+ * figure when overnight has no value (Alta never publishes overnight; a resort may leave
+ * it empty while publishing 12 h). A published amount is never hidden behind a "—".
+ */
 export function newSnowKey(snowfall: SnowfallSet): "overnight" | "h12" {
+  if (snowfall.overnight.state === "reported") return "overnight";
+  if (snowfall.h12.state === "reported") return "h12";
   return snowfall.overnight.state === "unavailable" && snowfall.h12.state !== "unavailable" ? "h12" : "overnight";
 }

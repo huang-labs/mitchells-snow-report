@@ -146,8 +146,8 @@ it("preserves Alta's own snow windows and distinguishes zero, empty and unsuppor
     <ResortReportPage source={source} now={FIXTURE_NOW} />,
   );
   expect(
-    container.querySelector(".resort-snow__headline")?.textContent,
-  ).toContain("12 h");
+    container.querySelector(".resort-snow__headline .resort-metric__qualifier")?.textContent,
+  ).toMatch(/12/);
   // An empty field and an unpublished window share one "no data" mark.
   const empty = container.querySelector(".resort-snow__headline .metric--not_reported")!;
   expect(empty.textContent).toBe("—");
@@ -162,7 +162,9 @@ it("preserves Alta's own snow windows and distinguishes zero, empty and unsuppor
   const missing = container.querySelector(".resort-snow__unavailable")!.textContent!;
   expect(missing).toMatch(/^No data from Alta: /);
   expect(missing).toContain("24 h");
-  expect(missing).toContain("Overnight");
+  expect(missing).toContain("48 h");
+  // Alta's Overnight tile holds its 12 h total, so overnight isn't missing.
+  expect(missing).not.toContain("Overnight");
 });
 
 it("explains Brighton's missing observations and handles a completely unavailable resort", () => {
@@ -228,12 +230,44 @@ it("shows the same snowfall slots in the same order for every resort", () => {
     unmount();
     return labels;
   };
-  const tail = ["48 h", "72 h", "7 days", "Storm", "Season"];
-  // Alta publishes 12 h instead of overnight, so its new-snow tile is 12 h and overnight moves to the row.
-  expect(slots("alta")).toEqual(["12 h", "24 h", "Base depth", "Overnight", ...tail]);
-  for (const id of ["snowbird", "solitude", "brighton"]) {
-    expect(slots(id)).toEqual(["Overnight", "24 h", "Base depth", "12 h", ...tail]);
+  // Alta's Overnight tile holds its 12 h total; no resort shows a separate 12 h slot.
+  for (const { id } of RESORTS) {
+    expect(slots(id)).toEqual(["Overnight", "24 h", "Base depth", "48 h", "72 h", "7 days", "Storm", "Season"]);
   }
+});
+
+it("captions Alta's Overnight tile with its 12-hour window and doesn't list overnight as unsupported", () => {
+  const { container } = render(renderSection("alta", report, FIXTURE_NOW, null));
+  const first = container.querySelector(".resort-snow__headline .resort-metric")!;
+  expect(first.querySelector(".resort-metric__label")!.textContent).toBe("Overnight");
+  expect(first.querySelector(".resort-metric__qualifier")!.textContent).toMatch(/12/);
+  expect(container.querySelector(".resort-snow__unavailable")?.textContent ?? "").not.toMatch(/Overnight|12 h/);
+});
+
+it("fills the Overnight tile with a published 12 h figure when overnight is empty", () => {
+  const base = report.sources.brighton.payload as ResortReport;
+  const source: ApiSource<ResortReport> = {
+    ...report.sources.brighton,
+    payload: {
+      ...base,
+      snowfall: {
+        ...base.snowfall,
+        overnight: { state: "not_reported", label: "Snow Overnight" },
+        h12: { state: "reported", value: 4, unit: "in", label: "Snow 12 Hrs." },
+      },
+    },
+  };
+  const { container, unmount } = render(<ResortReportPage source={source} now={FIXTURE_NOW} />);
+  const first = container.querySelector(".resort-snow__headline .resort-metric")!;
+  expect(first.querySelector(".resort-metric__label")!.textContent).toBe("Overnight");
+  expect(first.querySelector(".metric__value")!.textContent).toBe("4″");
+  expect(first.querySelector(".resort-metric__qualifier")!.textContent).toBe("Snow 12 Hrs.");
+  unmount();
+  // With overnight published, the tile keeps it.
+  const both = structuredClone(source);
+  (both.payload as ResortReport).snowfall.overnight = { state: "reported", value: 2, unit: "in", label: "Snow Overnight" };
+  const view = render(<ResortReportPage source={both} now={FIXTURE_NOW} />);
+  expect(view.container.querySelector(".resort-snow__headline .metric__value")!.textContent).toBe("2″");
 });
 
 it("keeps a resort's wording only where its window differs, and lists shared source notes once", () => {
@@ -330,7 +364,7 @@ it("discloses conflicting source snowfall while retaining the published amounts"
   payload.snowfall.h24 = { state: "reported", value: 0, unit: "in", label: "Last 24 hours" };
   const { container } = render(<ResortReportPage source={source} now={FIXTURE_NOW} />);
   expect(screen.getByRole("note").textContent).toContain("Snowfall data warning");
-  expect(screen.getByRole("note").textContent).toContain("shown as published");
+  expect(screen.getByRole("note").textContent).toBe("Snowfall data warning: the resort publishes conflicting or invalid amounts.");
   expect(container.querySelector(".resort-snow__headline")?.textContent).toContain("6");
   expect(payload.snowfall.overnight).toMatchObject({ state: "reported", value: 6 });
 });
