@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { unstable_readConfig } from "wrangler";
 import {
   Cloudflare,
@@ -14,24 +14,22 @@ import {
 import {
   baselineKey,
   baselineValue,
+  PreviewKV,
   PreviewStorage,
   SEED_KEY,
+  STATUS_KEY,
 } from "../scripts/preview/storage";
 import {
   assertPullRequest,
-  collectionUrl,
-  deploymentUrls,
+  collectPreview,
+  failureComment,
   previewConfig,
   readinessComment,
-  revokedResponse,
   selectedChannels,
-  withRunner,
-  type PreviewStatus,
-  type RunnerHooks,
 } from "../scripts/preview/workflow";
+import { gatewayAi } from "../scripts/preview/ai";
 import { emptyDailySnowState } from "@/lib/dailysnow";
 import type { ReportResponse } from "@/lib/types";
-import type { CollectSummary } from "@/lib/collect";
 import { buildReport } from "@/lib/report";
 
 const id = "a".repeat(32);
@@ -41,51 +39,155 @@ const encode = (value: unknown) =>
 const decode = (value: ArrayBuffer) =>
   JSON.parse(new TextDecoder().decode(value));
 
-describe("preview deletion propagation", () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
+/** Cloudflare's KV REST API over two in-memory namespaces; production is read-only. */
+function kvApi(production: Record<string, { value: ArrayBuffer; expiration?: number }>) {
+  const pr = new Map<string, ArrayBuffer>();
+  const writes: Array<{ key: string; expiration: string | null }> = [];
+  const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(String(input));
+    const isProduction = url.pathname.includes(PRODUCTION_KV);
+    if (isProduction && init?.method && init.method !== "GET")
+      throw new Error("Production write attempted");
+    if (url.pathname.endsWith("/keys"))
+      return Response.json({
+        success: true,
+        result: Object.entries(production).map(([name, { expiration }]) => ({ name, expiration })),
+        result_info: {},
+      });
+    const key = decodeURIComponent(url.pathname.split("/values/")[1]);
+    if (init?.method === "PUT") {
+      const body = init.body;
+      pr.set(key, typeof body === "string" ? (new TextEncoder().encode(body).buffer as ArrayBuffer) : (body as ArrayBuffer));
+      writes.push({ key, expiration: url.searchParams.get("expiration") });
+      return Response.json({ success: true });
+    }
+    const value = isProduction ? production[key]?.value : pr.get(key);
+    return value ? new Response(value) : new Response("missing", { status: 404 });
+  });
+  const storage = new PreviewStorage(new Cloudflare("account", "credential", fetchImpl as typeof fetch), namespace, 12);
+  return { pr, writes, fetchImpl, storage };
+}
 
-  it("waits for a deleted temporary runner to disappear from the control plane", async () => {
-    const methods: string[] = [];
-    let reads = 0;
-    const cf = new Cloudflare("account", "test-token", (async (_input, init) => {
-      methods.push(init?.method ?? "GET");
-      if (init?.method === "DELETE") return Response.json({ success: true });
-      return ++reads <= 2
-        ? Response.json({ success: true, result: { id: "seed-pr-18" } })
-        : new Response(null, { status: 404 });
-    }) as typeof fetch);
-    await Promise.all([
-      expect(deletePreview(cf, "seed-pr-18")).resolves.toBeUndefined(),
-      vi.runAllTimersAsync(),
-    ]);
-    expect(methods).toEqual(["DELETE", "GET", "GET", "GET"]);
+describe("preview data built in memory", () => {
+  const now = Date.parse("2026-11-07T15:00:00Z");
+  const expiration = Math.floor(now / 1000) + 600;
+  const image = new Uint8Array([137, 80, 78, 71, 255]).buffer;
+  const production = () => ({
+    "snapshot:v1": { value: encode({ production: true }) },
+    "plume-panel:live": { value: image, expiration },
+    "plume-panel:expiring": { value: image, expiration: Math.floor(now / 1000) + 30 },
+    ADMIN_TOKEN: { value: encode("secret") },
   });
 
-  it("fails after bounded checks when deletion never becomes visible", async () => {
+  it("reads the production baseline before anything is written, then stores it once with the seed marker last", async () => {
+    const api = kvApi(production());
+    const kv = await PreviewKV.open(api.storage, now);
+    expect(api.writes).toEqual([]);
+    expect(kv.copied).toBe(2);
+    expect(JSON.parse((await kv.get("snapshot:v1", "text"))!)).toEqual({ production: true });
+    expect(await kv.get("ADMIN_TOKEN", "text")).toBeNull();
+    await kv.put("dailysnow:v1:2026-11-07", "post", { expirationTtl: 3600 });
+    await kv.flush({ editions: {} }, now);
+    expect(api.writes.map((w) => w.key)).toEqual([
+      "snapshot:v1",
+      "plume-panel:live",
+      "dailysnow:v1:2026-11-07",
+      STATUS_KEY,
+      SEED_KEY,
+    ]);
+    expect(api.writes[1].expiration).toBe(String(expiration));
+    expect(Number(api.writes[2].expiration)).toBeGreaterThan(Date.now() / 1000 + 3500);
+    expect(new Uint8Array(api.pr.get("plume-panel:live")!)).toEqual(new Uint8Array(image));
+  });
+
+  it("reuses a seeded namespace and writes only values the run changed", async () => {
+    const api = kvApi(production());
+    await (await PreviewKV.open(api.storage, now)).flush({}, now);
+    api.pr.set("snapshot:v1", encode({ previewEdit: true }));
+    api.writes.length = 0;
+    const kv = await PreviewKV.open(api.storage, now);
+    expect(kv.copied).toBeNull();
+    expect(JSON.parse((await kv.get("snapshot:v1", "text"))!)).toEqual({ previewEdit: true });
+    await kv.put("snapshot:v1", JSON.stringify({ refreshed: true }));
+    await kv.flush({}, now);
+    expect(api.writes.map((w) => w.key)).toEqual(["snapshot:v1", STATUS_KEY]);
+  });
+
+  it("does not store anything, or mark the namespace seeded, when the production read fails", async () => {
+    const api = kvApi(production());
+    api.fetchImpl.mockImplementation(async (input) =>
+      String(input).includes("/keys")
+        ? Response.json({ success: true, result: [{ name: "snapshot:v1" }], result_info: {} })
+        : String(input).includes(PRODUCTION_KV)
+          ? new Response("unavailable", { status: 503 })
+          : new Response("missing", { status: 404 }),
+    );
+    await expect(PreviewKV.open(api.storage, now)).rejects.toThrow(/503/);
+    expect(api.writes).toEqual([]);
+  });
+
+  it("keeps production's snow history when a new PR's first refresh fails every source", async () => {
+    // PR #27 lost Alta's history: the refresh read an empty snapshot and wrote over the copy.
+    const alta = { state: "reported", valueIn: 1, label: "24 Hour", windowEnd: "2026-11-05T08:00:00Z", collectedAt: "2026-11-05T14:00:00Z" };
+    const api = kvApi({
+      "snapshot:v1": {
+        value: encode({ schemaVersion: 1, writtenAt: "2026-11-07T14:00:00Z", sources: {}, snowLog: { resorts: { alta: { "2026-11-05": alta } }, forecasts: {} } }),
+      },
+    });
+    const kv = await PreviewKV.open(api.storage, now);
+    const { status } = await collectPreview({
+      kv,
+      sha: "abcdef123456",
+      channels: [],
+      now: () => new Date(now),
+      fetchImpl: (async () => new Response("down", { status: 503 })) as typeof fetch,
+    });
+    await kv.flush(status, now);
+    const stored = decode(api.pr.get("snapshot:v1")!);
+    expect(stored.snowLog.resorts.alta["2026-11-05"]).toEqual(alta);
+    expect(status.sourceFailures.length).toBeGreaterThan(0);
+    expect(status.refreshedSha).toBe("abcdef123456");
+  });
+
+  it("requires Workers AI before generating a channel", async () => {
+    const kv = await PreviewKV.open(kvApi(production()).storage, now);
+    await expect(
+      collectPreview({ kv, sha: "abc", channels: ["utah"], now: () => new Date(now), fetchImpl: (async () => new Response("down", { status: 503 })) as typeof fetch }),
+    ).rejects.toThrow(/Workers AI/);
+  });
+});
+
+describe("preview Workers AI over REST", () => {
+  it("returns the binding-shaped result through the preview gateway without caching", async () => {
+    const fetchImpl = vi.fn(async () => Response.json({ success: true, result: { response: "{}" } }));
+    const ai = gatewayAi("account", "credential", "mitchells-snow-report-preview", fetchImpl as typeof fetch);
+    expect(await ai.run("@cf/zai-org/glm-5.3-flash", { messages: [] })).toEqual({ response: "{}" });
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://api.cloudflare.com/client/v4/accounts/account/ai/run/@cf/zai-org/glm-5.3-flash");
+    expect(new Headers(init.headers).get("cf-aig-gateway-id")).toBe("mitchells-snow-report-preview");
+    expect(new Headers(init.headers).get("cf-aig-skip-cache")).toBe("true");
+  });
+
+  it("surfaces the HTTP status and API errors", async () => {
+    const ai = gatewayAi("account", "credential", "gateway", (async () =>
+      Response.json({ success: false, errors: [{ message: "rate limited" }] }, { status: 429 })) as typeof fetch);
+    await expect(ai.run("model", {})).rejects.toThrow(/HTTP 429.*rate limited/);
+  });
+});
+
+describe("closed-PR preview deletion", () => {
+  it("deletes only the PR's own Preview and accepts one that is already gone", async () => {
     const mock = vi.fn(async () => Response.json({ success: true }));
-    const cf = new Cloudflare("account", "test-token", mock);
-    await Promise.all([
-      expect(deletePreview(cf, "seed-pr-18")).rejects.toThrow(/still exists after deletion/),
-      vi.runAllTimersAsync(),
-    ]);
-    expect(mock).toHaveBeenCalledTimes(13); // One DELETE, twelve GETs.
+    expect(await deletePreview(new Cloudflare("account", "test-token", mock), 18)).toBe(true);
+    expect(String((mock.mock.calls[0] as unknown[])[0])).toMatch(/\/workers\/workers\/mitchells-snow-report-preview\/previews\/pr-18$/);
+    const absent = vi.fn(async () => new Response(null, { status: 404 }));
+    expect(await deletePreview(new Cloudflare("account", "test-token", absent), 18)).toBe(false);
   });
 
-  it("accepts an already absent preview without polling", async () => {
-    const mock = vi.fn(async () => new Response(null, { status: 404 }));
-    await expect(deletePreview(new Cloudflare("account", "test-token", mock), "seed-pr-18")).resolves.toBeUndefined();
-    expect(mock).toHaveBeenCalledTimes(1);
-  });
-
-  it.each([401, 429, 500])("propagates HTTP %i without retrying or claiming cleanup succeeded", async (status) => {
-    const mock = vi.fn(async (_input, init?: RequestInit) => init?.method === "DELETE"
-      ? Response.json({ success: true })
-      : Response.json({ errors: [{ code: 1, message: "API failure" }] }, { status }));
-    const cf = new Cloudflare("account", "test-token", mock);
-    await expect(deletePreview(cf, "seed-pr-18")).rejects.toThrow(`HTTP ${status}`);
-    expect(mock).toHaveBeenCalledTimes(2);
-    expect(vi.getTimerCount()).toBe(0);
+  it.each([401, 403, 429, 500])("propagates HTTP %i instead of reporting the Preview removed", async (status) => {
+    const mock = vi.fn(async () => Response.json({ errors: [{ code: 1, message: "API failure" }] }, { status }));
+    await expect(deletePreview(new Cloudflare("account", "test-token", mock), 18)).rejects.toThrow(`HTTP ${status}`);
+    expect(mock).toHaveBeenCalledOnce();
   });
 });
 
@@ -158,96 +260,6 @@ describe("preview storage ownership and baseline", () => {
     expect(copied.lastError).toBeNull();
     expect(copied.lastAttemptAt).toBeNull();
   });
-  it("copies binary stills with their expiry, resumes existing preview values, paginates, and seeds only once", async () => {
-    const values = new Map<string, ArrayBuffer>([
-      ["snapshot:v1", encode({ previewEdit: true })],
-    ]);
-    const writes: Array<{ key: string; expiration: string | null }> = [];
-    const now = Date.now();
-    const expiration = Math.floor(now / 1000) + 600;
-    const image = new Uint8Array([137, 80, 78, 71, 255]).buffer;
-    const mock = vi.fn(
-      async (input: string | URL | Request, init?: RequestInit) => {
-        const url = new URL(String(input));
-        const production = url.pathname.includes(PRODUCTION_KV);
-        if (production && init?.method && init.method !== "GET")
-          throw new Error("Production write attempted");
-        if (url.pathname.endsWith("/keys"))
-          return Response.json({
-            success: true,
-            result: url.searchParams.get("cursor")
-              ? [
-                  { name: "ADMIN_TOKEN" },
-                  { name: "plume-panel:expired", expiration: expiration - 600 },
-                ]
-              : [
-                  { name: "snapshot:v1" },
-                  { name: "plume-panel:live", expiration },
-                ],
-            result_info: {
-              cursor: url.searchParams.get("cursor") ? "" : "next",
-            },
-          });
-        const key = decodeURIComponent(url.pathname.split("/values/")[1]);
-        if (production)
-          return new Response(
-            key === "snapshot:v1" ? encode({ production: true }) : image,
-          );
-        if (init?.method === "PUT") {
-          const body = init.body;
-          values.set(
-            key,
-            typeof body === "string"
-              ? new TextEncoder().encode(body).buffer
-              : (body as ArrayBuffer),
-          );
-          writes.push({ key, expiration: url.searchParams.get("expiration") });
-          return Response.json({ success: true });
-        }
-        return values.has(key)
-          ? new Response(values.get(key))
-          : new Response("missing", { status: 404 });
-      },
-    );
-    const storage = new PreviewStorage(
-      new Cloudflare("account", "credential", mock as typeof fetch),
-      namespace,
-      12,
-    );
-    expect(await storage.seed(now)).toBe(1);
-    expect(decode(values.get("snapshot:v1")!)).toEqual({ previewEdit: true });
-    expect(new Uint8Array(values.get("plume-panel:live")!)).toEqual(
-      new Uint8Array(image),
-    );
-    expect(writes).toEqual([
-      { key: "plume-panel:live", expiration: String(expiration) },
-      { key: SEED_KEY, expiration: null },
-    ]);
-    expect(await storage.seed(now)).toBe(0);
-  });
-  it("does not commit a seed marker after a failed copy", async () => {
-    const paths: string[] = [];
-    const cf = new Cloudflare("account", "credential", (async (input, init) => {
-      const url = String(input);
-      paths.push(url);
-      if (url.includes("/keys?"))
-        return Response.json({
-          success: true,
-          result: [{ name: "snapshot:v1" }],
-          result_info: {},
-        });
-      if (url.includes(PRODUCTION_KV))
-        return new Response("unavailable", { status: 503 });
-      if (!init?.method) return new Response("missing", { status: 404 });
-      return Response.json({ success: true });
-    }) as typeof fetch);
-    await expect(new PreviewStorage(cf, namespace, 12).seed()).rejects.toThrow(
-      /503/,
-    );
-    expect(
-      paths.filter((p) => decodeURIComponent(p).includes(SEED_KEY)),
-    ).toHaveLength(1); // only initial GET
-  });
   it("finds namespaces beyond the first page rather than creating duplicates", async () => {
     const cf = new Cloudflare("account", "credential", (async (input) => {
       const second = new URL(String(input)).searchParams.get("page") === "2";
@@ -258,86 +270,6 @@ describe("preview storage ownership and baseline", () => {
       });
     }) as typeof fetch);
     expect(await findNamespace(cf, 12, true)).toEqual(namespace);
-  });
-});
-
-describe("temporary runner orchestration", () => {
-  const summary: CollectSummary = {
-    startedAt: "2026-11-05T15:00:00Z",
-    durationMs: 1,
-    results: [{ id: "nws", ok: true, ms: 1 }],
-    skipped: [],
-  };
-  const status = (): PreviewStatus => ({ sourceFailures: [], editions: {} });
-  function hooks(): RunnerHooks {
-    return {
-      deploy: vi.fn(async () => [
-        "https://alias.example",
-        "https://immutable.example",
-      ]),
-      remove: vi.fn(async () => {}),
-      collect: vi.fn(async () => summary),
-      report: vi.fn(async () => buildReport(null)),
-      revoked: vi.fn(async () => {}),
-    };
-  }
-  it("refreshes without any forced channel, then revokes every returned runner URL", async () => {
-    const h = hooks(),
-      s = status();
-    await withRunner(h, [], s, "head");
-    expect(h.collect).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(h.collect).mock.calls[0][2]).toBeUndefined();
-    expect(s.refreshedSha).toBe("head");
-    expect(h.remove).toHaveBeenCalledOnce();
-    expect(h.revoked).toHaveBeenCalledTimes(2);
-  });
-  it("removes the runner after collection failure or partial deployment", async () => {
-    for (const failure of ["collect", "deploy"] as const) {
-      const h = hooks();
-      vi.mocked(h[failure]).mockRejectedValueOnce(new Error("timeout"));
-      await expect(withRunner(h, [], status(), "head")).rejects.toThrow(
-        /timeout/,
-      );
-      expect(h.remove).toHaveBeenCalledOnce();
-    }
-  });
-  it("reports caps/skips without retrying or resetting channel state", async () => {
-    const h = hooks(),
-      s = status();
-    vi.mocked(h.collect).mockResolvedValue({
-      ...summary,
-      publications: [{ channel: "utah", skipped: "channel daily cap" }],
-    });
-    expect(await withRunner(h, ["utah"], s, "head", false)).toEqual([
-      "utah: channel daily cap",
-    ]);
-    expect(h.collect).toHaveBeenCalledTimes(1);
-    expect(s.editions).toEqual({});
-    expect(h.remove).toHaveBeenCalledOnce();
-  });
-  it("records commit provenance only after seeing a newly published edition", async () => {
-    const h = hooks(),
-      s = status();
-    vi.mocked(h.collect).mockResolvedValue({
-      ...summary,
-      publications: [{ channel: "utah", published: "2026-11-05" }],
-    });
-    vi.mocked(h.report).mockResolvedValue({
-      ...buildReport(null),
-      dailySnows: { utah: { generatedAt: summary.startedAt } },
-    } as ReportResponse);
-    await withRunner(h, ["utah"], s, "head", false);
-    expect(s.editions.utah).toEqual({
-      sha: "head",
-      generatedAt: summary.startedAt,
-    });
-  });
-  it("propagates cleanup failures rather than claiming that temporary access is closed", async () => {
-    const h = hooks();
-    vi.mocked(h.remove).mockRejectedValue(new Error("delete forbidden"));
-    await expect(withRunner(h, [], status(), "head")).rejects.toThrow(
-      /delete forbidden/,
-    );
   });
 });
 
@@ -357,13 +289,8 @@ it("requires an open same-repository PR at the exact checked-out head", () => {
   ).toThrow();
 });
 
-it("uses an explicit source list for refresh and forces only the chosen generation channel", () => {
-  const refresh = collectionUrl("https://preview.example");
-  expect(refresh.searchParams.getAll("source")).toContain("nws");
-  expect(refresh.searchParams.has("dailysnow")).toBe(false);
-  const generate = collectionUrl("https://preview.example", "western-us");
-  expect(generate.searchParams.get("channel")).toBe("western-us");
-  expect(generate.searchParams.get("dailysnow")).toBe("force");
+it("orders all regions before Western and rejects unknown channels", () => {
+  expect(selectedChannels("none")).toEqual([]);
   expect(selectedChannels("all").at(-1)).toBe("western-us");
   expect(selectedChannels("all")).toHaveLength(9);
   expect(() => selectedChannels("bogus")).toThrow();
@@ -371,7 +298,7 @@ it("uses an explicit source list for refresh and forces only the chosen generati
 
 it("never carries production bindings, routes, secrets or crons into generated preview config", () => {
   const base = unstable_readConfig({ config: "wrangler.jsonc" });
-  const config = previewConfig(base, id, false);
+  const config = previewConfig(base, id);
   expect(config.routes).toEqual([]);
   expect(config.triggers.crons).toEqual([]);
   expect(config.vars.AI_ENABLED).toBe("false");
@@ -379,7 +306,7 @@ it("never carries production bindings, routes, secrets or crons into generated p
   expect(JSON.stringify(config)).not.toContain(PRODUCTION_KV);
   expect(JSON.stringify(config)).not.toContain(LEGACY_PREVIEW_KV);
   expect(JSON.stringify(config)).not.toContain("ADMIN_TOKEN");
-  expect(previewConfig(base, id, true).previews.ai).toEqual({ binding: "AI" });
+  expect(config).not.toHaveProperty("ai");
 });
 
 it("distinguishes baseline articles from regenerated ones and surfaces source failures in the PR comment", () => {
@@ -404,81 +331,8 @@ it("distinguishes baseline articles from regenerated ones and surfaces source fa
   expect(body).toContain("PR commit abcdef1");
   expect(body).toContain("nws: HTTP 503");
   expect(body).toContain("No edition");
-});
-
-it("recognizes deleted Preview responses without accepting an arbitrary server error as revocation", async () => {
-  expect(await revokedResponse(new Response(null, { status: 404 }))).toBe(true);
-  expect(
-    await revokedResponse(
-      new Response('<span class="cf-error-code">1101</span>', {
-        status: 500,
-        headers: { "x-preview-user-error": "true" },
-      }),
-    ),
-  ).toBe(true);
-  expect(
-    await revokedResponse(
-      new Response("Database unavailable", { status: 500 }),
-    ),
-  ).toBe(false);
-  expect(
-    await revokedResponse(new Response("Method not allowed", { status: 405 })),
-  ).toBe(false);
-});
-
-it("waits for the deployed runner's report before sending any write request", async () => {
-  let ready!: (report: ReportResponse) => void;
-  const report = new Promise<ReportResponse>((resolve) => {
-    ready = resolve;
-  });
-  const collect = vi.fn(async () => ({
-    startedAt: "now",
-    durationMs: 0,
-    results: [],
-    skipped: [],
-  }));
-  const operation = withRunner(
-    {
-      deploy: async () => ["https://immutable.example"],
-      remove: async () => {},
-      revoked: async () => {},
-      report: async () => report,
-      collect,
-    },
-    [],
-    { sourceFailures: [], editions: {} },
-    "head",
-  );
-  await Promise.resolve();
-  await Promise.resolve();
-  expect(collect).not.toHaveBeenCalled();
-  ready(buildReport(null));
-  await operation;
-  expect(collect).toHaveBeenCalledOnce();
-});
-
-it("prefers the immutable deployment URL for writes and tracks both URL types for cleanup", () => {
-  const alias = "https://seed-pr-12-report.huang-inc.workers.dev";
-  const immutable = "https://revision-seed-pr-12-report.huang-inc.workers.dev";
-  expect(
-    deploymentUrls(
-      JSON.stringify({
-        type: "preview",
-        preview_urls: [alias],
-        deployment_urls: [immutable, alias],
-      }),
-    ),
-  ).toEqual([immutable, alias]);
-  expect(() =>
-    deploymentUrls(
-      JSON.stringify({
-        type: "preview",
-        preview_urls: ["https://unrelated.example"],
-      }),
-    ),
-  ).toThrow(/unexpected/);
-  expect(() => deploymentUrls(JSON.stringify({ type: "other" }))).toThrow(
-    /Missing/,
+  expect(failureComment(12, "abcdef123456", new Error("KV `down`\nretry"))).toContain(
+    "**Preview update for `abcdef1` failed:** KV  down  retry",
   );
 });
 

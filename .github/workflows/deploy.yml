@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 # Never run two production deploys at once; a newer push waits for the current one.
-# Finish preview writes and runner cleanup before another deployment starts.
+# Finish a PR's preview writes before another deployment for it starts.
 concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: false
@@ -91,7 +91,7 @@ jobs:
         run: npm run build
         env:
           SITE_URL: https://pr-${{ github.event.pull_request.number }}-mitchells-snow-report-preview.huang-inc.workers.dev
-      - name: Seed dedicated PR data, refresh sources and deploy preview
+      - name: Refresh dedicated PR data and deploy preview
         id: upload
         run: npx tsx scripts/preview-run.ts deploy --pr "$PR"
         env:
@@ -99,14 +99,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      - name: Remove abandoned temporary runner
-        if: always()
-        run: npx tsx scripts/preview-run.ts cleanup-runner --pr "$PR"
-        env:
-          PR: ${{ github.event.pull_request.number }}
-          GH_TOKEN: ${{ github.token }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Pages are static assets and share cards render without an article,
+      # so this check doesn't wait for the just-written KV to reach the edge.
       - name: Verify deployed share previews
         run: npx tsx scripts/check-share-preview.ts "$PREVIEW_URL"
         env:

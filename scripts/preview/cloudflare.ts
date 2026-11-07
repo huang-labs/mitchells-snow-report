@@ -18,7 +18,7 @@ export class CloudflareApiError extends Error {
 export class Cloudflare {
   constructor(
     readonly account: string,
-    private token: string,
+    readonly token: string,
     private fetchImpl: typeof fetch = fetch,
   ) {}
 
@@ -96,7 +96,6 @@ export const PREVIEW_GATEWAY = "mitchells-snow-report-preview";
 export const REPOSITORY = "huang-labs/mitchells-snow-report";
 export const namespaceTitle = (pr: number) => `mitchells-snow-report-pr-${pr}`;
 export const previewName = (pr: number) => `pr-${pr}`;
-export const runnerName = (pr: number) => `seed-pr-${pr}`;
 export const previewOrigin = (pr: number) =>
   `https://pr-${pr}-mitchells-snow-report-preview.huang-inc.workers.dev`;
 
@@ -143,25 +142,15 @@ export async function findNamespace(
   return found;
 }
 
-export const previewPath = (name: string) =>
-  `/workers/workers/${PREVIEW_WORKER}/previews/${name}`;
-export async function deletePreview(cf: Cloudflare, name: string) {
-  // Never accept the parent worker or a free-form production name.
-  if (!/^(?:pr|seed-pr)-[1-9]\d*$/.test(name))
-    throw new Error("Invalid preview name");
+/** True when the Preview was deleted, false when it was already absent. Every other API failure throws. */
+export async function deletePreview(cf: Cloudflare, pr: number) {
+  // missingOk returns only a 404; authentication, rate-limit and server errors still throw.
   const response = await cf.response(
-    previewPath(name),
+    `/workers/workers/${PREVIEW_WORKER}/previews/${previewName(pr)}`,
     { method: "DELETE" },
     true,
   );
-  if (response.status === 404) return;
-  // A successful DELETE can remain visible to GET briefly. Confirm removal
-  // before reusing the runner name; do not mask API/authentication failures.
-  for (let attempt = 0; attempt < 12; attempt++) {
-    if ((await cf.response(previewPath(name), {}, true)).status === 404) return;
-    if (attempt < 11) await new Promise((r) => setTimeout(r, 5_000));
-  }
-  throw new Error(`Preview ${name} still exists after deletion (12 checks)`);
+  return response.status !== 404;
 }
 
 export async function ensureGateway(cf: Cloudflare) {
