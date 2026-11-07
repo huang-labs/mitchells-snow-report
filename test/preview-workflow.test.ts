@@ -9,6 +9,7 @@ import {
   parsePr,
   findNamespace,
   ensureGateway,
+  deletePreview,
 } from "../scripts/preview/cloudflare";
 import {
   baselineKey,
@@ -170,6 +171,22 @@ describe("preview Workers AI over REST", () => {
     const ai = gatewayAi("account", "credential", "gateway", (async () =>
       Response.json({ success: false, errors: [{ message: "rate limited" }] }, { status: 429 })) as typeof fetch);
     await expect(ai.run("model", {})).rejects.toThrow(/HTTP 429.*rate limited/);
+  });
+});
+
+describe("closed-PR preview deletion", () => {
+  it("deletes only the PR's own Preview and accepts one that is already gone", async () => {
+    const mock = vi.fn(async () => Response.json({ success: true }));
+    expect(await deletePreview(new Cloudflare("account", "test-token", mock), 18)).toBe(true);
+    expect(String((mock.mock.calls[0] as unknown[])[0])).toMatch(/\/workers\/workers\/mitchells-snow-report-preview\/previews\/pr-18$/);
+    const absent = vi.fn(async () => new Response(null, { status: 404 }));
+    expect(await deletePreview(new Cloudflare("account", "test-token", absent), 18)).toBe(false);
+  });
+
+  it.each([401, 403, 429, 500])("propagates HTTP %i instead of reporting the Preview removed", async (status) => {
+    const mock = vi.fn(async () => Response.json({ errors: [{ code: 1, message: "API failure" }] }, { status }));
+    await expect(deletePreview(new Cloudflare("account", "test-token", mock), 18)).rejects.toThrow(`HTTP ${status}`);
+    expect(mock).toHaveBeenCalledOnce();
   });
 });
 

@@ -40,7 +40,8 @@ assertPullRequest(pull);
 if (operation === "cleanup") {
   if (pull.state !== "closed")
     throw new Error("Refusing to delete an open PR's data");
-  await deletePreview(cf, pr);
+  // Throws on any API failure, so the namespace is never deleted under a live Preview.
+  if (!(await deletePreview(cf, pr))) console.log(`PR ${pr} had no Preview`);
   const namespace = await findNamespace(cf, pr, false);
   if (namespace)
     await cf.response(`/storage/kv/namespaces/${namespace.id}`, {

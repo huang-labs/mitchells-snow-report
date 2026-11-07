@@ -142,12 +142,15 @@ export async function findNamespace(
   return found;
 }
 
+/** True when the Preview was deleted, false when it was already absent. Every other API failure throws. */
 export async function deletePreview(cf: Cloudflare, pr: number) {
-  await cf.response(
+  // missingOk returns only a 404; authentication, rate-limit and server errors still throw.
+  const response = await cf.response(
     `/workers/workers/${PREVIEW_WORKER}/previews/${previewName(pr)}`,
     { method: "DELETE" },
     true,
   );
+  return response.status !== 404;
 }
 
 export async function ensureGateway(cf: Cloudflare) {
