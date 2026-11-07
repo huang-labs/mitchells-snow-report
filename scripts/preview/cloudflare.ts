@@ -18,7 +18,7 @@ export class CloudflareApiError extends Error {
 export class Cloudflare {
   constructor(
     readonly account: string,
-    readonly token: string,
+    private token: string,
     private fetchImpl: typeof fetch = fetch,
   ) {}
 
