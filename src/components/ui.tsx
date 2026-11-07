@@ -25,10 +25,11 @@ export function MetricValue({ m, size = "lg" }: { m: Metric; size?: "xl" | "lg" 
         <span className={`metric__unit${m.unit === "in" || m.unit === "°F" ? " metric__unit--mark" : ""}`}>{unit}</span>
       </span>
     );
-  } else if (m.state === "not_reported") {
-    body = <span className="metric__missing" title={m.note}>not reported</span>;
   } else {
-    body = <span className="metric__na" title={m.note ?? "Not provided by this source"} aria-label="not provided">—</span>;
+    // One "no data" mark for a field left empty and a window the source doesn't publish;
+    // the metric's state (and its class) still tells them apart.
+    const why = m.state === "not_reported" ? "Not reported in this update" : "Not provided by this source";
+    body = <span className="metric__na" title={m.note ?? why} aria-label="no data">—</span>;
   }
   return (
     <span className={`metric metric--${size} metric--${m.state}`}>

@@ -39,9 +39,9 @@ function SnowMetric({
 /**
  * Every resort shows the same slots in the same order: new snow, 24 h and base
  * as tiles, then the other new-snow window, 48 h, 72 h, 7 days, storm and season.
- * A window the resort doesn't publish keeps its slot as "—".
+ * A window the resort doesn't publish, or left empty, keeps its slot as "—".
  */
-function snowSlots(snowfall: SnowfallSet) {
+function snowSlots(snowfall: SnowfallSet, base: Metric) {
   const recent = newSnowKey(snowfall);
   const other = recent === "overnight" ? "h12" : "overnight";
   const slot = (key: keyof SnowfallSet) => ({
@@ -61,7 +61,10 @@ function snowSlots(snowfall: SnowfallSet) {
   return {
     hero: [slot(recent), slot("h24")],
     history,
-    unsupported: [slot(recent), slot("h24"), ...history].filter((s) => s.metric.state === "unavailable").map((s) => s.label),
+    // Missing values all show "—"; one line names them, whether left empty or never published.
+    missing: [slot(recent), slot("h24"), { label: "Base depth", metric: base }, ...history]
+      .filter((s) => s.metric.state !== "reported")
+      .map((s) => s.label),
     notes: [...notes].map(([note, labels]) => ({ note, labels })),
   };
 }
@@ -99,7 +102,7 @@ export function ResortReportPage({
       </section>
     );
 
-  const snow = snowSlots(r.snowfall);
+  const snow = snowSlots(r.snowfall, r.base);
   const issues = snowfallIssues(r.snowfall);
   const location=r.reportingLocation??{name:resortById(source.id)?.station,elevationFt:resortById(source.id)?.elevationFt,note:undefined};
   const observations = r.observations.filter(
@@ -183,14 +186,14 @@ export function ResortReportPage({
             <SnowMetric key={s.key} label={s.label} metric={s.metric} qualifier={s.qualifier} />
           ))}
         </div>
-        {(snow.unsupported.length > 0 || snow.notes.length > 0) && (
+        {(snow.missing.length > 0 || snow.notes.length > 0) && (
           <div className="resort-snow__notes">
             {snow.notes.map(({ note, labels }) => (
               <p key={note}>{labels.join(", ")}: {note}</p>
             ))}
-            {snow.unsupported.length > 0 && (
+            {snow.missing.length > 0 && (
               <p className="resort-snow__unavailable">
-                Not provided by {r.resort}: {snow.unsupported.join(", ")}
+                No data from {r.resort}: {snow.missing.join(", ")}
               </p>
             )}
           </div>
