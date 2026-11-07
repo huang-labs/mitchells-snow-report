@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseAlta } from "@/lib/sources/alta";
-import { parseBrighton } from "@/lib/sources/brighton";
+import { parseBrighton, reportPalCommentTitle } from "@/lib/sources/brighton";
 import { parseMtnPowder } from "@/lib/sources/mtnpowder";
 import { expandHourly, findNextStorm, summarizeGrid } from "@/lib/sources/nws";
 import { forecastHoursFromPath, parsePlumePage, runCodeToIso } from "@/lib/sources/plumes";
@@ -112,6 +112,18 @@ describe("Brighton reportpal", () => {
     expect(report.lifts?.length).toBe(8);
     expect(report.terrain).toBeNull();
     expect(report.notices.some((n) => n.text.includes("no uphill"))).toBe(true);
+    expect(report.notices.find((n) => n.text.includes("no uphill"))?.title).toBe("Overcast, snowing");
+  });
+
+  it("labels untitled ReportPal comments instead of showing feed keys (Big Sky)", () => {
+    const { report } = parseBrighton(j("bigsky_reportpal.json"));
+    const alert = report.notices.find((n) => n.text.includes("opening day"));
+    expect(alert).toMatchObject({ title: "Alert", severity: "warning" });
+    expect(report.notices.every((n) => !/^(comment|commentAlert|trailsAlert|liftsAlert)$/i.test(n.title))).toBe(true);
+  });
+
+  it("falls back to a generic title for unknown untitled comment keys", () => {
+    expect(reportPalCommentTitle("someNewKey")).toBe("Notice");
   });
 });
 
