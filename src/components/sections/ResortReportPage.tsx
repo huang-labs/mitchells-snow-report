@@ -37,32 +37,32 @@ function SnowMetric({
 }
 
 /**
- * Every resort shows the same slots in the same order: new snow, 24 h and base
- * as tiles, then the other new-snow window, 48 h, 72 h, 7 days, storm and season.
- * A window the resort doesn't publish, or left empty, keeps its slot as "—".
+ * Every resort shows the same slots in the same order: overnight, 24 h and base
+ * as tiles, then 48 h, 72 h, 7 days, storm and season. Alta's overnight tile
+ * holds its 12 h total, captioned with Alta's own wording. A window the resort
+ * doesn't publish, or left empty, keeps its slot as "—".
  */
 function snowSlots(snowfall: SnowfallSet, base: Metric) {
-  const recent = newSnowKey(snowfall);
-  const other = recent === "overnight" ? "h12" : "overnight";
   const slot = (key: keyof SnowfallSet) => ({
     key,
-    label: SNOW_LABEL[key],
+    label: SNOW_LABEL[key === "h12" ? "overnight" : key],
     metric: snowfall[key],
-    qualifier: snowfall[key].state === "unavailable" ? null : snowQualifier(key, snowfall[key].label),
+    qualifier: snowfall[key].state === "unavailable" ? null : snowQualifier(key === "h12" ? "overnight" : key, snowfall[key].label),
   });
-  const history = ([other, "h48", "h72", "d7", "storm", "season"] as const).map(slot);
+  const hero = [slot(newSnowKey(snowfall)), slot("h24")];
+  const history = (["h48", "h72", "d7", "storm", "season"] as const).map(slot);
   // Source notes ("rolling total computed by Snowbird…") apply to several
   // windows at once, so they're listed once under the section.
   const notes = new Map<string, string[]>();
-  for (const s of [slot(recent), slot("h24"), ...history]) {
+  for (const s of [...hero, ...history]) {
     if (s.metric.state === "unavailable" || !s.metric.note) continue;
     notes.set(s.metric.note, [...(notes.get(s.metric.note) ?? []), s.label]);
   }
   return {
-    hero: [slot(recent), slot("h24")],
+    hero,
     history,
     // Missing values all show "—"; one line names them, whether left empty or never published.
-    missing: [slot(recent), slot("h24"), { label: "Base depth", metric: base }, ...history]
+    missing: [...hero, { label: "Base depth", metric: base }, ...history]
       .filter((s) => s.metric.state !== "reported")
       .map((s) => s.label),
     notes: [...notes].map(([note, labels]) => ({ note, labels })),
@@ -170,9 +170,8 @@ export function ResortReportPage({
           <span>Reported by {r.resort}</span>
         </div>
         {issues.length > 0 && (
-          <p className="resort-report__gap" role="note">
+          <p className="resort-report__gap resort-snow__warning" role="note">
             Snowfall data warning: the resort publishes conflicting or invalid amounts.
-            Figures below are shown as published; affected values are withheld from the timeline, Daily Snow and storm tracking.
           </p>
         )}
         <div className="resort-snow__headline">
