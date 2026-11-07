@@ -228,6 +228,29 @@ describe("app shell", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("orders a resort page's sections with the regional Daily Snow teaser after Snowfall", async () => {
+    const edition = {
+      channel: "utah", timeZone: "America/Denver", date: "2026-11-06", phase: "quiet", title: "Dry and Clear",
+      summary: "No new snow across the region.", sections: [], figures: {}, numbers: { canyons: [], resorts: [] },
+      generatedAt: "2026-11-06T14:12:00Z", model: "@cf/zai-org/glm-5.3-flash", trigger: "morning",
+      outdated: false, failing: false, archive: [],
+    } satisfies NonNullable<NonNullable<ReportResponse["dailySnows"]>["utah"]>;
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ...REPORT, dailySnows: { utah: edition } }));
+    const view = renderAt("/alta");
+    await loadedHeading("Alta");
+    const page = document.querySelector(".resort-report")!;
+    const headings = [...page.querySelectorAll("h2")].map((h) => h.textContent);
+    expect(headings.slice(0, 3)).toEqual(["Snowfall", "Daily SnowAI", "On the mountain"]);
+    const jumps = [...page.querySelectorAll(".resort-report__jump a")].map((a) => a.textContent);
+    expect(jumps.slice(0, 3)).toEqual(["Snowfall", "Daily Snow", "Weather"]);
+    // The teaser opens the region's full post without reloading the report.
+    expect(fireEvent.click(screen.getByRole("link", { name: "Read the Utah Daily Snow →" }))).toBe(false);
+    expect(nav.pathname).toBe("/daily-snow/utah");
+    view.rerender(<AppShell><SectionView id="daily-snow" region="utah" /></AppShell>);
+    expect(screen.getByRole("heading", { level: 1, name: "Dry and Clear" })).toBeTruthy();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
   it("opens the forecast from a resort without reloading the report", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(REPORT));
     const view = renderAt("/alta");

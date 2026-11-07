@@ -1,0 +1,36 @@
+/* Regional Daily Snow teaser on resort pages. A summary, so it sits on a panel. */
+.resort-dailysnow h2 .badge {
+  margin-left: 0.5em;
+  vertical-align: 3px;
+}
+.resort-dailysnow__card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border-radius: 8px;
+  background: var(--panel);
+}
+.resort-dailysnow__meta,
+.resort-dailysnow__footer {
+  color: var(--muted);
+  font-size: var(--fs-caption);
+}
+.resort-dailysnow__title {
+  font-size: 20px;
+  line-height: 1.3;
+}
+.resort-dailysnow__summary {
+  line-height: 1.55;
+}
+.resort-dailysnow__footer {
+  margin-top: 4px;
+}
+@media (max-width: 900px) {
+  .resort-dailysnow__card {
+    padding: 16px;
+  }
+  .resort-dailysnow__title {
+    font-size: 18px;
+  }
+}

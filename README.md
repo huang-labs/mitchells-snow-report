@@ -6,7 +6,7 @@ A snow and conditions web app for 16 favorite Western United States resorts, bui
 
 - Compare resort snowfall day by day (past week, last 24 h, NWS week ahead), lift and terrain status, and webcams.
 - Select eight regions for NWS mountain weather and University of Utah plumes.
-- Read eight regional **Daily Snow** forecasts and a standalone **United States West** article covering this week (NWS mountain snowfall for days 1–3 and 4–7) and week two (the NOAA 8–14-day pattern map), labeled as AI with model attribution.
+- Read eight regional **Daily Snow** forecasts and a standalone **United States West** article covering this week (NWS mountain snowfall for days 1–3 and 4–7) and week two (the NOAA 8–14-day pattern map), labeled as AI with model attribution. Each resort page shows its region's latest edition (title and summary, dated) below Snowfall, linking to the full post.
 
 Next.js builds the static frontend. A Cloudflare Worker serves the APIs and collects upstream data on a five-minute cron, storing the latest successful results in KV. Pages read that stored data; AI generation runs during collection. Shared snowfall consistency checks keep contradictory source amounts out of new AI and derived snow data while preserving the published figures with a warning on resort pages; see [data semantics](docs/FRESHNESS.md). Regional Daily Snow attempts start at 7 AM local time with an 11 AM cutoff; United States West starts at 8 AM Pacific with a noon cutoff. Webcam collection retries failed YouTube metadata lookups and uses official Snowbasin and Jackson Hole camera feeds; blocked or unsupported pages retain their official webcam links. See [source notes](docs/IMPLEMENTATION_NOTES.md#adapters) for coverage and retry behavior.
 

@@ -1,7 +1,8 @@
 import { snowfallIssues } from "@/lib/snowfall-quality";
 import { resortTimeZone, resortById } from "@/lib/catalog";
 import Link from "next/link";
-import type { ApiSource, Metric, ResortReport, SnowfallSet } from "@/lib/types";
+import type { ApiDailySnow, ApiSource, Metric, ResortReport, SnowfallSet } from "@/lib/types";
+import { ResortDailySnowTeaser } from "../dailysnow/ResortTeaser";
 import { formatLocal } from "@/lib/time";
 import {
   FreshnessBadge,
@@ -84,11 +85,14 @@ export function ResortReportPage({
   now,
   cams,
   loadedAt = null,
+  dailySnow = null,
 }: {
   source: ApiSource;
   now: Date;
   cams?: ApiSource;
   loadedAt?: number | null;
+  /** The resort's regional Daily Snow edition, shown as a teaser below Snowfall. */
+  dailySnow?: ApiDailySnow | null;
 }) {
   const r = source.payload as ResortReport | null;
   if (!r)
@@ -145,6 +149,7 @@ export function ResortReportPage({
 
       <nav className="resort-report__jump" aria-label="In this resort report">
         <a href="#resort-snow-heading">Snowfall</a>
+        {dailySnow && resortById(source.id) && <a href="#resort-dailysnow-heading">Daily Snow</a>}
         <a href="#resort-weather-heading">Weather</a>
         {r.narrative && <a href="#resort-narrative-heading">Resort report</a>}
         <a href="#resort-lifts-heading">Lifts</a>
@@ -199,6 +204,10 @@ export function ResortReportPage({
           </div>
         )}
       </section>
+
+      {resortById(source.id) && (
+        <ResortDailySnowTeaser post={dailySnow} region={resortById(source.id)!.region} now={now} />
+      )}
 
       <section
         className="resort-weather"
