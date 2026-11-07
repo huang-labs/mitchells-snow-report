@@ -49,6 +49,21 @@ function amount(loc: Record<string, Amount | string | null>, key: string, fallba
   return fromField(v?.inches ?? null, "in", label, note);
 }
 
+// ReportPal comment names are feed keys ("commentAlert"); never show one as a heading.
+const REPORTPAL_COMMENT_TITLES: Record<string, string> = {
+  Comment: "Conditions report",
+  commentAlert: "Alert",
+  trailsAlert: "Trails alert",
+  liftsAlert: "Lifts alert",
+  Uphill: "Uphill travel",
+  Weather: "Weather",
+  Road: "Roads",
+};
+
+export function reportPalCommentTitle(name: string): string {
+  return REPORTPAL_COMMENT_TITLES[name] ?? "Notice";
+}
+
 export function parseBrighton(rp: ReportPal): { report: ResortReport; sourceUpdatedAt: string | null } {
   assertValid(rp && rp.name, "Brighton reportpal response missing name");
   assertValid(!rp.units || rp.units === "USC", `Unexpected Brighton units ${rp.units}`);
@@ -85,7 +100,7 @@ export function parseBrighton(rp: ReportPal): { report: ResortReport; sourceUpda
   for (const c of rp.comments?.comment ?? []) {
     const text = htmlToText(c.text);
     if (!text || c.name === "Events") continue;
-    const title = c.title || c.name;
+    const title = (c.title ?? "").trim() || reportPalCommentTitle(c.name);
     notices.push({ title, text, severity: /alert/i.test(c.name) ? "warning" : "info", updatedAt: reportTime });
   }
 
