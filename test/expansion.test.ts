@@ -543,9 +543,10 @@ describe("independent editions and stored artifacts", () => {
     expect(validateWestern(raw, input).shortTerm).toHaveLength(2);
     raw.sections[1].paragraphs[0].text = "Read [Tahoe](/daily-snow/tahoe).";
     expect(() => validateWestern(raw, input)).toThrow(/links/);
-    // The ceiling accepts 600 words but rejects 601.
+    // The ceiling accepts 500 words but rejects 501.
     const long = structuredClone(raw);
-    for (const section of long.sections) for (const p of section.paragraphs) p.text = "Pattern ".repeat(100).trim();
+    for (const section of long.sections) for (const p of section.paragraphs) p.text = "Pattern ".repeat(80).trim();
+    long.sections[0].paragraphs[0].text += " Pattern".repeat(20);
     expect(() => validateWestern(long, input)).not.toThrow();
     long.sections[0].paragraphs[0].text += " Pattern";
     expect(() => validateWestern(long, input)).toThrow(/too long: \d+ words/);
