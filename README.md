@@ -8,7 +8,7 @@ A snow and conditions web app for 16 favorite Western United States resorts, bui
 - Select eight regions for NWS mountain weather and University of Utah plumes.
 - Read eight regional **Daily Snow** forecasts and a standalone **United States West** article covering this week (NWS mountain snowfall for days 1–3 and 4–7) and week two (the NOAA 8–14-day pattern map), labeled as AI with model attribution.
 
-Next.js builds the static frontend. A Cloudflare Worker serves the APIs and collects upstream data on a five-minute cron through a single Durable Object, which keeps the latest successful results and copies them to KV for reads. Pages read that stored data; AI generation runs during collection. Shared snowfall consistency checks keep contradictory source amounts out of new AI and derived snow data while preserving the published figures with a warning on resort pages; see [data semantics](docs/FRESHNESS.md). Regional Daily Snow attempts start at 7 AM local time with an 11 AM cutoff; United States West starts at 8 AM Pacific with a noon cutoff. Webcam collection retries failed YouTube metadata lookups and uses official Snowbasin and Jackson Hole camera feeds; blocked or unsupported pages retain their official webcam links. See [source notes](docs/IMPLEMENTATION_NOTES.md#adapters) for coverage and retry behavior.
+Next.js builds the static frontend. A Cloudflare Worker serves the APIs and collects upstream data on a five-minute cron through a single Durable Object, which keeps the latest successful results and copies them to KV for reads. Pages read that stored data. After each collection, one Durable Object per Daily Snow channel decides whether to publish and runs the model in its own alarm. Shared snowfall consistency checks keep contradictory source amounts out of new AI and derived snow data while preserving the published figures with a warning on resort pages; see [data semantics](docs/FRESHNESS.md). Regional Daily Snow attempts start at 7 AM local time with an 11 AM cutoff; United States West starts at 8 AM Pacific with a noon cutoff. Webcam collection retries failed YouTube metadata lookups and uses official Snowbasin and Jackson Hole camera feeds; blocked or unsupported pages retain their official webcam links. See [source notes](docs/IMPLEMENTATION_NOTES.md#adapters) for coverage and retry behavior.
 
 ## Quick start
 
@@ -62,7 +62,7 @@ The fixed favorites are Alta, Snowbird, Solitude, Brighton, Park City, Deer Vall
 
 ## PR previews
 
-Every PR gets its own preview KV, seeded once from production reads and refreshed from real sources on deployment. Previews run no cron and do not automatically regenerate AI articles. The Action runs the branch's collection code in Node, writes the result to the PR's KV once, then deploys. The PR's Preview comment reports source freshness and which commit generated each article; see [preview operations](docs/DEPLOYMENT.md#refresh-or-regenerate-a-hosted-pr-preview).
+Every PR gets its own preview KV, seeded once from production reads and refreshed from real sources on deployment. Previews run no cron and do not automatically regenerate AI articles. The Action copies a production baseline on a PR's first run, deploys, then seeds, refreshes and (on request) generates through the Preview's own Durable Objects. The PR's Preview comment reports source freshness and which commit generated each article; see [preview operations](docs/DEPLOYMENT.md#refresh-or-regenerate-a-hosted-pr-preview).
 
 ```sh
 npm run preview:refresh -- --pr 10

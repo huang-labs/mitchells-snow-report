@@ -8,9 +8,9 @@ import { MemoryKV, readSnapshot, writeSnapshot } from "@/lib/store";
 import { dailySnowFigureKey, dailySnowKey, emptyDailySnowState } from "@/lib/dailysnow";
 import { channelKV, channelStateKey } from "@/lib/dailysnow/regions";
 import { DAILY_SNOW_ARCHIVE_POSTS } from "@/lib/report";
-import type { ApiDailySnow, DailySnowHistoryEntry, DailySnowPost } from "@/lib/types";
+import type { ApiDailySnow, DailySnowHistoryEntry, DailySnowPost, ReportResponse } from "@/lib/types";
 import { createFixtureFetch, FIXTURE_NOW } from "./fixtureFetch";
-import { memoryCollector } from "./memoryStorage";
+import { memoryChannels, memoryCollector } from "./memoryStorage";
 
 function setup(adminToken?: string) {
   const env: WorkerEnv = {
@@ -19,10 +19,12 @@ function setup(adminToken?: string) {
     ADMIN_TOKEN: adminToken,
   };
   env.COLLECTOR = memoryCollector(env).namespace;
+  const channels = memoryChannels(env);
+  env.CHANNEL = channels.namespace;
   const pending: Promise<unknown>[] = [];
   const ctx = { waitUntil: (p: Promise<unknown>) => pending.push(p) } as unknown as ExecutionContext;
   const call = (path: string, init?: RequestInit) => worker.fetch(new Request(`https://snow.test${path}`, init), env, ctx);
-  return { env, ctx, pending, call };
+  return { env, ctx, pending, call, channels };
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -145,10 +147,64 @@ describe("Worker request routing", () => {
 
   it("logs a failed collection instead of leaving an unhandled rejection", async () => {
     const { env, ctx, pending } = setup();
-    env.COLLECTOR = { getByName: () => ({ collect: async () => { throw new Error("storage reset"); } }) };
+    env.COLLECTOR = { getByName: () => ({ collect: async () => { throw new Error("storage reset"); }, latest: async () => null, seed: async () => false }) };
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     await worker.scheduled({ scheduledTime: FIXTURE_NOW.getTime(), cron: "*/5 * * * *" } as ScheduledController, env, ctx);
     await Promise.all(pending);
     expect(JSON.parse(String(error.mock.calls[0][0]))).toMatchObject({ event: "collection_failed", error: "storage reset" });
+  });
+});
+
+describe("admin publication through channel objects", () => {
+  const auth = { Authorization: "Bearer test-token" };
+  const reply = { title: "A Snow Outlook", summary: "Mountain weather varies across the tracked locations.", sections: [{ id: "update", paragraphs: [{ text: "Check the source times for the latest mountain forecast.", figure: "none" }] }] };
+
+  it("returns once a forced attempt is reserved; the channel's alarm publishes it", async () => {
+    const { env, call, channels } = setup("test-token");
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    env.AI = { async run() { await gate; return { response: JSON.stringify(reply) }; } };
+    vi.spyOn(globalThis, "fetch").mockImplementation(createFixtureFetch().fetchImpl);
+    const res = await call("/api/admin/collect?source=alta&dailysnow=force&channel=utah", { method: "POST", headers: auth });
+    const summary = (await res.json()) as CollectSummary;
+    // The model is still held: the request did not wait for it.
+    expect(summary.publications).toEqual([{ channel: "utah", scheduled: expect.any(String) }]);
+    const during = (await (await call("/api/admin/channel?channel=utah", { headers: auth })).json()) as { pending: boolean; state: { lastAttemptAt: string } };
+    expect(during.pending).toBe(true);
+    expect(during.state.lastAttemptAt).toBe(summary.publications![0].scheduled);
+    release();
+    await channels.settle();
+    expect(channels.outcomes).toEqual([{ channel: "utah", published: expect.any(String) }]);
+    const after = (await (await call("/api/admin/channel?channel=utah", { headers: auth })).json()) as { pending: boolean; state: { current: { generatedAt: string } } };
+    expect(after.pending).toBe(false);
+    expect(after.state.current.generatedAt).toBe(summary.publications![0].scheduled);
+    // Readers see it through the KV read copy, and the admin report through the objects.
+    const report = (await (await call("/api/report")).json()) as ReportResponse;
+    expect(report.dailySnows?.utah?.generatedAt).toBe(after.state.current.generatedAt);
+    const direct = (await (await call("/api/admin/report", { headers: auth })).json()) as ReportResponse;
+    expect(direct.dailySnows?.utah?.generatedAt).toBe(after.state.current.generatedAt);
+    expect(direct.sources.alta.status).toBe("ok");
+  });
+
+  it("seeds only empty objects", async () => {
+    const { call } = setup("test-token");
+    const snapshot = { schemaVersion: 1, writtenAt: FIXTURE_NOW.toISOString(), sources: {} };
+    const channels = { utah: { ...emptyDailySnowState(), lastError: "seeded" } };
+    const seed = () => call("/api/admin/seed", { method: "POST", headers: auth, body: JSON.stringify({ snapshot, channels }) }).then((r) => r.json());
+    expect(await seed()).toEqual({ snapshot: true, channels: { utah: true } });
+    expect(await seed()).toEqual({ snapshot: false, channels: { utah: false } });
+    const status = (await (await call("/api/admin/channel?channel=utah", { headers: auth })).json()) as { state: { lastError: string } };
+    expect(status.state.lastError).toBe("seeded");
+    expect((await call("/api/admin/seed", { method: "POST", headers: auth, body: JSON.stringify({ channels: { nowhere: {} } }) })).status).toBe(400);
+  });
+
+  it("guards every admin route with the token and its method", async () => {
+    const disabled = setup();
+    for (const path of ["/api/admin/channel?channel=utah", "/api/admin/report", "/api/admin/seed"]) expect((await disabled.call(path)).status).toBe(404);
+    const { call } = setup("test-token");
+    expect((await call("/api/admin/report")).status).toBe(401);
+    expect((await call("/api/admin/report", { method: "POST", headers: auth })).headers.get("allow")).toBe("GET");
+    expect((await call("/api/admin/seed", { headers: auth })).headers.get("allow")).toBe("POST");
+    expect((await call("/api/admin/channel?channel=nowhere", { headers: auth })).status).toBe(400);
   });
 });

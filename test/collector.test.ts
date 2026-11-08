@@ -5,7 +5,7 @@ import { MemoryKV, readSnapshot, SNAPSHOT_KEY, writeSnapshot } from "@/lib/store
 import type { Snapshot, SourceId, SourceRecord } from "@/lib/types";
 import { collectAndPublish, COLLECTOR_NAME } from "@/worker/collection";
 import type { WorkerEnv } from "@/worker/env";
-import { MemoryStorage, memoryCollector } from "./memoryStorage";
+import { MemoryStorage, memoryChannels, memoryCollector } from "./memoryStorage";
 
 const MIN = 60_000;
 const T0 = new Date("2026-10-30T14:00:00Z");
@@ -176,15 +176,16 @@ describe("collectAndPublish (Worker side)", () => {
     const e = env();
     e.AI = { run: vi.fn() };
     const c = memoryCollector(e, { sources: [fakeSource("alta", value("a"))] });
-    const readsChannelState = () => vi.mocked(e.SNOW_KV.get).mock.calls.some(([key]) => String(key).startsWith("daily-state:"));
-    vi.spyOn(e.SNOW_KV, "get");
-    e.COLLECTOR = { getByName: () => ({ collect: async (r) => ({ ...(await c.collector.collect(r)), joined: true }) }) };
+    const channels = memoryChannels(e);
+    e.CHANNEL = channels.namespace;
+    const asked = vi.spyOn(channels.namespace, "getByName");
+    e.COLLECTOR = { getByName: () => ({ collect: async (r) => ({ ...(await c.collector.collect(r)), joined: true }), latest: () => c.collector.latest(), seed: (x) => c.collector.seed(x) }) };
     expect((await collectAndPublish(e, { now: T0, scheduled: true })).publications).toEqual([]);
-    expect(readsChannelState()).toBe(false);
-    // The run that started the work does evaluate publication.
+    expect(asked).not.toHaveBeenCalled();
+    // The run that started the work asks every channel.
     e.COLLECTOR = c.namespace;
     await collectAndPublish(e, { now: T0, scheduled: true });
-    expect(readsChannelState()).toBe(true);
+    expect(asked).toHaveBeenCalledTimes(9);
   });
 
   it("fails clearly when the Durable Object binding is missing", async () => {

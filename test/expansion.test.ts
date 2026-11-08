@@ -325,26 +325,24 @@ describe("publication guards in channel state", () => {
     expect(out).toEqual([{ channel: "western-us", skipped: "channel daily cap" }]);
     expect(calls.n).toBe(0);
   });
-  it("counts attempts still running from an earlier cron toward the concurrency limit", async () => {
+  it("decides each channel on its own: attempts in flight elsewhere don't hold back other channels", async () => {
+    // Before ChannelObject, a four-channel limit shared one cron's deadline.
     const kv = new MemoryKV();
     const calls = { n: 0 };
     const at = new Date(+now - 60000).toISOString();
     for (const r of REGIONS.slice(0, 3))
       await kv.put(channelStateKey(r.id), JSON.stringify({ ...emptyDailySnowState(), lastAttemptAt: at }));
     const out = await runChannels({ SNOW_KV: kv, AI: replyAi(calls) }, base, now, { force: true });
-    const limited = out.filter((o) => o.skipped === "generation concurrency limit").map((o) => o.channel);
-    expect(limited).toEqual(REGIONS.slice(4).map((r) => r.id));
-    // The forced Western overview follows the regional attempts.
-    expect(out.filter((o) => o.published || o.error).map((o) => o.channel)).toEqual([REGIONS[3].id, "western-us"]);
+    expect(out.filter((o) => o.skipped === "in-flight").map((o) => o.channel)).toEqual(REGIONS.slice(0, 3).map((r) => r.id));
+    expect(out.filter((o) => o.published || o.error).map((o) => o.channel)).toEqual([...REGIONS.slice(3).map((r) => r.id), "western-us"]);
   });
   it("forces every requested channel, regions before the Western overview, when no channel is named", async () => {
     const kv = new MemoryKV();
-    const calls = { n: 0 };
-    const out = await runChannels({ SNOW_KV: kv, AI: replyAi(calls) }, base, now, { force: true });
-    const attempted = out.filter((o) => o.published || o.error).map((o) => o.channel);
-    expect([...attempted.slice(0, 4)].sort()).toEqual(REGIONS.slice(0, 4).map((r) => r.id).sort());
-    expect(attempted.at(-1)).toBe("western-us");
-    expect(out.filter((o) => o.skipped === "generation concurrency limit").map((o) => o.channel)).toEqual(REGIONS.slice(4).map((r) => r.id));
+    const out = await runChannels({ SNOW_KV: kv, AI: replyAi({ n: 0 }) }, base, now, { force: true });
+    expect(out.map((o) => o.channel)).toEqual([...REGIONS.map((r) => r.id), "western-us"]);
+    expect(out.slice(0, -1).every((o) => o.published)).toBe(true);
+    // This reply is not a valid Western article; the overview is still attempted, last.
+    expect(out.at(-1)).toMatchObject({ channel: "western-us", error: expect.stringContaining("Invalid Western sections") });
   });
   it("publishes only to per-channel keys, never the collector-owned source snapshot", async () => {
     // CollectorObject rewrites snapshot:v1 from its own copy after every run, so a
@@ -356,29 +354,6 @@ describe("publication guards in channel state", () => {
     const keys = put.mock.calls.map(([key]) => key);
     expect(keys).not.toContain(SNAPSHOT_KEY);
     expect(keys.every((k) => k.startsWith("daily-state:v2:") || k.startsWith("channel:v1:"))).toBe(true);
-  });
-  it("does not let a superseded run overwrite a newer attempt's state or edition", async () => {
-    const kv = new MemoryKV();
-    let release!: () => void;
-    const gate = new Promise<void>((r) => (release = r));
-    const env = {
-      SNOW_KV: kv,
-      AI: {
-        async run() {
-          await gate;
-          return { response: JSON.stringify(reply()) };
-        },
-      },
-    };
-    const slow = runChannels(env, base, now, { channel: "tahoe", force: true });
-    await new Promise((r) => setTimeout(r, 0));
-    const newer = { ...emptyDailySnowState(), lastAttemptAt: new Date(+now + 13 * 60000).toISOString() };
-    await kv.put(channelStateKey("tahoe"), JSON.stringify(newer));
-    release();
-    const out = await slow;
-    expect(out[0].error).toMatch(/superseded/);
-    expect(JSON.parse((await kv.get(channelStateKey("tahoe"), "text"))!)).toEqual(newer);
-    expect(await channelKV(kv, "tahoe").get(dailySnowKey("2026-11-05"), "text")).toBeNull();
   });
 });
 

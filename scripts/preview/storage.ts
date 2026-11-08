@@ -140,10 +140,12 @@ export class PreviewStorage {
 }
 
 /**
- * The KV a preview run collects into. Reads fall through to the PR namespace
- * over REST; writes stay in memory until `flush` stores them once. Everything
- * this run reads and writes goes through the same REST store, so nothing
- * depends on when an edge location sees a write.
+ * The PR namespace as the preview tooling sees it. Reads fall through to the
+ * PR namespace over REST; a first run's production baseline stays in memory
+ * until `writeChanged` stores it once. The Preview's Durable Objects then own
+ * the snapshot and channel states (seeded from these values, never from an
+ * edge KV read that may not see them yet); this class only writes the
+ * baseline, the status record and the seed marker.
  */
 export class PreviewKV implements KVLike {
   private cache = new Map<string, Entry | null>();
@@ -199,8 +201,8 @@ export class PreviewKV implements KVLike {
     return text ? (JSON.parse(text) as T) : null;
   }
 
-  /** Store every changed value, then the status, then (first run only) the seed marker. */
-  async flush(status: unknown, now = Date.now()) {
+  /** Store every value changed since the last write (a first run's production baseline). */
+  async writeChanged(now = Date.now()) {
     const keys = [...this.dirty].filter((k) =>
       live(this.cache.get(k)!.expiration, now),
     );
@@ -211,6 +213,12 @@ export class PreviewKV implements KVLike {
           return this.storage.put(key, value, expiration);
         }),
       );
+    this.dirty.clear();
+    return keys.length;
+  }
+
+  /** Store the status, then (first run only) the seed marker. */
+  async finish(status: unknown, now = Date.now()) {
     await this.storage.put(STATUS_KEY, JSON.stringify(status));
     // Without the marker, a later run re-seeds from production rather than
     // trusting a partially written namespace.
@@ -219,7 +227,12 @@ export class PreviewKV implements KVLike {
         SEED_KEY,
         JSON.stringify({ seededAt: new Date(now).toISOString(), copied: this.copied }),
       );
-    this.dirty.clear();
-    return keys.length;
+  }
+
+  /** Store every changed value, then the status, then (first run only) the seed marker. */
+  async flush(status: unknown, now = Date.now()) {
+    const written = await this.writeChanged(now);
+    await this.finish(status, now);
+    return written;
   }
 }
