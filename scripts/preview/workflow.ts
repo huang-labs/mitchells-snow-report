@@ -1,15 +1,15 @@
 import { execFileSync } from "node:child_process";
+import { createHmac } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { unstable_readConfig } from "wrangler";
 import { CHANNELS, type ChannelId } from "../../src/lib/catalog";
 import { SOURCES } from "../../src/lib/sources";
-import { runCollection, type CollectorEnv } from "../../src/lib/collect";
+import type { CollectSummary } from "../../src/lib/collect";
 import { readChannelStates } from "../../src/lib/dailysnow/channels";
-import type { ReportResponse } from "../../src/lib/types";
-import { report } from "../../src/worker/report";
-import { gatewayAi } from "./ai";
+import type { DailySnowState, ReportResponse, Snapshot } from "../../src/lib/types";
+import { SNAPSHOT_KEY } from "../../src/lib/store";
 import {
   Cloudflare,
   REPOSITORY,
@@ -81,7 +81,13 @@ export function selectedChannels(value: string): ChannelId[] {
   return [channel.id];
 }
 
-/** Only carry known build settings; production routes, KV, triggers, vars, AI and secrets never spread into this config. */
+/**
+ * Only carry known build settings; production routes, KV, triggers and secrets
+ * never spread into this config. The Preview runs the same Durable Objects as
+ * production in its own namespace, with Workers AI routed through the preview
+ * gateway and automatic publication off: only an authenticated forced run
+ * generates. The admin token is uploaded separately as a secret.
+ */
 export function previewConfig(
   base: ReturnType<typeof unstable_readConfig>,
   namespace: string,
@@ -89,8 +95,16 @@ export function previewConfig(
   const bindings = {
     define: base.define,
     kv_namespaces: [{ binding: "SNOW_KV", id: namespace }],
+    durable_objects: {
+      bindings: [
+        { name: "COLLECTOR", class_name: "CollectorObject" },
+        { name: "CHANNEL", class_name: "ChannelObject" },
+      ],
+    },
+    ai: { binding: "AI" },
     vars: {
-      AI_ENABLED: "false",
+      AI_GATEWAY_ID: PREVIEW_GATEWAY,
+      DAILY_SNOW_AUTOMATIC: "false",
       COLLECTOR_CONTACT: "https://mitchells-snow-report.huang.mx",
     },
   };
@@ -105,8 +119,6 @@ export function previewConfig(
     preview_urls: true,
     routes: [],
     triggers: { crons: [] },
-    // The class exists in every Preview (each gets its own namespace), but nothing binds it:
-    // previews run no cron or admin collection, so this tooling stays the snapshot's only writer.
     migrations: base.migrations,
     observability: base.observability,
     ...bindings,
@@ -114,8 +126,17 @@ export function previewConfig(
   };
 }
 
+/**
+ * The PR preview's admin token, derived rather than stored: HMAC of the PR
+ * number keyed with the deployment token, so every run can recompute it, one
+ * PR's token opens no other preview, and deleting the Preview deletes it.
+ */
+export function previewAdminToken(secret: string, pr: number): string {
+  return createHmac("sha256", secret).update(`mitchells-snow-report:preview-admin:pr-${pr}`).digest("hex");
+}
+
 /** Upload the built site and Worker as the PR's stable `pr-<number>` Preview. */
-export function deployPreview(pr: number, sha: string, namespace: string) {
+export function deployPreview(pr: number, sha: string, namespace: string, adminToken: string) {
   const temp = mkdtempSync(join(tmpdir(), "snow-preview-"));
   try {
     const config = join(temp, "wrangler.json");
@@ -125,6 +146,8 @@ export function deployPreview(pr: number, sha: string, namespace: string) {
         previewConfig(unstable_readConfig({ config: "wrangler.jsonc" }), namespace),
       ),
     );
+    const secrets = join(temp, "secrets.json");
+    writeFileSync(secrets, JSON.stringify({ ADMIN_TOKEN: adminToken }), { mode: 0o600 });
     execFileSync(
       "npx",
       [
@@ -139,6 +162,8 @@ export function deployPreview(pr: number, sha: string, namespace: string) {
         "--ignore-base-config",
         "--tag",
         sha.slice(0, 7),
+        "--secrets-file",
+        secrets,
       ],
       {
         stdio: ["ignore", "pipe", "pipe"],
@@ -156,71 +181,95 @@ export function deployPreview(pr: number, sha: string, namespace: string) {
   }
 }
 
-export interface PreviewRun {
-  kv: PreviewKV;
-  sha: string;
-  channels: ChannelId[];
-  /** Workers AI for explicit generation; required when `channels` is non-empty. */
-  ai?: CollectorEnv["AI"];
-  now?: () => Date;
-  fetchImpl?: typeof fetch;
+/** Authenticated calls to one PR preview's admin endpoints (src/worker/admin.ts). */
+export class PreviewWorker {
+  constructor(
+    readonly origin: string,
+    private token: string,
+    private fetchImpl: typeof fetch = fetch,
+    private wait = (ms: number) => new Promise((r) => setTimeout(r, ms)),
+  ) {}
+
+  /** A just-deployed Preview can answer 404 (or 5xx) briefly; retry those for about a minute. */
+  async json<T>(path: string, init: RequestInit = {}): Promise<T> {
+    for (let attempt = 0; ; attempt++) {
+      const response = await this.fetchImpl(`${this.origin}${path}`, {
+        ...init,
+        headers: { ...Object.fromEntries(new Headers(init.headers)), Authorization: `Bearer ${this.token}`, "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(5 * 60_000),
+      });
+      if (response.ok) return (await response.json()) as T;
+      const retryable = response.status === 404 || response.status >= 500;
+      const body = (await response.text().catch(() => "")).slice(0, 300);
+      if (!retryable || attempt >= 6)
+        throw new Error(`Preview ${init.method ?? "GET"} ${path.split("?")[0]}: HTTP ${response.status} ${body}`);
+      await this.wait(10_000);
+    }
+  }
 }
 
+export interface PreviewRun {
+  kv: PreviewKV;
+  worker: PreviewWorker;
+  sha: string;
+  channels: ChannelId[];
+  /** How often and how long to wait for a forced edition (its alarm runs the model). */
+  poll?: { everyMs: number; timeoutMs: number; wait?: (ms: number) => Promise<void> };
+}
+
+type ChannelStatus = { state: DailySnowState; pending: boolean };
+
 /**
- * Refresh every source, then force each requested channel in order, all
- * through the branch's real collection code against the in-memory KV.
- * Returns the status to store and any generation failures or skips.
+ * Drive the deployed preview's own Durable Objects, which are the PR data's
+ * only writers: seed any that are still empty from the PR namespace (a
+ * production baseline on a PR's first run), refresh every branch-defined
+ * source, then force each requested channel in order and wait for its alarm to
+ * finish. Returns the status to store, generation failures or skips, and the
+ * report built from the objects themselves.
  */
-export async function collectPreview(run: PreviewRun) {
-  const now = run.now ?? (() => new Date());
-  const status = (await run.kv.json<PreviewStatus>(STATUS_KEY)) ?? {
-    sourceFailures: [],
-    editions: {},
-  };
-  const env: CollectorEnv = {
-    SNOW_KV: run.kv,
-    COLLECTOR_CONTACT: "https://mitchells-snow-report.huang.mx",
-    AI_ENABLED: "false",
-  };
-  // Explicit sources bypass cadence, so every branch-defined source is fetched.
-  const refresh = await runCollection(env, {
-    now: now(),
-    only: SOURCES.map((s) => s.id),
-    fetchImpl: run.fetchImpl,
+export async function refreshPreview(run: PreviewRun) {
+  const poll = { everyMs: 15_000, timeoutMs: 16 * 60_000, wait: (ms: number) => new Promise<void>((r) => setTimeout(r, ms)), ...run.poll };
+  const status = (await run.kv.json<PreviewStatus>(STATUS_KEY)) ?? { sourceFailures: [], editions: {} };
+  const post = (path: string, body?: unknown) =>
+    run.worker.json<unknown>(path, { method: "POST", ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+
+  // Only empty objects take the seed: a Preview's objects outlive its deployments.
+  await post("/api/admin/seed", {
+    snapshot: (await run.kv.json<Snapshot>(SNAPSHOT_KEY)) ?? undefined,
+    channels: await readChannelStates(run.kv),
   });
+
+  // Explicit sources bypass cadence, so every branch-defined source is fetched.
+  const refresh = (await post(`/api/admin/collect?${SOURCES.map((s) => `source=${s.id}`).join("&")}`)) as CollectSummary;
   status.refreshedAt = refresh.startedAt;
   status.refreshedSha = run.sha;
-  status.sourceFailures = refresh.results
-    .filter((r) => !r.ok)
-    .map((r) => `${r.id}: ${r.error ?? "failed"}`);
+  status.sourceFailures = refresh.results.filter((r) => !r.ok).map((r) => `${r.id}: ${r.error ?? "failed"}`);
 
   const failures: string[] = [];
-  if (run.channels.length && !run.ai)
-    throw new Error("Generation requires Workers AI");
-  const generate: CollectorEnv = {
-    ...env,
-    AI: run.ai,
-    AI_ENABLED: "true",
-    AI_GATEWAY_ID: PREVIEW_GATEWAY,
-  };
   for (const channel of run.channels) {
-    const result = await runCollection(generate, {
-      now: now(),
-      channel,
-      forceDailySnow: true,
-      fetchImpl: run.fetchImpl,
-    });
-    const outcome = result.publications?.find((p) => p.channel === channel);
-    const post = (await readChannelStates(run.kv))[channel]?.current;
-    if (!outcome?.published || outcome.error || !post) {
-      failures.push(
-        `${channel}: ${outcome?.error ?? outcome?.skipped ?? "not published"}`,
-      );
+    const forced = (await post(`/api/admin/collect?dailysnow=force&channel=${channel}`)) as CollectSummary;
+    const outcome = forced.publications?.find((p) => p.channel === channel);
+    if (!outcome?.scheduled) {
+      failures.push(`${channel}: ${outcome?.error ?? outcome?.skipped ?? "not scheduled"}`);
       continue;
     }
-    status.editions[channel] = { sha: run.sha, generatedAt: post.generatedAt };
+    // The model runs in the channel's alarm; poll rather than hold a connection open.
+    let current: ChannelStatus;
+    for (let waited = 0; ; waited += poll.everyMs) {
+      current = await run.worker.json<ChannelStatus>(`/api/admin/channel?channel=${channel}`);
+      if (!current.pending || current.state.lastAttemptAt !== outcome.scheduled) break;
+      if (waited >= poll.timeoutMs) break;
+      await poll.wait(poll.everyMs);
+    }
+    const published = current!.state.current?.generatedAt === outcome.scheduled;
+    if (published) status.editions[channel] = { sha: run.sha, generatedAt: outcome.scheduled };
+    else
+      failures.push(
+        `${channel}: ${current!.pending ? `still running after ${Math.round(poll.timeoutMs / 60_000)} min` : (current!.state.lastError ?? "not published")}`,
+      );
   }
-  return { status, failures };
+  const report = await run.worker.json<ReportResponse>("/api/admin/report");
+  return { status, failures, report };
 }
 
 export function readinessComment(
@@ -273,9 +322,9 @@ export async function comment(pr: number, body: string) {
 }
 
 /**
- * Prepare a PR preview: collect into memory, store the result once over REST,
- * then deploy the public preview (no admin token, no AI). The PR comment is
- * built from the stored state, so it doesn't wait for edge propagation.
+ * Prepare a PR preview: store a first run's production baseline, deploy the
+ * Preview with its admin token, then refresh (and optionally generate) through
+ * its own Durable Objects. The PR comment is built from those objects' state.
  */
 export async function runPreview(
   cf: Cloudflare,
@@ -286,28 +335,25 @@ export async function runPreview(
 ) {
   if (channels.length) await ensureGateway(cf);
   const kv = await PreviewKV.open(storage);
-  if (kv.copied !== null)
-    console.log(`Seeding from ${kv.copied} production values (production reads only)`);
-  const { status, failures } = await collectPreview({
-    kv,
-    sha,
-    channels,
-    ai: channels.length
-      ? gatewayAi(cf.account, cf.token, PREVIEW_GATEWAY)
-      : undefined,
-  });
-  const current = (await (
-    await report({ SNOW_KV: kv })
-  ).json()) as ReportResponse;
   // Pushes and dispatches for one PR are serialized; a newer head supersedes this run.
   assertPullRequest(await github<PullRequest>(`/pulls/${pr}`), sha);
-  console.log(`Stored ${await kv.flush(status)} changed values`);
-  deployPreview(pr, sha, storage.namespace.id);
-  // No propagation wait: nothing reads this KV back before writing, the comment
-  // comes from `current`, and the share-preview check needs no KV data (pages are
-  // static assets; share cards render without an article).
-  await comment(pr, readinessComment(pr, sha, status, current, failures));
-  if (failures.length || current.requiredMissing.length)
+  if (kv.copied !== null) {
+    console.log(`Seeding from ${kv.copied} production values (production reads only)`);
+    // Archives, stills and plume panels are read through KV; the objects get their state from the seed call.
+    console.log(`Stored ${await kv.writeChanged()} baseline values`);
+  }
+  const token = previewAdminToken(cf.token, pr);
+  deployPreview(pr, sha, storage.namespace.id, token);
+  const { status, failures, report } = await refreshPreview({
+    kv,
+    worker: new PreviewWorker(previewOrigin(pr), token),
+    sha,
+    channels,
+  });
+  // The seed marker comes last: an interrupted first run seeds again next time.
+  await kv.finish(status);
+  await comment(pr, readinessComment(pr, sha, status, report, failures));
+  if (failures.length || report.requiredMissing.length)
     throw new ReportedPreviewError(
       "Preview deployed with data failures; see the PR readiness comment",
     );

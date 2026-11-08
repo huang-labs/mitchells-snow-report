@@ -32,12 +32,19 @@
       "id": "5fb1857843374e8ea427c2117b5f3955"
     }
   ],
-  // CollectorObject is the single writer of the source snapshot (src/worker/collector-object.ts).
-  // PR previews carry the class and migration but no binding: they run no cron or admin collection.
+  // Single writers: CollectorObject owns the source snapshot, one ChannelObject per channel id owns
+  // that channel's Daily Snow state (src/worker/collector-object.ts, src/worker/channel-object.ts).
+  // PR previews bind both through generated config (scripts/preview/workflow.ts).
   "durable_objects": {
-    "bindings": [{ "name": "COLLECTOR", "class_name": "CollectorObject" }]
+    "bindings": [
+      { "name": "COLLECTOR", "class_name": "CollectorObject" },
+      { "name": "CHANNEL", "class_name": "ChannelObject" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CollectorObject"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["CollectorObject"] },
+    { "tag": "v2", "new_sqlite_classes": ["ChannelObject"] }
+  ],
   // One global collection cron for every source category.
   "triggers": {
     "crons": ["*/5 * * * *"]

@@ -1,4 +1,4 @@
-import { adminCollect } from "./admin";
+import { admin, ADMIN_ROUTES } from "./admin";
 import { dailySnow } from "./daily-snow";
 import { dailySnowFigure } from "./daily-snow-figure";
 import { dailySnowShareImage } from "./daily-snow-share-image";
@@ -17,9 +17,10 @@ function methodNotAllowed(allow: string) {
 export async function handleFetch(request: Request, env: WorkerEnv, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
-  if (path === "/api/admin/collect") {
+  const adminMethod = ADMIN_ROUTES[path];
+  if (adminMethod) {
     if (!env.ADMIN_TOKEN) return new Response("Not found", { status: 404 });
-    return request.method === "POST" ? adminCollect(request, env) : methodNotAllowed("POST");
+    return request.method === adminMethod ? admin(request, env) : methodNotAllowed(adminMethod);
   }
 
   const share=/^\/daily-snow\/([^/]+)\/opengraph-image$/.exec(path);

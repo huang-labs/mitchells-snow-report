@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { Collector, type CollectorRequest } from "../lib/collector";
+import type { Snapshot } from "../lib/types";
 import type { WorkerEnv } from "./env";
 
 /**
@@ -12,5 +13,13 @@ export class CollectorObject extends DurableObject<WorkerEnv> {
 
   collect(request: CollectorRequest) {
     return this.collector.collect(request);
+  }
+
+  latest() {
+    return this.collector.latest();
+  }
+
+  seed(snapshot: Snapshot) {
+    return this.collector.seed(snapshot);
   }
 }

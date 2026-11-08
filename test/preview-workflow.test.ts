@@ -21,13 +21,19 @@ import {
 } from "../scripts/preview/storage";
 import {
   assertPullRequest,
-  collectPreview,
   failureComment,
+  previewAdminToken,
   previewConfig,
+  PreviewWorker,
+  refreshPreview,
   readinessComment,
   selectedChannels,
 } from "../scripts/preview/workflow";
-import { gatewayAi } from "../scripts/preview/ai";
+import { handleFetch } from "@/worker/fetch";
+import type { WorkerEnv } from "@/worker/env";
+import { MemoryKV } from "@/lib/store";
+import { memoryChannels, memoryCollector } from "./memoryStorage";
+import { createFixtureFetch } from "./fixtureFetch";
 import { emptyDailySnowState } from "@/lib/dailysnow";
 import type { ReportResponse } from "@/lib/types";
 import { buildReport } from "@/lib/report";
@@ -126,6 +132,35 @@ describe("preview data built in memory", () => {
     expect(api.writes).toEqual([]);
   });
 
+});
+
+/** A deployed Preview: the real Worker handler with in-memory Durable Objects behind the admin token. */
+function previewWorker(opts: { fetchImpl?: typeof fetch; ai?: WorkerEnv["AI"] } = {}) {
+  const env: WorkerEnv = {
+    SNOW_KV: new MemoryKV(),
+    ASSETS: { fetch: vi.fn() },
+    ADMIN_TOKEN: previewAdminToken("deploy-token", 12),
+    DAILY_SNOW_AUTOMATIC: "false",
+    AI: opts.ai,
+  };
+  const collector = memoryCollector(env, { fetchImpl: opts.fetchImpl });
+  env.COLLECTOR = collector.namespace;
+  const channels = memoryChannels(env, { fetchImpl: opts.fetchImpl });
+  env.CHANNEL = channels.namespace;
+  const ctx = { waitUntil: () => {} } as unknown as ExecutionContext;
+  const worker = new PreviewWorker(
+    "https://pr-12.example",
+    previewAdminToken("deploy-token", 12),
+    (async (url: string | URL | Request, init?: RequestInit) => handleFetch(new Request(url, init), env, ctx)) as typeof fetch,
+    async () => {},
+  );
+  return { env, collector, channels, worker };
+}
+
+describe("preview refresh through the Preview's own Durable Objects", () => {
+  const now = Date.parse("2026-11-07T15:00:00Z");
+  const down = (async () => new Response("down", { status: 503 })) as typeof fetch;
+
   it("keeps production's snow history when a new PR's first refresh fails every source", async () => {
     // PR #27 lost Alta's history: the refresh read an empty snapshot and wrote over the copy.
     const alta = { state: "reported", valueIn: 1, label: "24 Hour", windowEnd: "2026-11-05T08:00:00Z", collectedAt: "2026-11-05T14:00:00Z" };
@@ -135,43 +170,67 @@ describe("preview data built in memory", () => {
       },
     });
     const kv = await PreviewKV.open(api.storage, now);
-    const { status } = await collectPreview({
-      kv,
-      sha: "abcdef123456",
-      channels: [],
-      now: () => new Date(now),
-      fetchImpl: (async () => new Response("down", { status: 503 })) as typeof fetch,
-    });
-    await kv.flush(status, now);
-    const stored = decode(api.pr.get("snapshot:v1")!);
-    expect(stored.snowLog.resorts.alta["2026-11-05"]).toEqual(alta);
+    const { worker, collector } = previewWorker({ fetchImpl: down });
+    const { status, report } = await refreshPreview({ kv, worker, sha: "abcdef123456", channels: [] });
+    // The object was seeded from the baseline before the refresh, so the failed refresh kept it.
+    expect((await collector.collector.latest())?.snowLog?.resorts.alta?.["2026-11-05"]).toEqual(alta);
     expect(status.sourceFailures.length).toBeGreaterThan(0);
     expect(status.refreshedSha).toBe("abcdef123456");
+    // The comment's report comes from the objects, not an edge KV read.
+    expect(report.snapshotWrittenAt).toBe((await collector.collector.latest())?.writtenAt);
   });
 
-  it("requires Workers AI before generating a channel", async () => {
-    const kv = await PreviewKV.open(kvApi(production()).storage, now);
-    await expect(
-      collectPreview({ kv, sha: "abc", channels: ["utah"], now: () => new Date(now), fetchImpl: (async () => new Response("down", { status: 503 })) as typeof fetch }),
-    ).rejects.toThrow(/Workers AI/);
+  it("forces each channel through its object, waits for the alarm, and attributes the edition to the PR commit", async () => {
+    const reply = { title: "A Snow Outlook", summary: "Mountain weather varies across the tracked locations.", sections: [{ id: "update", paragraphs: [{ text: "Check the source times for the latest mountain forecast.", figure: "none" }] }] };
+    const kv = await PreviewKV.open(kvApi({}).storage, now);
+    const preview = previewWorker({ fetchImpl: createFixtureFetch().fetchImpl, ai: { async run() { return { response: JSON.stringify(reply) }; } } });
+    const { status, failures, report } = await refreshPreview({
+      kv,
+      worker: preview.worker,
+      sha: "abcdef123456",
+      channels: ["utah", "utah"],
+      poll: { everyMs: 1, timeoutMs: 1000, wait: () => preview.channels.settle() },
+    });
+    const generatedAt = report.dailySnows?.utah?.generatedAt;
+    expect(generatedAt).toBeTruthy();
+    expect(status.editions.utah).toEqual({ sha: "abcdef123456", generatedAt });
+    // The second forced run of the same channel counts toward its caps like any other.
+    expect(failures).toEqual([]);
+    expect(Object.keys(status.editions)).toEqual(["utah"]);
   });
-});
 
-describe("preview Workers AI over REST", () => {
-  it("returns the binding-shaped result through the preview gateway without caching", async () => {
-    const fetchImpl = vi.fn(async () => Response.json({ success: true, result: { response: "{}" } }));
-    const ai = gatewayAi("account", "credential", "mitchells-snow-report-preview", fetchImpl as typeof fetch);
-    expect(await ai.run("@cf/zai-org/glm-5.3-flash", { messages: [] })).toEqual({ response: "{}" });
-    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("https://api.cloudflare.com/client/v4/accounts/account/ai/run/@cf/zai-org/glm-5.3-flash");
-    expect(new Headers(init.headers).get("cf-aig-gateway-id")).toBe("mitchells-snow-report-preview");
-    expect(new Headers(init.headers).get("cf-aig-skip-cache")).toBe("true");
+  it("reports a channel that could not be scheduled instead of waiting for it", async () => {
+    const kv = await PreviewKV.open(kvApi({}).storage, now);
+    const { worker } = previewWorker({ fetchImpl: down }); // no AI binding: nothing is scheduled
+    const { failures } = await refreshPreview({ kv, worker, sha: "abc", channels: ["utah"] });
+    expect(failures).toEqual(["utah: not scheduled"]);
   });
 
-  it("surfaces the HTTP status and API errors", async () => {
-    const ai = gatewayAi("account", "credential", "gateway", (async () =>
-      Response.json({ success: false, errors: [{ message: "rate limited" }] }, { status: 429 })) as typeof fetch);
-    await expect(ai.run("model", {})).rejects.toThrow(/HTTP 429.*rate limited/);
+  it("seeds a Preview's objects only once, so later pushes keep PR-generated state", async () => {
+    const api = kvApi({ "snapshot:v1": { value: encode({ schemaVersion: 1, writtenAt: "2026-11-07T14:00:00Z", sources: {} }) } });
+    const { worker, collector } = previewWorker({ fetchImpl: down });
+    await refreshPreview({ kv: await PreviewKV.open(api.storage, now), worker, sha: "a", channels: [] });
+    const first = await collector.collector.latest();
+    api.pr.set("snapshot:v1", encode({ schemaVersion: 1, writtenAt: "2020-01-01T00:00:00Z", sources: {} }));
+    await refreshPreview({ kv: await PreviewKV.open(api.storage, now), worker, sha: "b", channels: [] });
+    expect((await collector.collector.latest())!.writtenAt >= first!.writtenAt).toBe(true);
+  });
+
+  it("retries a just-deployed Preview's 404s, but not authorization failures", async () => {
+    let calls = 0;
+    const flaky = new PreviewWorker("https://p", "t", (async () => (++calls < 3 ? new Response("", { status: 404 }) : Response.json({ ok: true }))) as typeof fetch, async () => {});
+    expect(await flaky.json("/api/admin/report")).toEqual({ ok: true });
+    expect(calls).toBe(3);
+    const denied = new PreviewWorker("https://p", "t", (async () => new Response("Unauthorized", { status: 401 })) as typeof fetch, async () => {});
+    await expect(denied.json("/api/admin/report")).rejects.toThrow(/HTTP 401/);
+  });
+
+  it("derives a distinct admin token per PR that does not reveal the deployment token", () => {
+    const token = previewAdminToken("deploy-token", 12);
+    expect(token).toMatch(/^[0-9a-f]{64}$/);
+    expect(token).toBe(previewAdminToken("deploy-token", 12));
+    expect(token).not.toBe(previewAdminToken("deploy-token", 13));
+    expect(token).not.toContain("deploy-token");
   });
 });
 
@@ -301,16 +360,19 @@ it("never carries production bindings, routes, secrets or crons into generated p
   const config = previewConfig(base, id);
   expect(config.routes).toEqual([]);
   expect(config.triggers.crons).toEqual([]);
-  expect(config.vars.AI_ENABLED).toBe("false");
-  expect(config.previews).not.toHaveProperty("ai");
   expect(JSON.stringify(config)).not.toContain(PRODUCTION_KV);
   expect(JSON.stringify(config)).not.toContain(LEGACY_PREVIEW_KV);
+  // The admin token is uploaded as a secret file, never written into config.
   expect(JSON.stringify(config)).not.toContain("ADMIN_TOKEN");
-  expect(config).not.toHaveProperty("ai");
-  // CollectorObject ships with its migration but no binding in previews.
-  expect(config.migrations).toEqual([{ tag: "v1", new_sqlite_classes: ["CollectorObject"] }]);
-  expect(config).not.toHaveProperty("durable_objects");
-  expect(config.previews).not.toHaveProperty("durable_objects");
+  for (const bindings of [config, config.previews]) {
+    // Workers AI only through the separate preview gateway, and only for forced runs.
+    expect(bindings.ai).toEqual({ binding: "AI" });
+    expect(bindings.vars).toMatchObject({ AI_GATEWAY_ID: "mitchells-snow-report-preview", DAILY_SNOW_AUTOMATIC: "false" });
+    expect(bindings.vars).not.toHaveProperty("AI_ENABLED");
+    // The Preview runs the same single writers, in its own Durable Object namespace.
+    expect(bindings.durable_objects.bindings.map((b) => b.class_name)).toEqual(["CollectorObject", "ChannelObject"]);
+  }
+  expect(config.migrations).toEqual(base.migrations);
 });
 
 it("distinguishes baseline articles from regenerated ones and surfaces source failures in the PR comment", () => {

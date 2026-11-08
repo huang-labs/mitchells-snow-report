@@ -101,6 +101,25 @@ export class Collector {
     return run;
   }
 
+  /** The last committed snapshot, for publication. Does not wait for a queued run. */
+  latest(): Promise<Snapshot | null> {
+    return this.store().read();
+  }
+
+  /**
+   * Initialize an empty store from `snapshot` (PR previews, whose tooling copies
+   * a production baseline). Queued like a run; an initialized store is left alone.
+   */
+  seed(snapshot: Snapshot): Promise<boolean> {
+    const run = this.tail.then(async () => {
+      if (await readStoredSnapshot(this.storage)) return false;
+      await this.store().write(snapshot);
+      return true;
+    });
+    this.tail = run.catch(() => {});
+    return run;
+  }
+
   private run(request: CollectorRequest): Promise<CollectedSnapshot> {
     return collectSnapshot(this.env, this.store(), {
       now: request.now ? new Date(request.now) : new Date(),
