@@ -117,7 +117,7 @@ export function DailySnowPage({ report, now,channel="western-us",selector }: { r
             <span className="eyebrow">Daily Snow<span className="badge badge--ai">AI</span></span>
             <h1 className="dailysnow__title">{viewed ? "Post not available" : "Waiting for the first post"}</h1>
           </header>
-          <p className="muted">{archived.error ?? (report.publicationStatus?.[channel]==="paused"?"Publishing pauses when the region is off-season and quiet.":report.publicationStatus?.[channel]==="delayed"?`The expected ${definition.name} edition has not been published. Source data or forecast generation is delayed.`:`An AI-written forecast for ${definition.name} is scheduled at ${channel==="western-us"?"8 AM Pacific":"7 AM local time"}. The first edition has not been published yet.`)}</p>
+          <p className="muted">{archived.error ?? (report.publicationStatus?.[channel]==="paused"?"Publishing pauses when the region is off-season and quiet.":report.publicationStatus?.[channel]==="delayed"?`The expected ${definition.name} edition has not been published. Source data or forecast generation is delayed.`:`An AI-written forecast for ${definition.name} is scheduled at ${channel==="western-us"?"7:15 AM Pacific":"7 AM local time"}. The first edition has not been published yet.`)}</p>
           {date && <button type="button" className="dailysnow__back" onClick={() => pick(null)}>Back to the latest post</button>}
         </div>
       </section>
