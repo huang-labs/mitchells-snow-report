@@ -105,6 +105,9 @@ export function previewConfig(
     preview_urls: true,
     routes: [],
     triggers: { crons: [] },
+    // The class exists in every Preview (each gets its own namespace), but nothing binds it:
+    // previews run no cron or admin collection, so this tooling stays the snapshot's only writer.
+    migrations: base.migrations,
     observability: base.observability,
     ...bindings,
     previews: bindings,

@@ -8,7 +8,7 @@ A snow and conditions web app for 16 favorite Western United States resorts, bui
 - Select eight regions for NWS mountain weather and University of Utah plumes.
 - Read eight regional **Daily Snow** forecasts and a standalone **United States West** article covering this week (NWS mountain snowfall for days 1–3 and 4–7) and week two (the NOAA 8–14-day pattern map), labeled as AI with model attribution.
 
-Next.js builds the static frontend. A Cloudflare Worker serves the APIs and collects upstream data on a five-minute cron, storing the latest successful results in KV. Pages read that stored data; AI generation runs during collection. Shared snowfall consistency checks keep contradictory source amounts out of new AI and derived snow data while preserving the published figures with a warning on resort pages; see [data semantics](docs/FRESHNESS.md). Regional Daily Snow attempts start at 7 AM local time with an 11 AM cutoff; United States West starts at 8 AM Pacific with a noon cutoff. Webcam collection retries failed YouTube metadata lookups and uses official Snowbasin and Jackson Hole camera feeds; blocked or unsupported pages retain their official webcam links. See [source notes](docs/IMPLEMENTATION_NOTES.md#adapters) for coverage and retry behavior.
+Next.js builds the static frontend. A Cloudflare Worker serves the APIs and collects upstream data on a five-minute cron through a single Durable Object, which keeps the latest successful results and copies them to KV for reads. Pages read that stored data; AI generation runs during collection. Shared snowfall consistency checks keep contradictory source amounts out of new AI and derived snow data while preserving the published figures with a warning on resort pages; see [data semantics](docs/FRESHNESS.md). Regional Daily Snow attempts start at 7 AM local time with an 11 AM cutoff; United States West starts at 8 AM Pacific with a noon cutoff. Webcam collection retries failed YouTube metadata lookups and uses official Snowbasin and Jackson Hole camera feeds; blocked or unsupported pages retain their official webcam links. See [source notes](docs/IMPLEMENTATION_NOTES.md#adapters) for coverage and retry behavior.
 
 ## Quick start
 
@@ -28,7 +28,7 @@ curl -X POST \
   http://localhost:8787/api/admin/collect
 ```
 
-The token comes from `.dev.vars`; keep that file local. Local cron does not run automatically, so repeat collection when you need fresh data. KV persists in `.wrangler/state`. The example sets `AI_ENABLED=false`: Workers AI remains remote even in local workerd, so enable it only for deliberate paid testing.
+The token comes from `.dev.vars`; keep that file local. Local cron does not run automatically, so repeat collection when you need fresh data. KV and the collector's Durable Object storage persist in `.wrangler/state`; delete that directory together for a clean start, since the collector only reads KV when its own storage is empty. The example sets `AI_ENABLED=false`: Workers AI remains remote even in local workerd, so enable it only for deliberate paid testing.
 
 Worker edits reload automatically. For frontend edits, run `npm run build` in another terminal and refresh, or restart the dev command. Use a different free port for each worktree and use the same port in the collection URL.
 

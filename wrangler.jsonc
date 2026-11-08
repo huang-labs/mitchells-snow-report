@@ -32,6 +32,12 @@
       "id": "5fb1857843374e8ea427c2117b5f3955"
     }
   ],
+  // CollectorObject is the single writer of the source snapshot (src/worker/collector-object.ts).
+  // PR previews carry the class and migration but no binding: they run no cron or admin collection.
+  "durable_objects": {
+    "bindings": [{ "name": "COLLECTOR", "class_name": "CollectorObject" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CollectorObject"] }],
   // One global collection cron for every source category.
   "triggers": {
     "crons": ["*/5 * * * *"]
@@ -54,6 +60,8 @@
       "vars": { "AI_GATEWAY_ID":"mitchells-snow-report", "COLLECTOR_CONTACT":"https://mitchells-snow-report.huang.mx" },
       "kv_namespaces":[{"binding":"SNOW_KV","id":"f9e542e8a1d0405f8624beade1bba09b"}],
       "ai":{"binding":"AI"},
+      // No cron and no admin token, so nothing here calls CollectorObject.
+      "durable_objects":{"bindings":[]},
       "triggers":{"crons":[]}
     }
   }

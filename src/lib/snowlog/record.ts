@@ -103,28 +103,3 @@ export function recordSnowLog(previous: SnowLogState | undefined, snapshot: Snap
   }
   return log;
 }
-
-/**
- * Merge two runs' logs (see store.ts): each day keeps its preferred entry, and days
- * past retention at `now` and removed catalog entries are dropped. The stored log
- * still holds days a run has just pruned, so retention must apply here too or the
- * union would restore them.
- */
-export function mergeSnowLog(a: SnowLogState | undefined, b: SnowLogState | undefined, now: Date): SnowLogState | undefined {
-  if (!a && !b) return undefined;
-  const out: SnowLogState = { resorts: {}, forecasts: {} };
-  for (const { id } of RESORTS) {
-    const oldest = oldestDay(now, resortTimeZone(id));
-    const days = prune(a?.resorts[id], oldest);
-    for (const [k, v] of Object.entries(prune(b?.resorts[id], oldest))) days[k] = preferReading(days[k], v)!;
-    if (Object.keys(days).length) out.resorts[id] = days;
-  }
-  for (const area of FORECAST_AREAS) {
-    const c = area.id;
-    const oldest = oldestDay(now, regionById(area.region)!.timeZone);
-    const days = prune(a?.forecasts[c], oldest);
-    for (const [k, v] of Object.entries(prune(b?.forecasts[c], oldest))) days[k] = preferForecast(days[k], v)!;
-    if (Object.keys(days).length) out.forecasts[c] = days;
-  }
-  return out;
-}

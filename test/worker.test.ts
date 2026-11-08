@@ -10,6 +10,7 @@ import { channelKV, channelStateKey } from "@/lib/dailysnow/regions";
 import { DAILY_SNOW_ARCHIVE_POSTS } from "@/lib/report";
 import type { ApiDailySnow, DailySnowHistoryEntry, DailySnowPost } from "@/lib/types";
 import { createFixtureFetch, FIXTURE_NOW } from "./fixtureFetch";
+import { memoryCollector } from "./memoryStorage";
 
 function setup(adminToken?: string) {
   const env: WorkerEnv = {
@@ -17,6 +18,7 @@ function setup(adminToken?: string) {
     ASSETS: { fetch: vi.fn(async () => new Response("static page")) },
     ADMIN_TOKEN: adminToken,
   };
+  env.COLLECTOR = memoryCollector(env).namespace;
   const pending: Promise<unknown>[] = [];
   const ctx = { waitUntil: (p: Promise<unknown>) => pending.push(p) } as unknown as ExecutionContext;
   const call = (path: string, init?: RequestInit) => worker.fetch(new Request(`https://snow.test${path}`, init), env, ctx);
@@ -139,5 +141,14 @@ describe("Worker request routing", () => {
     await worker.scheduled({ scheduledTime: FIXTURE_NOW.getTime(), cron: "*/5 * * * *" } as ScheduledController, env, ctx);
     await Promise.all(pending);
     expect((await readSnapshot(env.SNOW_KV))?.sources.alta?.status).toBe("ok");
+  });
+
+  it("logs a failed collection instead of leaving an unhandled rejection", async () => {
+    const { env, ctx, pending } = setup();
+    env.COLLECTOR = { getByName: () => ({ collect: async () => { throw new Error("storage reset"); } }) };
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    await worker.scheduled({ scheduledTime: FIXTURE_NOW.getTime(), cron: "*/5 * * * *" } as ScheduledController, env, ctx);
+    await Promise.all(pending);
+    expect(JSON.parse(String(error.mock.calls[0][0]))).toMatchObject({ event: "collection_failed", error: "storage reset" });
   });
 });
