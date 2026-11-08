@@ -148,13 +148,9 @@ function previewWorker(opts: { fetchImpl?: typeof fetch; ai?: WorkerEnv["AI"] } 
   const channels = memoryChannels(env, { fetchImpl: opts.fetchImpl });
   env.CHANNEL = channels.namespace;
   const ctx = { waitUntil: () => {} } as unknown as ExecutionContext;
-  const worker = new PreviewWorker(
-    "https://pr-12.example",
-    previewAdminToken("deploy-token", 12),
-    (async (url: string | URL | Request, init?: RequestInit) => handleFetch(new Request(url, init), env, ctx)) as typeof fetch,
-    async () => {},
-  );
-  return { env, collector, channels, worker };
+  const handle = (async (url: string | URL | Request, init?: RequestInit) => handleFetch(new Request(url, init), env, ctx)) as typeof fetch;
+  const worker = new PreviewWorker("https://pr-12.example", previewAdminToken("deploy-token", 12), handle, async () => {});
+  return { env, collector, channels, worker, handle };
 }
 
 describe("preview refresh through the Preview's own Durable Objects", () => {
@@ -216,6 +212,25 @@ describe("preview refresh through the Preview's own Durable Objects", () => {
     expect((await collector.collector.latest())!.writtenAt >= first!.writtenAt).toBe(true);
   });
 
+  it("sends a forced publication once, and reports a lost response for that channel without retrying it", async () => {
+    const kv = await PreviewKV.open(kvApi({}).storage, now);
+    const preview = previewWorker({ fetchImpl: down, ai: { run: vi.fn() } });
+    const forced: string[] = [];
+    const worker = new PreviewWorker("https://pr-12.example", previewAdminToken("deploy-token", 12), (async (url: string | URL | Request, init?: RequestInit) => {
+      const response = await preview.handle(url, init);
+      if (!String(url).includes("dailysnow=force")) return response;
+      forced.push(String(url));
+      // The Worker handled the request, but the edge lost the response.
+      return new Response("bad gateway", { status: 502 });
+    }) as typeof fetch, async () => {});
+    const { failures } = await refreshPreview({ kv, worker, sha: "abc", channels: ["utah", "tahoe"] });
+    expect(forced).toHaveLength(2); // once per channel, never retried
+    expect(failures).toEqual([
+      expect.stringMatching(/^utah: Preview POST \/api\/admin\/collect: HTTP 502/),
+      expect.stringMatching(/^tahoe: Preview POST \/api\/admin\/collect: HTTP 502/),
+    ]);
+  });
+
   it("retries a just-deployed Preview's 404s, but not authorization failures", async () => {
     let calls = 0;
     const flaky = new PreviewWorker("https://p", "t", (async () => (++calls < 3 ? new Response("", { status: 404 }) : Response.json({ ok: true }))) as typeof fetch, async () => {});
@@ -223,6 +238,11 @@ describe("preview refresh through the Preview's own Durable Objects", () => {
     expect(calls).toBe(3);
     const denied = new PreviewWorker("https://p", "t", (async () => new Response("Unauthorized", { status: 401 })) as typeof fetch, async () => {});
     await expect(denied.json("/api/admin/report")).rejects.toThrow(/HTTP 401/);
+    // A POST retries only when the caller marks it repeatable.
+    calls = 0;
+    const once = new PreviewWorker("https://p", "t", (async () => (++calls, new Response("", { status: 503 }))) as typeof fetch, async () => {});
+    await expect(once.json("/api/admin/collect", { method: "POST" })).rejects.toThrow(/HTTP 503/);
+    expect(calls).toBe(1);
   });
 
   it("derives a distinct admin token per PR that does not reveal the deployment token", () => {

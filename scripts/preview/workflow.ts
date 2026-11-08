@@ -190,8 +190,14 @@ export class PreviewWorker {
     private wait = (ms: number) => new Promise((r) => setTimeout(r, ms)),
   ) {}
 
-  /** A just-deployed Preview can answer 404 (or 5xx) briefly; retry those for about a minute. */
-  async json<T>(path: string, init: RequestInit = {}): Promise<T> {
+  /**
+   * A just-deployed Preview can answer 404 (or 5xx) briefly; requests that are
+   * safe to repeat retry those for about a minute. GETs retry by default; a POST
+   * retries only when the caller says repeating it is harmless (`repeatable`),
+   * because a lost response may follow work the Worker already did.
+   */
+  async json<T>(path: string, init: RequestInit = {}, opts: { repeatable?: boolean } = {}): Promise<T> {
+    const repeatable = opts.repeatable ?? (init.method ?? "GET") === "GET";
     for (let attempt = 0; ; attempt++) {
       const response = await this.fetchImpl(`${this.origin}${path}`, {
         ...init,
@@ -201,7 +207,7 @@ export class PreviewWorker {
       if (response.ok) return (await response.json()) as T;
       const retryable = response.status === 404 || response.status >= 500;
       const body = (await response.text().catch(() => "")).slice(0, 300);
-      if (!retryable || attempt >= 6)
+      if (!retryable || !repeatable || attempt >= 6)
         throw new Error(`Preview ${init.method ?? "GET"} ${path.split("?")[0]}: HTTP ${response.status} ${body}`);
       await this.wait(10_000);
     }
@@ -230,24 +236,34 @@ type ChannelStatus = { state: DailySnowState; pending: boolean };
 export async function refreshPreview(run: PreviewRun) {
   const poll = { everyMs: 15_000, timeoutMs: 16 * 60_000, wait: (ms: number) => new Promise<void>((r) => setTimeout(r, ms)), ...run.poll };
   const status = (await run.kv.json<PreviewStatus>(STATUS_KEY)) ?? { sourceFailures: [], editions: {} };
-  const post = (path: string, body?: unknown) =>
-    run.worker.json<unknown>(path, { method: "POST", ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  const post = (path: string, opts: { body?: unknown; repeatable: boolean }) =>
+    run.worker.json<unknown>(path, { method: "POST", ...(opts.body === undefined ? {} : { body: JSON.stringify(opts.body) }) }, { repeatable: opts.repeatable });
 
   // Only empty objects take the seed: a Preview's objects outlive its deployments.
+  // Repeatable: only empty objects take a seed.
   await post("/api/admin/seed", {
-    snapshot: (await run.kv.json<Snapshot>(SNAPSHOT_KEY)) ?? undefined,
-    channels: await readChannelStates(run.kv),
+    body: { snapshot: (await run.kv.json<Snapshot>(SNAPSHOT_KEY)) ?? undefined, channels: await readChannelStates(run.kv) },
+    repeatable: true,
   });
 
   // Explicit sources bypass cadence, so every branch-defined source is fetched.
-  const refresh = (await post(`/api/admin/collect?${SOURCES.map((s) => `source=${s.id}`).join("&")}`)) as CollectSummary;
+  // Repeatable: a second refresh only fetches the sources again.
+  const refresh = (await post(`/api/admin/collect?${SOURCES.map((s) => `source=${s.id}`).join("&")}`, { repeatable: true })) as CollectSummary;
   status.refreshedAt = refresh.startedAt;
   status.refreshedSha = run.sha;
   status.sourceFailures = refresh.results.filter((r) => !r.ok).map((r) => `${r.id}: ${r.error ?? "failed"}`);
 
   const failures: string[] = [];
   for (const channel of run.channels) {
-    const forced = (await post(`/api/admin/collect?dailysnow=force&channel=${channel}`)) as CollectSummary;
+    // Sent once: a retry after a lost response would find this channel's own attempt
+    // in flight and report a failure while the edition publishes.
+    let forced: CollectSummary;
+    try {
+      forced = (await post(`/api/admin/collect?dailysnow=force&channel=${channel}`, { repeatable: false })) as CollectSummary;
+    } catch (error) {
+      failures.push(`${channel}: ${error instanceof Error ? error.message : String(error)}`);
+      continue;
+    }
     const outcome = forced.publications?.find((p) => p.channel === channel);
     if (!outcome?.scheduled) {
       failures.push(`${channel}: ${outcome?.error ?? outcome?.skipped ?? "not scheduled"}`);
