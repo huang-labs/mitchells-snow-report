@@ -1,9 +1,9 @@
-import { beforeAll, describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect, vi } from "vitest";
 import { RESORTS, REGIONS, CHANNELS, FORECAST_AREAS, regionById } from "@/lib/catalog";
 import { parseFavoriteHtml, parseBachelor, parseJackson, favoriteSources } from "@/lib/sources/favorites";
 import { parseMtnPowder } from "@/lib/sources/mtnpowder";
 import { runCollection } from "@/lib/collect";
-import { MemoryKV, readSnapshot, writeSnapshot } from "@/lib/store";
+import { MemoryKV, readSnapshot, SNAPSHOT_KEY, writeSnapshot } from "@/lib/store";
 import { buildDailyDigest } from "@/lib/dailysnow/digest";
 import { regionalSnapshot, channelKV, channelStateKey } from "@/lib/dailysnow/regions";
 import { runChannels, readChannelStates } from "@/lib/dailysnow/channels";
@@ -345,6 +345,17 @@ describe("publication guards in channel state", () => {
     expect([...attempted.slice(0, 4)].sort()).toEqual(REGIONS.slice(0, 4).map((r) => r.id).sort());
     expect(attempted.at(-1)).toBe("western-us");
     expect(out.filter((o) => o.skipped === "generation concurrency limit").map((o) => o.channel)).toEqual(REGIONS.slice(4).map((r) => r.id));
+  });
+  it("publishes only to per-channel keys, never the collector-owned source snapshot", async () => {
+    // CollectorObject rewrites snapshot:v1 from its own copy after every run, so a
+    // publication that wrote it would be lost; publication state lives in channel keys.
+    const kv = new MemoryKV();
+    const put = vi.spyOn(kv, "put");
+    const out = await runChannels({ SNOW_KV: kv, AI: replyAi({ n: 0 }) }, base, now, { force: true });
+    expect(out.some((o) => o.published)).toBe(true);
+    const keys = put.mock.calls.map(([key]) => key);
+    expect(keys).not.toContain(SNAPSHOT_KEY);
+    expect(keys.every((k) => k.startsWith("daily-state:v2:") || k.startsWith("channel:v1:"))).toBe(true);
   });
   it("does not let a superseded run overwrite a newer attempt's state or edition", async () => {
     const kv = new MemoryKV();

@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { barLabel, buildSnowTimeline, timelineScale } from "@/components/timeline/model";
 import { runCollection } from "@/lib/collect";
 import { addDays, forecastForDay, liquidForDay, morningOf, snowDayOf, snowDayWindow } from "@/lib/snowlog/days";
-import { mergeSnowLog, recordSnowLog } from "@/lib/snowlog/record";
+import { recordSnowLog } from "@/lib/snowlog/record";
 import type { SnowLogState } from "@/lib/snowlog/types";
-import { mergeSnapshot, MemoryKV, readSnapshot, writeSnapshot } from "@/lib/store";
+import { MemoryKV, readSnapshot, writeSnapshot } from "@/lib/store";
 import type { Metric, NwsPayload, PrimaryResortId, ResortReport, Snapshot, SourceRecord } from "@/lib/types";
 import { createFixtureFetch, FIXTURE_NOW } from "./fixtureFetch";
 
@@ -116,12 +116,10 @@ describe("recordSnowLog", () => {
     };
     const recorded = recordSnowLog(previous, snap({}), now);
     expect(recorded).toEqual(previous);
-    expect(mergeSnowLog(previous, undefined, now)).toEqual(previous);
     // Mountain has crossed its boundary; Pacific still has half an hour to go.
     const later = new Date("2026-12-01T13:30:00Z");
     const expected = { resorts: { "mammoth-mountain": previous.resorts["mammoth-mountain"] }, forecasts: { "mammoth-mountain": previous.forecasts["mammoth-mountain"] } };
     expect(recordSnowLog(previous, snap({}), later)).toEqual(expected);
-    expect(mergeSnowLog(previous, undefined, later)).toEqual(expected);
   });
 
   it("records a morning's 24 h report and lets a later morning correction replace it", () => {
@@ -214,35 +212,16 @@ describe("recordSnowLog", () => {
 });
 
 describe("snapshot storage", () => {
-  it.each(["stored", "incoming"])("ignores removed catalog entries in the %s snapshot while preserving current history", (side) => {
+  it("drops removed catalog entries from the stored log while keeping current history", () => {
     const now = new Date("2026-12-01T15:00:00Z");
-    const current: SnowLogState = {
-      resorts: { alta: { "2026-12-01": { state: "reported", valueIn: 4, label: "24 h", windowEnd: null, collectedAt: now.toISOString() } } },
-      forecasts: { LCC: { "2026-12-01": { snowIn: 5, issuedAt: null, collectedAt: now.toISOString() } } },
-    };
+    const day = { state: "reported" as const, valueIn: 4, label: "24 h", windowEnd: null, collectedAt: now.toISOString() };
+    const forecast = { snowIn: 5, issuedAt: null, collectedAt: now.toISOString() };
     // Persisted JSON can contain identifiers that no longer exist in the catalog.
-    const retired: SnowLogState = JSON.parse(JSON.stringify({
-      resorts: { "removed-resort": current.resorts.alta },
-      forecasts: { "removed-area": current.forecasts.LCC },
+    const stored: SnowLogState = JSON.parse(JSON.stringify({
+      resorts: { alta: { "2026-12-01": day }, "removed-resort": { "2026-12-01": day } },
+      forecasts: { LCC: { "2026-12-01": forecast }, "removed-area": { "2026-12-01": forecast } },
     }));
-    const stored = side === "stored" ? retired : current;
-    const incoming = side === "incoming" ? retired : current;
-    expect(mergeSnowLog(stored, incoming, now)).toEqual(current);
-    expect(mergeSnapshot(
-      { ...snap({}), snowLog: stored },
-      { ...snap({}), writtenAt: now.toISOString(), snowLog: incoming },
-    ).snowLog).toEqual(current);
-  });
-
-  it("merges concurrent runs' logs day by day", () => {
-    const reading = (state: "reported" | "no_report", collectedAt: string, valueIn?: number) => ({ state, valueIn, label: "x", windowEnd: null, collectedAt });
-    const a: SnowLogState = { resorts: { alta: { "2026-12-01": reading("reported", "2026-12-01T13:00:00Z", 4), "2026-11-30": reading("reported", "2026-11-30T13:00:00Z", 1) } }, forecasts: {} };
-    const b: SnowLogState = { resorts: { alta: { "2026-12-01": reading("no_report", "2026-12-01T14:00:00Z") }, snowbird: { "2026-12-01": reading("reported", "2026-12-01T14:00:00Z", 2) } }, forecasts: {} };
-    const merged = mergeSnowLog(a, b, new Date("2026-12-01T15:00:00Z"))!;
-    expect(merged.resorts.alta?.["2026-12-01"]?.valueIn).toBe(4);
-    expect(merged.resorts.alta?.["2026-11-30"]?.valueIn).toBe(1);
-    expect(merged.resorts.snowbird?.["2026-12-01"]?.valueIn).toBe(2);
-    expect(mergeSnapshot({ ...snap({}), snowLog: a }, { ...snap({}), writtenAt: "2026-12-01T15:00:00Z", snowLog: b }).snowLog).toEqual(merged);
+    expect(recordSnowLog(stored, snap({}), now)).toEqual({ resorts: { alta: stored.resorts.alta }, forecasts: { LCC: stored.forecasts.LCC } });
   });
 
   it("expires days past retention through the real snapshot write, not just the record step", async () => {
@@ -255,7 +234,7 @@ describe("snapshot storage", () => {
     const pruned = recordSnowLog((await readSnapshot(kv))!.snowLog, snap({}), now);
     await writeSnapshot(kv, { ...snap({}), writtenAt: now.toISOString(), snowLog: pruned });
     const log = (await readSnapshot(kv))!.snowLog!;
-    // The stored copy still had Nov 10; the merge must not bring it back.
+    // The stored copy still had Nov 10; the rewritten snapshot must not bring it back.
     expect(Object.keys(log.resorts.alta!)).toEqual(["2026-11-25"]);
     expect(log.forecasts.LCC).toBeUndefined();
   });

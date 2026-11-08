@@ -15,12 +15,13 @@ Mitchell's deployment uses Cloudflare account **Huang Inc.**. Production starts 
 | Workers AI Gateway | `mitchells-snow-report`, logging, no cache, sliding 64 requests/day |
 | PR review AI Gateway | `pr-agent`, logging, sliding 100 requests/day; see [AI code review](AI_CODE_REVIEW.md) |
 | Production cron | `*/5 * * * *`; local publication hours evaluated in code |
+| Collector Durable Object | `CollectorObject` (SQLite storage, migration `v1`), one instance; authoritative source snapshot |
 
 ## GitHub Actions
 
 CI typechecks, tests, builds and smoke-checks. Deployment requires `MITCHELLS_DEPLOYMENT_ENABLED=true`. The inherited `DEPLOYMENT_ENABLED` stays false so an older main workflow cannot deploy Cottonwoods while this feature PR is open.
 
-On main, `npm run deploy` uploads assets and deploys the Worker, custom domain and cron. Cloudflare manages DNS/certificate for the custom domain. No production seeding or historical import is required.
+On main, `npm run deploy` uploads assets and deploys the Worker, custom domain, cron and `CollectorObject` migration. On its first run the collector starts from the `snapshot:v1` already in KV, so the switch keeps source history; a collection still running in the old Worker version as it deploys may lose that one run, which the next cron collects again. Cloudflare manages DNS/certificate for the custom domain. No production seeding or historical import is required.
 
 Same-repository PRs deploy through **Worker Previews**. The `preview` job checks out the exact PR head, prepares dedicated data, and updates the stable `pr-<number>` alias. Fork and Dependabot PRs receive no deployment secrets. Preview jobs for one PR share a concurrency group, so a push, a data dispatch and cleanup never overlap, and each run checks that the PR is still open at the same head before it stores data or deploys.
 
@@ -29,7 +30,7 @@ Every PR receives a KV namespace named `mitchells-snow-report-pr-<number>`, pres
 1. **Load.** If the namespace has no seed marker, the run reads an allowlisted production baseline into memory: the source snapshot (including snow history), channel editions/history, retained article stills and live plume panels. Binary values and absolute expirations are preserved; production generation reservations, failures and request counters are not copied, and production is only read. Every other read falls through to the PR namespace over the KV REST API.
 2. **Collect.** The branch's own `runCollection` runs in Node against that in-memory KV and refreshes **all branch-defined sources**, regardless of cadence, with AI disabled. A failed source keeps last-good data and is called out in the PR comment; partial failures do not fail deployment unless required data is missing. Successful fetches do not change upstream report publication times. Explicit Daily Snow generation then forces each requested channel through the same code (see below).
 3. **Store.** Values the run changed are written over REST, then the status record, then, on a first run, the seed marker. Without the marker, the next run seeds again from production instead of trusting a partly written namespace. The marker also keeps later pushes from overwriting PR-generated content or resetting preview attempt caps. Cloudflare can acknowledge namespace creation before its KV write path recognizes the new ID, so writes retry only HTTP 404 / code 10013 with “namespace not found”, at 1/2/4/8/16-second intervals, then fail with the original API error.
-4. **Deploy.** `wrangler preview` uploads the built site and Worker as `pr-<number>`, bound to the PR namespace, with AI disabled, no admin token, no routes and no cron.
+4. **Deploy.** `wrangler preview` uploads the built site and Worker as `pr-<number>`, bound to the PR namespace, with AI disabled, no admin token, no routes and no cron. The `CollectorObject` class and migration ship, but previews bind nothing to it, so this tooling remains the PR snapshot's only writer.
 
 No step reads KV through the Worker's binding before writing, so the copied baseline can't be overwritten by a refresh that ran before an edge location saw it. (Cloudflare can take up to about 60 s to make a REST write visible at the edge; on the public preview that only delays what a reader sees.) No preview cron runs and no AI generation happens automatically.
 
@@ -68,4 +69,4 @@ The admin endpoint returns 404 unless a temporary `ADMIN_TOKEN` is configured an
 
 Model calls are paid and can take up to ten minutes including fallback. Manual publication counts toward the channel and global caps. No request parameter bypasses them. `AI_ENABLED=false` suppresses generation for local collection.
 
-Production reads are safe for investigation. Ask before production KV writes not requested by the owner. Tail with `npx wrangler tail mitchells-snow-report`; collection logs include source and channel outcomes.
+Production reads are safe for investigation. Ask before production KV writes not requested by the owner. In production, `CollectorObject` owns the source snapshot: a hand-edited `snapshot:v1` is overwritten by the next collection, so source repairs go through the admin endpoint. Tail with `npx wrangler tail mitchells-snow-report`; collection logs include source and channel outcomes.

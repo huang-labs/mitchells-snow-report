@@ -1,8 +1,7 @@
-import { planDailySnow, type DailySnowPlan } from "./dailysnow";
-import { archiveStorms, trackStorms } from "./dailysnow/storm-store";
+import { archiveStorms } from "./dailysnow/storm-store";
 import { createFetchContext, type CollectorSecrets } from "./http";
 import { runChannels, type ChannelsEnv } from "./dailysnow/channels";
-import { FORECAST_AREAS, RESORTS, type ChannelId } from "./catalog";
+import { FORECAST_AREAS, type ChannelId } from "./catalog";
 import { regionalSnapshot } from "./dailysnow/regions";
 import { advanceStormTracking } from "./dailysnow/storms";
 import { buildDigest } from "./dailysnow/facts";
@@ -107,13 +106,38 @@ export async function collectSource(
 }
 
 /**
- * Run every source concurrently and persist one snapshot. Sources are isolated:
- * one failure (or throw) never affects another source's record.
+ * Where a collection run reads its previous snapshot and commits the new one.
+ * Exactly one run at a time may use a store: production's CollectorObject
+ * serializes its runs, and Node tooling runs one collection at a time.
  */
-export async function runCollection(env: CollectorEnv, opts: CollectOptions = {}): Promise<CollectSummary> {
+export interface SnapshotStore {
+  read(): Promise<Snapshot | null>;
+  write(snapshot: Snapshot): Promise<void>;
+}
+
+/** The KV snapshot itself as the store, for Node tooling and tests. */
+export function kvSnapshotStore(kv: KVLike): SnapshotStore {
+  return { read: () => readSnapshot(kv), write: async (s) => void (await writeSnapshot(kv, s)) };
+}
+
+export type CollectionOptions = Pick<CollectOptions, "now" | "sources" | "fetchImpl" | "only">;
+
+/** One committed collection: its summary (without publications) and the stored snapshot. */
+export interface CollectedSnapshot {
+  summary: Omit<CollectSummary, "publications">;
+  snapshot: Snapshot;
+}
+
+/**
+ * Run every due source concurrently, derive storm memory, operating times and
+ * the snow log, and commit one snapshot to `store`. Sources are isolated: one
+ * failure (or throw) never affects another source's record. Publication is a
+ * separate step (publishCollected), so a slow model call never holds the store.
+ */
+export async function collectSnapshot(env: CollectorEnv, store: SnapshotStore, opts: CollectionOptions = {}): Promise<CollectedSnapshot> {
   const now = opts.now ?? new Date();
   const started = Date.now();
-  const previous = await readSnapshot(env.SNOW_KV);
+  const previous = await store.read();
   const selected = (opts.sources ?? SOURCES).filter((s) => !opts.only || opts.only.includes(s.id));
   // Manual runs (`only`) collect what was asked regardless of intervals.
   const defs = opts.only ? selected : selected.filter((s) => isDue(s, previous?.sources[s.id], now));
@@ -130,10 +154,8 @@ export async function runCollection(env: CollectorEnv, opts: CollectOptions = {}
     writtenAt: new Date().toISOString(),
     sources: {},
   };
-  // Carry over records of sources not collected this run (manual `only` runs);
-  // records of sources that no longer exist are dropped. writeSnapshot merges
-  // this snapshot with whatever a concurrent run wrote since `previous` was
-  // read, keeping the newer attempt per source (see store.ts).
+  // Carry over records of sources not collected this run; records of sources
+  // that no longer exist are dropped.
   for (const def of SOURCES) {
     const prev = previous?.sources[def.id];
     if (prev) snapshot.sources[def.id] = prev;
@@ -171,20 +193,40 @@ export async function runCollection(env: CollectorEnv, opts: CollectOptions = {}
     console.error("snowlog: recording failed", err);
   }
   snapshot.writtenAt=new Date().toISOString();
-  const stored=await writeSnapshot(env.SNOW_KV,snapshot);
+  await store.write(snapshot);
   // Archive after the snapshot write: working records remain in the snapshot,
   // and the next run retries an area whose archive write failed.
-  for(const [area,state] of Object.entries(stored.areaStorms??{})){
+  for(const [area,state] of Object.entries(snapshot.areaStorms??{})){
     try {
-      await archiveStorms(env.SNOW_KV,{...stored,stormTracking:state},now);
+      await archiveStorms(env.SNOW_KV,{...snapshot,stormTracking:state},now);
     } catch (err) {
       console.error(`dailysnow: storm archive failed for ${area}`, err);
     }
   }
-  const publications=await runChannels(env,stored,now,{force:opts.forceDailySnow,channel:opts.channel,fetchImpl:opts.fetchImpl});
   return {
-    startedAt:now.toISOString(),durationMs:Date.now()-started,
-    results:records.map(({rec,ms})=>({id:rec.id,ok:rec.status==="ok",...(rec.status==="error"?{error:rec.lastError??"unknown"}:{}),ms})),
-    skipped,publications,
+    summary: {
+      startedAt: now.toISOString(),
+      durationMs: Date.now() - started,
+      results: records.map(({ rec, ms }) => ({ id: rec.id, ok: rec.status === "ok", ...(rec.status === "error" ? { error: rec.lastError ?? "unknown" } : {}), ms })),
+      skipped,
+    },
+    snapshot,
   };
+}
+
+/** Run Daily Snow publication against a committed snapshot and complete the summary. */
+export async function publishCollected(env: CollectorEnv, collected: CollectedSnapshot, opts: CollectOptions = {}): Promise<CollectSummary> {
+  const started = Date.now();
+  const now = opts.now ?? new Date(collected.summary.startedAt);
+  const publications = await runChannels(env, collected.snapshot, now, { force: opts.forceDailySnow, channel: opts.channel, fetchImpl: opts.fetchImpl });
+  return { ...collected.summary, durationMs: collected.summary.durationMs + (Date.now() - started), publications };
+}
+
+/**
+ * Collect into the KV snapshot directly, then publish. For Node tooling and
+ * tests, which run one collection at a time; the deployed Worker goes through
+ * CollectorObject instead (src/worker/collection.ts).
+ */
+export async function runCollection(env: CollectorEnv, opts: CollectOptions = {}): Promise<CollectSummary> {
+  return publishCollected(env, await collectSnapshot(env, kvSnapshotStore(env.SNOW_KV), opts), opts);
 }

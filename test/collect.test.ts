@@ -3,8 +3,8 @@ import { collectSource, runCollection } from "@/lib/collect";
 import { buildReport, classify, STALE_AFTER_MS } from "@/lib/report";
 import { SOURCES } from "@/lib/sources";
 import type { SourceDefinition } from "@/lib/sources/types";
-import { mergeSnapshot, MemoryKV, readSnapshot } from "@/lib/store";
-import type { DailySnowState, Snapshot, SourceId, SourceRecord } from "@/lib/types";
+import { MemoryKV, readSnapshot } from "@/lib/store";
+import type { SourceRecord } from "@/lib/types";
 import { createFixtureFetch, FAKE_TOKENS, FIXTURE_NOW } from "./fixtureFetch";
 
 const MIN = 60_000;
@@ -208,104 +208,5 @@ describe("per-source collection intervals", () => {
     expect(classify(plumes, rec(29), now).freshness).toBe("current");
     expect(classify(plumes, rec(46), now).freshness).toBe("current"); // 30-min interval + 22-min margin − 5
     expect(classify(plumes, rec(48), now).freshness).toBe("stale");
-  });
-});
-
-describe("concurrent snapshot writers", () => {
-  let kv: MemoryKV;
-  beforeEach(() => {
-    kv = new MemoryKV();
-  });
-
-  it("keeps a concurrent run's fresher records instead of reverting them", async () => {
-    const t1 = new Date("2026-10-30T14:00:00Z");
-    await runCollection({ SNOW_KV: kv }, {
-      now: t1,
-      sources: [
-        fakeSource("alta", async () => ({ payload: { v: "alta-1" }, sourceUpdatedAt: null })),
-        fakeSource("snowbird", async () => ({ payload: { v: "snowbird-1" }, sourceUpdatedAt: null })),
-      ],
-    });
-
-    // Run B reads the snapshot, collects alta, and is held before it writes.
-    let releaseB: () => void = () => {};
-    const gate = new Promise<void>((resolve) => (releaseB = resolve));
-    const t2 = new Date(t1.getTime() + MIN);
-    const runB = runCollection({ SNOW_KV: kv }, {
-      now: t2,
-      sources: [
-        fakeSource("alta", async () => {
-          await gate;
-          return { payload: { v: "alta-B" }, sourceUpdatedAt: null };
-        }),
-      ],
-    });
-    // While B is held, another run completes and refreshes snowbird.
-    const t3 = new Date(t1.getTime() + 2 * MIN);
-    await runCollection({ SNOW_KV: kv }, {
-      now: t3,
-      sources: [fakeSource("snowbird", async () => ({ payload: { v: "snowbird-C" }, sourceUpdatedAt: null }))],
-    });
-    releaseB();
-    await runB;
-
-    const snap = (await readSnapshot(kv))!;
-    expect(snap.sources.alta!.payload).toEqual({ v: "alta-B" });
-    expect(snap.sources.alta!.lastAttemptAt).toBe(t2.toISOString());
-    // B still carried snowbird-1 from its initial read; the newer attempt survives.
-    expect(snap.sources.snowbird!.payload).toEqual({ v: "snowbird-C" });
-    expect(snap.sources.snowbird!.lastAttemptAt).toBe(t3.toISOString());
-  });
-
-  it("mergeSnapshot keeps the newest attempt per source record", () => {
-    const tOld = "2026-10-30T14:00:00.000Z";
-    const tNew = "2026-10-30T15:00:00.000Z";
-    const rec = (id: SourceId, attempt: string, v: string): SourceRecord => ({
-      id,
-      lastAttemptAt: attempt,
-      lastSuccessfulFetchAt: attempt,
-      sourceUpdatedAt: null,
-      status: "ok",
-      lastError: null,
-      lastErrorAt: null,
-      consecutiveFailures: 0,
-      diagnostics: null,
-      payload: { v },
-    });
-    const latest: Snapshot = {
-      schemaVersion: 1,
-      writtenAt: tNew,
-      sources: { alta: rec("alta", tNew, "alta-latest") },
-    };
-    const incoming: Snapshot = {
-      schemaVersion: 1,
-      writtenAt: "2026-10-30T16:00:00.000Z",
-      sources: { alta: rec("alta", tOld, "alta-stale"), snowbird: rec("snowbird", tOld, "snowbird-first") },
-    };
-    const merged = mergeSnapshot(latest, incoming);
-    expect(merged.sources.alta!.payload).toEqual({ v: "alta-latest" });
-    expect(merged.sources.snowbird!.payload).toEqual({ v: "snowbird-first" });
-    expect(merged.writtenAt).toBe(incoming.writtenAt);
-  });
-
-  it("mergeSnapshot keeps the newest AI state and drops sources absent from the incoming snapshot", () => {
-    const tOld = "2026-10-30T14:00:00.000Z";
-    const tNew = "2026-10-30T15:00:00.000Z";
-    const latest: Snapshot = {
-      schemaVersion: 1,
-      writtenAt: tOld,
-      sources: { alta: { id: "alta", lastAttemptAt: tOld, lastSuccessfulFetchAt: null, sourceUpdatedAt: null, status: "never", lastError: null, lastErrorAt: null, consecutiveFailures: 0, diagnostics: null, payload: null } },
-      dailySnow: { lastAttemptAt: tOld, current: { generatedAt: tOld } } as DailySnowState,
-    };
-    const incoming: Snapshot = {
-      schemaVersion: 1,
-      writtenAt: tNew,
-      sources: {},
-      dailySnow: { lastAttemptAt: tNew, current: { generatedAt: tNew } } as DailySnowState,
-    };
-    const merged = mergeSnapshot(latest, incoming);
-    expect(merged.sources.alta).toBeUndefined(); // not in the incoming snapshot: treated as removed
-    expect(merged.dailySnow?.lastAttemptAt).toBe(tNew);
-    expect(merged.writtenAt).toBe(tNew);
   });
 });

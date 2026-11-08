@@ -307,6 +307,10 @@ it("never carries production bindings, routes, secrets or crons into generated p
   expect(JSON.stringify(config)).not.toContain(LEGACY_PREVIEW_KV);
   expect(JSON.stringify(config)).not.toContain("ADMIN_TOKEN");
   expect(config).not.toHaveProperty("ai");
+  // CollectorObject ships with its migration but no binding in previews.
+  expect(config.migrations).toEqual([{ tag: "v1", new_sqlite_classes: ["CollectorObject"] }]);
+  expect(config).not.toHaveProperty("durable_objects");
+  expect(config.previews).not.toHaveProperty("durable_objects");
 });
 
 it("distinguishes baseline articles from regenerated ones and surfaces source failures in the PR comment", () => {

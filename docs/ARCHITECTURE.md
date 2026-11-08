@@ -2,12 +2,12 @@
 
 [← README](../README.md)
 
-Next.js exports 44 fixed web app pages into `out/`. Cloudflare Static Assets serves HTML, navigation payloads, scripts and styles. A plain Worker (`worker.ts`) handles APIs, share images and the five-minute collection cron. There is no request-time Next.js server.
+Next.js exports 44 fixed web app pages into `out/`. Cloudflare Static Assets serves HTML, navigation payloads, scripts and styles. A plain Worker (`worker.ts`) handles APIs, share images and the five-minute collection cron, which runs collection in the `CollectorObject` Durable Object. There is no request-time Next.js server.
 
 ```text
 Browser → static pages → /api/report → source snapshot + nine publication states
-Cron → due sources → source snapshot / local snow log / per-area storm memory
-     → per-channel attempt record → Workers AI → channel archive + state
+Cron → CollectorObject → due sources → source snapshot / local snow log / per-area storm memory
+     → (back in the cron) per-channel attempt record → Workers AI → channel archive + state
 Link crawler → /daily-snow[/region]/opengraph-image → channel-specific PNG
 ```
 
@@ -25,7 +25,9 @@ Each source independently retains its last good payload through failures. Resort
 
 NWS resolves catalog coordinates through `/points`, caching the grid/office mapping for 24 hours and invalidating it when coordinates change. Point failures retain that point with its own error and check time. Discussions deduplicate the nine verified issuing offices. Plumes isolate failures per station. A retained point, discussion or chart carries its own `lastError`; the source's update time comes from entries fetched that run, and a run in which every point, office or station fails is a failed collection, so the source goes stale on schedule. Regional rendering and regional digests recalculate source age from the region's own points, stations and offices.
 
-All sources live at `snapshot:v1`, with a 14-day snow log and per-forecast-area storm memory. Source writes merge newer attempts against the latest snapshot. This is best effort: KV propagation and the read/put gap can still lose overlapping source updates. Publication attempts are recorded in separate per-channel state keys, so a late source write cannot erase them.
+The source snapshot (every source record, the 14-day snow log, per-forecast-area storm memory and resort operating times) has one writer: the `CollectorObject` Durable Object, a single instance (`src/worker/collector-object.ts`, logic in `src/lib/collector.ts`). Cron and admin collection both call it. It queues runs explicitly, because a Durable Object's input gate opens while it awaits upstream fetches. Each run reads the previous run's committed snapshot, so nothing is merged and overlapping runs cannot lose updates. A cron that arrives while another cron waits joins that run, and only the first caller publishes. The authoritative copy lives in the object's SQLite storage, one row per source and per other field (the whole snapshot was about 350 KB in November 2026; values may be up to 2 MB each). After every commit the object rewrites `snapshot:v1` in KV, the read copy behind `/api/report`. A failed KV write is logged and repaired by the next run. Editing `snapshot:v1` by hand does not change the collector, which never reads KV again after it first starts from an empty store.
+
+Daily Snow publication runs after the collector returns, in the calling cron or admin invocation, so a model call of several minutes never delays the next collection. Publication attempts are recorded in separate per-channel state keys. Node tooling (`collect:once`, PR preview preparation) runs the same collection against KV directly, one run at a time.
 
 Snow days end at **6 AM destination local time**, including 23/25-hour DST days. A morning capture accepts a resort's published 24-hour window only when its timestamp is recent enough for that morning. Rolling windows are never added. Each forecast area retains the NWS forecast a day began with. History starts with collection; there is no imported or fabricated backfill.
 

@@ -6,7 +6,7 @@ import { archiveStorms, trackStorms } from "@/lib/dailysnow/storm-store";
 import { advanceStormTracking, mergeStormTracking, seedStormTracking, stormDigest, stormForPost, stormKey } from "@/lib/dailysnow/storms";
 import { askDailySnow, buildModelInput, validateDailySnow } from "@/lib/dailysnow/llm";
 import { PRIMARY_MODEL } from "@/lib/ai/model";
-import { mergeSnapshot, MemoryKV, readSnapshot, writeSnapshot } from "@/lib/store";
+import { MemoryKV, readSnapshot, writeSnapshot } from "@/lib/store";
 import type { DailySnowPost, NwsPayload, PrimaryResortId, ResortCamsPayload, ResortReport, Snapshot } from "@/lib/types";
 import { createFixtureFetch } from "./fixtureFetch";
 
@@ -182,9 +182,6 @@ describe("persistent storm observations", () => {
     expect(mergeStormTracking(a, b)).toEqual(mergeStormTracking(b, a));
     const closed = run(snapshot(30), merged);
     expect(mergeStormTracking(closed, a)!.events[0].status).toBe("closed");
-    const latest = { ...snapshot(30), stormTracking: closed };
-    const incoming = { ...snapshot(2), stormTracking: a };
-    expect(mergeSnapshot(latest, incoming).stormTracking?.events[0].status).toBe("closed");
   });
 
   it("archives records once per material change, for 30 days from the last change", async () => {
