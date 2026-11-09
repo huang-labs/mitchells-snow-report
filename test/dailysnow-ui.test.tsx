@@ -91,7 +91,7 @@ it("leads with storm observations the prose didn't place and closes with the plu
 it.each([undefined, "utah"] as const)("uses the article header while Daily Snow loads for %s", (region) => {
   render(<ReportLoading sectionId="daily-snow" region={region} />);
   expect(screen.getByRole("status").textContent).toBe("Loading Daily Snow…");
-  expect(screen.getByText(region ? "Utah" : "United States West").className).toBe("eyebrow");
+  expect(screen.getByText(region ? "Utah" : "United States West", { selector: "p" }).className).toBe("eyebrow");
   expect(screen.getByText("AI").className).toContain("badge--ai");
   expect(screen.getByRole("heading", { name: "Daily Snow" }).className).toContain("screenReader");
   expect(screen.getByRole("region", { name: "Daily Snow" }).getAttribute("aria-busy")).toBe("true");
