@@ -1,6 +1,5 @@
-/* All geometry and animation stay local to the loading module. */
+/* Page grids are shared with ready content; decorative shapes and animation stay local. */
 .loading { width: 100%; }
-.reading { max-width: 720px; margin: 0 auto; }
 .screenReader { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .header { display: flex; flex-direction: column; gap: 12px; margin-bottom: var(--page-gap); }
 .subtitle { max-width: 760px; }
@@ -13,10 +12,10 @@
 .shortLine { width: 140px; max-width: 60%; height: 18px; }
 .shapes, .subtitle { animation: loading-pulse 1.8s ease-in-out 500ms infinite; }
 @keyframes loading-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
-.columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; }
-.figure, .forecast, .canyon, .resort { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.figure, .resort { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
 .chart { aspect-ratio: 1.7; background: var(--panel); border-radius: 6px; }
-.camera { aspect-ratio: 16 / 9; background: var(--panel); border-radius: 4px; }
+.forecastChart { height: 190px; background: var(--panel); border-radius: 6px; }
+.railEntry { padding: 16px 12px; }
 .summary { background: var(--panel); border-radius: 8px; padding: 24px; }
 .forecastTable { display: grid; gap: 24px; padding: 12px 0; }
 .snowfall { display: grid; }
@@ -26,12 +25,12 @@
 .snowStrip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)) 152px repeat(7, minmax(0, 1fr)); gap: 4px; align-items: end; height: 120px; border-bottom: 1px solid var(--line); }
 .snowStrip > div { background: var(--panel-2); border-radius: 2px 2px 0 0; width: 60%; max-width: 30px; justify-self: center; height: 6px; }
 .snowStrip > .snowToday { width: 100%; max-width: none; height: 100%; border-radius: 6px; background: var(--panel); }
-.jumpLinks { display: flex; gap: 24px; border-bottom: 1px solid var(--line); padding-bottom: 20px; }
+.jumpLinks { display: flex; flex-wrap: wrap; gap: 16px 24px; border-bottom: 1px solid var(--line); padding-bottom: 20px; }
 .jumpLinks > div { width: 100px; max-width: 25%; }
-.metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.metrics { min-width: 0; }
 .metrics > div { min-height: 120px; background: var(--panel); border-radius: 8px; }
-.history { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
-.history > div { padding: 16px 0; }
+.history { margin-top: 4px; }
+.history > div { min-width: 0; padding: 0; }
 .article { display: grid; gap: 16px; }
 .articleHeader { margin-bottom: 8px; }
 .articleHeading { display: grid; gap: 16px; margin-top: 4px; }
@@ -42,9 +41,7 @@
 .error p { color: var(--muted); }
 .errorDetail { font-size: var(--fs-caption); overflow-wrap: anywhere; }
 @media (max-width: 900px) {
-  .columns { grid-template-columns: minmax(0, 1fr); gap: var(--page-gap); }
   .snowStrip { grid-template-columns: repeat(7, minmax(0, 1fr)) minmax(44px, 1.6fr) repeat(7, minmax(0, 1fr)); gap: 2px; height: 88px; }
-  .history { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (prefers-reduced-motion: reduce) {
   .shapes, .subtitle { animation: none; }

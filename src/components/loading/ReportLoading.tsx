@@ -1,6 +1,7 @@
 import { RESORTS,regionById,type RegionId } from "@/lib/catalog";
 import { findSection } from "@/lib/sections";
 import styles from "./loading.module.css";
+import "../sections/resort-report.css";
 
 function Lines() {
   return <div className={styles.lines}><div /><div /><div /></div>;
@@ -8,10 +9,12 @@ function Lines() {
 
 function Forecast() {
   return (
-    <div className={styles.forecast}>
+    <div className="weather-point">
+      <div className={styles.shortLine} /><Lines />
       <div className={styles.summary}><Lines /></div>
       <div className={styles.forecastTable}><Lines /><Lines /><Lines /></div>
-      <div className={styles.chart} />
+      <div className={styles.forecastChart} />
+      <Lines />
     </div>
   );
 }
@@ -39,23 +42,27 @@ function Layout({ kind }: { kind: string }) {
         </div>
       );
     case "weather":
-      return <div className={styles.columns}><Forecast /><Forecast /></div>;
+      return <div className="weather-grid"><Forecast /><Forecast /></div>;
     case "plumes":
       return (
-        <div className={styles.columns}>
-          {[0, 1, 2, 3].map((i) => (
-            <div className={styles.figure} key={i}><div className={styles.shortLine} /><div className={styles.chart} /></div>
+        <div className="plume-grid">
+          {[0, 1].map((station) => (
+            <div className="plume-station" key={station}>
+              {[0, 1].map((panel) => (
+                <div className={styles.figure} key={panel}><div className={styles.shortLine} /><div className={styles.chart} /></div>
+              ))}
+            </div>
           ))}
         </div>
       );
     default:
       return (
         <div className={styles.resort}>
-          <div className={styles.jumpLinks}><div /><div /><div /></div>
+          <div className={styles.jumpLinks}>{Array.from({ length: 6 }, (_, i) => <div key={i} />)}</div>
           <div className={styles.shortLine} />
-          <div className={styles.metrics}><div /><div /></div>
-          <div className={styles.history}>
-            {[0, 1, 2, 3].map((i) => <div key={i}><Lines /></div>)}
+          <div className={`resort-snow__headline ${styles.metrics}`}><div /><div /><div /></div>
+          <div className={`resort-snow__history ${styles.history}`}>
+            {[0, 1, 2, 3, 4].map((i) => <div key={i}><Lines /></div>)}
           </div>
           <div className={styles.articleSection}><div className={styles.shortLine} /><Lines /></div>
         </div>
@@ -72,26 +79,39 @@ function pageTitle(id: string,region:RegionId="utah") {
 /** One entry point for initial report loads and direct Daily Snow archive loads. */
 export function ReportLoading({ sectionId,region }: { sectionId: string;region?:RegionId }) {
   const title = pageTitle(sectionId,region);
+  const article = sectionId === "daily-snow";
+  const regional = ["daily-snow", "weather", "plumes"].includes(sectionId);
+  const regionName = article && !region ? "United States West" : regionById(region ?? "utah")!.name;
   return (
-    <div className={`${styles.loading} ${sectionId === "daily-snow" ? styles.reading : ""}`}>
-      <span className={styles.screenReader} role="status">Loading {title}…</span>
-      <section aria-busy="true" aria-label={title}>
-        {sectionId === "daily-snow" ? <header className={`dailysnow__header ${styles.articleHeader}`}>
-          <h1 className={styles.screenReader}>{title}</h1>
-          <p className="eyebrow">{region ? regionById(region)!.name : "United States West"}</p>
-          <div className="dailysnow__meta">
-            <span className="eyebrow">Daily Snow<span className="badge badge--ai">AI</span></span>
-          </div>
-          <div aria-hidden="true" className={`${styles.articleHeading} ${styles.shapes}`}>
-            <div className={styles.articleTitle} /><div className={styles.articleTitle} />
-          </div>
-          <div aria-hidden="true" className={styles.shapes}><Lines /></div>
-        </header> : <header className={styles.header}>
-          <h1>{title}</h1>
-          <div aria-hidden="true" className={styles.subtitle}><Lines /></div>
-        </header>}
-        <div aria-hidden="true" className={styles.shapes}><Layout kind={sectionId} /></div>
-      </section>
+    <div className={article ? "dailysnow-layout" : undefined}>
+      {article && <div aria-hidden="true" className={`dailysnow__history ${styles.shapes}`}>
+        <div className={styles.shortLine} />
+        {Array.from({ length: 5 }, (_, i) => <div className={styles.railEntry} key={i}><Lines /></div>)}
+      </div>}
+      <div className={`${styles.loading} ${article ? "dailysnow" : ""}`}>
+        <span className={styles.screenReader} role="status">Loading {title}…</span>
+        <section aria-busy="true" aria-label={title}>
+          {regional && <div aria-hidden="true" className="region-selector">
+            <select disabled tabIndex={-1}><option>{regionName}</option></select>
+          </div>}
+          {sectionId === "daily-snow" ? <header className={`dailysnow__header ${styles.articleHeader}`}>
+            <h1 className={styles.screenReader}>{title}</h1>
+            <p className="eyebrow">{regionName}</p>
+            <div className="dailysnow__meta">
+              <span className="eyebrow">Daily Snow<span className="badge badge--ai">AI</span></span>
+            </div>
+            <div aria-hidden="true" className={`${styles.articleHeading} ${styles.shapes}`}>
+              <div className={styles.articleTitle} /><div className={styles.articleTitle} />
+            </div>
+            <div aria-hidden="true" className={styles.shapes}><Lines /></div>
+          </header> : <header className={styles.header}>
+            {!regional && sectionId !== "regional" && <p className="eyebrow">Mountain report</p>}
+            <h1>{title}</h1>
+            <div aria-hidden="true" className={styles.subtitle}><Lines /></div>
+          </header>}
+          <div aria-hidden="true" className={styles.shapes}><Layout kind={sectionId} /></div>
+        </section>
+      </div>
     </div>
   );
 }
