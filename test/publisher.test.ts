@@ -160,7 +160,7 @@ describe("ChannelPublisher (one channel's single writer)", () => {
 describe("Western overview", () => {
   const western = (editions: PublisherDeps["editions"]) =>
     new ChannelPublisher("western-us", new MemoryChannelStorage(), { SNOW_KV: new MemoryKV(), AI: { run: vi.fn() } }, { snapshot: async () => base, editions });
-  // 9 AM PST: inside Western's 8 AM–noon window.
+  // 9 AM PST: inside Western's 7:15 AM–noon window.
   const westernNow = "2026-11-05T17:00:00.000Z";
 
   it("waits for a regional edition, and reads editions after the decision", async () => {

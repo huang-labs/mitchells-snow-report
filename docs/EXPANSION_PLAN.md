@@ -197,7 +197,7 @@ from `src/lib/recommend/` before deleting the recommendation feature.
 
 ### 4. Western United States Daily Snow
 
-Target **8 AM Pacific / 9 AM Mountain**. Use today's available regional summaries
+Target **7:15 AM Pacific / 8:15 AM Mountain**. Use today's available regional summaries
 and their saved structured facts. Open with the overall weather story, highlight
 regional differences, and link to full regional articles. Any numerical comparison
 must use matching forecast windows, with location and source attribution.

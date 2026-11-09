@@ -28,15 +28,15 @@ describe("Daily Snow publication availability", () => {
     [3, 8], [7, 1], [11, 1], [12, 1],
   ])("keeps all channels' scheduling and publication windows aligned in local time (2026-%i-%i)", (month, day) => {
     for (const channel of CHANNELS) {
-      const start = channel.id === "western-us" ? 8 : 7;
+      const start = channel.id === "western-us" ? 7 * 60 + 15 : 7 * 60;
       const end = channel.id === "western-us" ? 12 : 11;
-      for (const [hour, minute, trigger, publication] of [
-        [start - 1, 59, null, "scheduled"],
-        [start, 0, "morning", "pending"],
-        [end - 1, 59, "morning", "pending"],
-        [end, 0, null, "delayed"],
+      for (const [minutes, trigger, publication] of [
+        [start - 1, null, "scheduled"],
+        [start, "morning", "pending"],
+        [end * 60 - 1, "morning", "pending"],
+        [end * 60, null, "delayed"],
       ] as const) {
-        const at = zonedToUtc(2026, month, day, hour, minute, 0, channel.timeZone);
+        const at = zonedToUtc(2026, month, day, Math.floor(minutes / 60), minutes % 60, 0, channel.timeZone);
         expect(shouldRunDailySnow(undefined, at, channel.id)).toBe(trigger);
         expect(dailySnowPublicationStatus(null, undefined, at, true, channel.id)).toBe(publication);
       }

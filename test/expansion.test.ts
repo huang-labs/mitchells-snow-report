@@ -283,12 +283,12 @@ describe("regional boundaries and calendars", () => {
     }));
     expect(forecastForDay(series, window)).toBe(series.length);
   });
-  it("starts Mountain and Pacific editions at 7AM local and the Western overview at 8AM Pacific", () => {
+  it("starts Mountain and Pacific editions at 7AM local and the Western overview at 7:15AM Pacific", () => {
     expect(shouldRunDailySnow(undefined, new Date("2026-11-05T14:00:00Z"), "utah")).toBe("morning");
     expect(shouldRunDailySnow(undefined, new Date("2026-11-05T14:00:00Z"), "tahoe")).toBeNull();
     expect(shouldRunDailySnow(undefined, new Date("2026-11-05T15:00:00Z"), "tahoe")).toBe("morning");
     expect(shouldRunDailySnow(undefined, new Date("2026-11-05T15:00:00Z"), "western-us")).toBeNull();
-    expect(shouldRunDailySnow(undefined, new Date("2026-11-05T16:00:00Z"), "western-us")).toBe("morning");
+    expect(shouldRunDailySnow(undefined, new Date("2026-11-05T15:15:00Z"), "western-us")).toBe("morning");
   });
 });
 
@@ -541,12 +541,16 @@ describe("independent editions and stored artifacts", () => {
     expect(() => validateWestern(raw, input)).toThrow(/snowfall amounts/);
     raw.sections[1].paragraphs[0].text = "The mountain outlook follows.";
     expect(validateWestern(raw, input).shortTerm).toHaveLength(2);
+    // Brief outlooks can use one paragraph without padding to a fixed quota.
+    const brief = structuredClone(raw);
+    for (const section of brief.sections) section.paragraphs = section.paragraphs.slice(0, 1);
+    expect(validateWestern(brief, input).shortTerm).toHaveLength(1);
     raw.sections[1].paragraphs[0].text = "Read [Tahoe](/daily-snow/tahoe).";
     expect(() => validateWestern(raw, input)).toThrow(/links/);
-    // The ceiling accepts 650 words but rejects 651.
+    // The ceiling accepts 550 words but rejects 551.
     const long = structuredClone(raw);
-    for (const section of long.sections) for (const p of section.paragraphs) p.text = "Pattern ".repeat(100).trim();
-    long.sections[0].paragraphs[0].text += " Pattern".repeat(50);
+    for (const section of long.sections) for (const p of section.paragraphs) p.text = "Pattern ".repeat(80).trim();
+    long.sections[0].paragraphs[0].text += " Pattern".repeat(70);
     expect(() => validateWestern(long, input)).not.toThrow();
     long.sections[0].paragraphs[0].text += " Pattern";
     expect(() => validateWestern(long, input)).toThrow(/too long: \d+ words/);
