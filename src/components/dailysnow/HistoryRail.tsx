@@ -3,7 +3,7 @@ import type { ApiDailySnow, DailySnowPhase } from "@/lib/types";
 import { PHASE_LABEL, postDate } from "./labels";
 
 /** How many posts the rail shows: the live post plus the archive before it. */
-const HISTORY_COUNT = 5;
+const HISTORY_COUNT = 4;
 
 type Entry = { date: string; title: string; phase?: DailySnowPhase; live: boolean };
 /** Picks a post by date; null = the live post. */
