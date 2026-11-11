@@ -28,6 +28,22 @@ function amountText(day: TimelineDay): string {
   return day.state === "not_recorded" || day.state === "no_forecast" ? "" : "–";
 }
 
+/** The seven-day forecast total, to the tenth the daily forecasts carry; "≥" marks a lower bound. */
+function totalInches(v: number): string {
+  return `${Number.isInteger(v) ? v : v.toFixed(1)}″`;
+}
+
+function totalText(total: SnowTimelineModel["futureTotal"]): string {
+  return total === null ? "—" : `${total.complete ? "" : "≥"}${totalInches(total.in)}`;
+}
+
+/** The total for screen readers, where an inch mark alone would be ambiguous. */
+function totalSpoken(total: SnowTimelineModel["futureTotal"]): string {
+  if (total === null) return "forecast total unavailable";
+  const amount = total.in === 1 ? "1 inch" : `${total.in} inches`;
+  return `${total.complete ? "" : "at least "}${amount} forecast`;
+}
+
 function Day({ day, scale }: { day: TimelineDay; scale: number }) {
   return (
     <li className={`snowtl__day snowtl__day--${day.kind} snowtl__day--${day.state}${day.weekend ? " snowtl__day--weekend" : ""}`}>
@@ -83,10 +99,24 @@ export function SnowTimeline({
           </span>
         )}
       </div>
-      <ol className="snowtl__strip" aria-label={`${label} snowfall by day: past 7 days, last 24 hours, next 7 days`}>
+      <ol className="snowtl__strip" aria-label={`${label} snowfall by day: past 7 days, last 24 hours, next 7 days, ${totalSpoken(model.futureTotal)}`}>
         <li className="snowtl__span snowtl__span--past" aria-hidden="true">Past 7 days</li>
         <li className="snowtl__span snowtl__span--now" aria-hidden="true">Last 24 h</li>
-        <li className="snowtl__span snowtl__span--next" aria-hidden="true">Next 7 days</li>
+        <li className="snowtl__span snowtl__span--next" aria-hidden="true">
+          <span className="snowtl__span-next-label">Next 7 days</span>
+          <span
+            className={`snowtl__span-total${model.futureTotal === null ? " snowtl__span-total--none" : ""}`}
+            title={
+              model.futureTotal === null
+                ? "No NWS forecast total for the next 7 days"
+                : model.futureTotal.complete
+                  ? "NWS forecast total for the next 7 days"
+                  : `At least ${totalInches(model.futureTotal.in)}: some days have no complete NWS forecast`
+            }
+          >
+            {totalText(model.futureTotal)}
+          </span>
+        </li>
         {model.past.map((day) => <Day key={day.key} day={day} scale={scale} />)}
         <li className="snowtl__day snowtl__day--today">
           <span className="snowtl__sr">{model.last24.detail}</span>

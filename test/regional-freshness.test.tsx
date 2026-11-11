@@ -82,9 +82,12 @@ describe("destination forecasts and report times", () => {
   it("does not present a failing forecast point's last payload as the current forecast", () => {
     render(<RegionalPage now={now} report={withTahoe(null)} />);
     expect(tahoe().querySelectorAll(".snowtl__day--forecast:not(.snowtl__day--no_forecast)").length).toBeGreaterThan(0);
+    expect(tahoe().querySelector(".snowtl__span-total")!.textContent).toBe("83.5″");
     cleanup();
     render(<RegionalPage now={now} report={withTahoe("Palisades Tahoe: HTTP 503")} />);
     expect(tahoe().querySelectorAll(".snowtl__day--no_forecast")).toHaveLength(7);
+    // A failed point contributes no total, rather than a zero.
+    expect(tahoe().querySelector(".snowtl__span-total")!.textContent).toBe("—");
   });
 
   it("shows a Pacific resort's report time in Pacific time", () => {

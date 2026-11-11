@@ -303,6 +303,32 @@ describe("timeline model", () => {
     expect(stale.last24.detail).toMatch(/report Thu, Oct 29, 4:00 PM MDT\)$/);
   });
 
+  it("totals the forecast days, and marks a total that is missing a day as a lower bound", () => {
+    // The forecast ends 6 days out, partway through the last day.
+    expect(model.futureTotal).toEqual({ in: 6.5, complete: false });
+    const complete = buildSnowTimeline({
+      resort: "alta", name: "Alta", canyon: "LCC", timeZone: ZONE, log, now, report: null,
+      forecast: { hourlySnow: hourly("2026-11-02T03:00:00Z", 8 * 24, 0.1) } as unknown as NwsPayload["points"][number],
+    });
+    expect(complete.futureTotal).toEqual({ in: 15.4, complete: true });
+  });
+
+  it("has no forecast total when no day has one, or when only dry days are known", () => {
+    const none = buildSnowTimeline({ resort: "alta", name: "Alta", canyon: "LCC", timeZone: ZONE, log, now, report: null, forecast: null });
+    expect(none.futureTotal).toBeNull();
+    const dry = buildSnowTimeline({
+      resort: "alta", name: "Alta", canyon: "LCC", timeZone: ZONE, log, now, report: null,
+      forecast: { hourlySnow: hourly("2026-11-02T03:00:00Z", 6 * 24, 0) } as unknown as NwsPayload["points"][number],
+    });
+    expect(dry.futureTotal).toBeNull();
+    // A complete dry week is a real zero, not a missing total.
+    const allDry = buildSnowTimeline({
+      resort: "alta", name: "Alta", canyon: "LCC", timeZone: ZONE, log, now, report: null,
+      forecast: { hourlySnow: hourly("2026-11-02T03:00:00Z", 8 * 24, 0) } as unknown as NwsPayload["points"][number],
+    });
+    expect(allDry.futureTotal).toEqual({ in: 0, complete: true });
+  });
+
   it("shares one bar scale, between 6″ and 18″", () => {
     expect(timelineScale([model])).toBe(9.5);
     expect(timelineScale([{ ...model, past: [], future: [], last24: { ...model.last24, metric: inches(30) } }])).toBe(18);

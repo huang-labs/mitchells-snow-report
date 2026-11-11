@@ -34,6 +34,12 @@ export interface TimelineDay {
 export interface SnowTimelineModel {
   past: TimelineDay[];
   future: TimelineDay[];
+  /**
+   * The seven forecast days' sum: null when no day has a forecast, or when the only
+   * known days are dry. `complete` is false when a day lacks a complete forecast, so
+   * `in` is a lower bound rather than the period's total.
+   */
+  futureTotal: { in: number; complete: boolean } | null;
   last24: { metric: Metric | null; reportTime: string | null; detail: string; warning?: string };
   canyon: CanyonId;
   /** The resort's IANA zone; report times display in it. */
@@ -128,6 +134,16 @@ export function buildSnowTimeline(input: {
     return pastDay(key, name, readings[key], ghosts[key]?.snowIn ?? null,timeZone);
   });
   const future = Array.from({ length: TIMELINE_DAYS }, (_, i) => futureDay(addDays(current, i), canyon, forecast?.hourlySnow, now,timeZone));
+  // A day without a forecast leaves the period's sum unknown. Keep the known days as
+  // a lower bound ("≥"), but don't dress a dry, incomplete week up as a zero total.
+  const knownAmounts = future.flatMap((day) => (day.amountIn === null ? [] : [day.amountIn]));
+  const knownTotal = Math.round(knownAmounts.reduce((sum, amount) => sum + amount, 0) * 10) / 10;
+  const futureTotal =
+    knownAmounts.length === future.length
+      ? { in: knownTotal, complete: true }
+      : knownAmounts.length > 0 && knownTotal > 0
+        ? { in: knownTotal, complete: false }
+        : null;
   const metric = usableSnowReport(report)?.snowfall.h24 ?? null;
   // The date matters here: an old report would otherwise read like today's.
   const at = report?.reportTime ? `, report ${formatLocal(report.reportTime, now,timeZone)}` : "";
@@ -138,7 +154,7 @@ export function buildSnowTimeline(input: {
       : metric.state === "not_reported"
         ? `Last 24 h · ${name} left its 24 h total empty${at}`
         : `Last 24 h · ${metric.note?.startsWith("Withheld:") ? metric.note : `${name} doesn’t publish a 24 h total`}`;
-  return { past, future, last24: { metric, reportTime: report?.reportTime ?? null, detail, ...(report && snowfallIssues(report.snowfall).length ? { warning: "Resort snowfall data warning: affected totals are withheld. See the resort report for published figures." } : {}) }, canyon, timeZone };
+  return { past, future, futureTotal, last24: { metric, reportTime: report?.reportTime ?? null, detail, ...(report && snowfallIssues(report.snowfall).length ? { warning: "Resort snowfall data warning: affected totals are withheld. See the resort report for published figures." } : {}) }, canyon, timeZone };
 }
 
 /** One scale for timelines shown together, so equal amounts draw equal bars. */

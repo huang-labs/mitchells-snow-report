@@ -304,6 +304,15 @@ it("shows each resort as a snowfall timeline: 7 recorded days, the last 24 h, 7 
   expect(alta.querySelectorAll(".snowtl__day--no_forecast")).toHaveLength(0);
   // The first forecast day is the snow day under way, ending at 6 AM (MDT).
   expect(alta.querySelector(".snowtl__day--forecast .snowtl__sr")!.textContent).toMatch(/now to 6 AM \(LCC grid point\)/);
+  // The next-week span totals the seven forecast days.
+  expect(alta.querySelector(".snowtl__span--next")!.textContent).toBe("Next 7 days17.6″");
+  expect(alta.querySelector(".snowtl__strip")!.getAttribute("aria-label")).toMatch(/next 7 days, 17.6 inches forecast$/);
+  // A forecast that starts late keeps the known days as a lower bound; a dry or
+  // absent one is no data, never a zero total.
+  const block = (name: string) => blocks.find((b) => b.querySelector(".resort-name")?.textContent === name)!;
+  expect(block("Winter Park").querySelector(".snowtl__span-total")!.textContent).toBe("≥0.3″");
+  expect(block("Winter Park").querySelector(".snowtl__strip")!.getAttribute("aria-label")).toMatch(/at least 0.3 inches forecast$/);
+  expect(block("Park City").querySelector(".snowtl__span-total")!.textContent).toBe("—");
   // BCC resorts use the BCC grid point; the strip carries no source captions.
   expect(blocks[2].querySelector(".snowtl__day--forecast .snowtl__sr")!.textContent).toMatch(/\(BCC grid point\)/);
   expect(alta.textContent).not.toMatch(/Morning reports|NWS forecast ·/);

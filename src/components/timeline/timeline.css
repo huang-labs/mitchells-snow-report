@@ -16,12 +16,20 @@
 .snowtl__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 .snowtl__strip { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)) var(--today-col) repeat(7, minmax(0, 1fr)); column-gap: 2px; align-items: end; }
-.snowtl__span { grid-row: 1; display: flex; align-items: center; gap: 8px; margin-bottom: 4px; color: var(--muted); font-size: var(--fs-label); font-weight: 650; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+.snowtl__span { grid-row: 1; align-self: start; display: flex; align-items: center; gap: 8px; margin-bottom: 4px; color: var(--muted); font-size: var(--fs-label); font-weight: 650; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
 .snowtl__span::before, .snowtl__span::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
 .snowtl__span--past { grid-column: 1 / 8; }
 .snowtl__span--now { grid-column: 8 / 9; justify-content: center; visibility: hidden; }
 .snowtl__span--now::before, .snowtl__span--now::after { content: none; }
-.snowtl__span--next { grid-column: 9 / 16; }
+/* Phones: the next-week span stacks its total under the label, so a three-digit
+   total still fits seven narrow columns. The lines stay on the label's row. */
+.snowtl__span--next { grid-column: 9 / 16; flex-direction: column; align-items: center; gap: 0; }
+.snowtl__span--next::before, .snowtl__span--next::after { content: none; }
+.snowtl__span-next-label { display: flex; align-items: center; gap: 8px; align-self: stretch; }
+.snowtl__span-next-label::before, .snowtl__span-next-label::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+/* The seven-day forecast total, to the tenth the daily forecasts carry. */
+.snowtl__span-total { color: var(--accent); font-size: var(--fs-caption); font-weight: 750; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.snowtl__span-total--none { color: var(--muted); font-weight: 500; }
 
 .snowtl__day { grid-row: 2; position: relative; display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 4px 0 6px; border-radius: 6px; }
 .snowtl__visual { display: contents; }
@@ -59,6 +67,11 @@
   .snowtl { --plot-h: 96px; --today-col: 152px; }
   .snowtl__strip { column-gap: 4px; }
   .snowtl__span--now { visibility: visible; }
+  /* Desktop: the total fits on the label row, so the plot keeps its height. */
+  .snowtl__span--next { flex-direction: row; align-items: center; gap: 8px; }
+  .snowtl__span--next::before, .snowtl__span--next::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+  .snowtl__span-next-label { display: contents; }
+  .snowtl__span-next-label::before, .snowtl__span-next-label::after { content: none; }
   .snowtl__head { display: flex; align-items: baseline; }
   .snowtl__heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
   .snowtl__reported { display: none; }
