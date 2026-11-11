@@ -5,7 +5,9 @@ import { ChannelPublisher, INTERRUPTED, MemoryChannelStorage, type PublisherDeps
 import { channelKV, channelStateKey } from "@/lib/dailysnow/regions";
 import { dailySnowKey } from "@/lib/dailysnow";
 import { MemoryKV, readSnapshot } from "@/lib/store";
-import type { DailySnowState, Snapshot } from "@/lib/types";
+import { regionsStillPublishing, westernWaitingOn } from "@/lib/dailysnow/schedule";
+import type { RegionId } from "@/lib/catalog";
+import type { DailySnowPost, DailySnowState, Snapshot } from "@/lib/types";
 import { createFixtureFetch } from "./fixtureFetch";
 
 // 8 AM MST: inside Utah's 7–11 AM window.
@@ -179,5 +181,77 @@ describe("Western overview", () => {
     const post = (await utah.publisher.state()).current!;
     const w = western(async () => ({ utah: post }));
     expect(await w.request({ now: westernNow })).toEqual({ channel: "western-us", scheduled: westernNow });
+  });
+});
+
+describe("Western waits for regional editions", () => {
+  // 7:20 AM PST on 2026-11-05: Pacific regions started at 7:00.
+  const at = "2026-11-05T15:20:00.000Z";
+  const t = new Date(at);
+  const state = (patch: Partial<DailySnowState>): DailySnowState => ({ ...emptyDailySnowState(), ...patch });
+  const posted = state({ current: { date: "2026-11-05" } as DailySnowPost });
+  const running = state({ lastAttemptAt: "2026-11-05T15:18:00.000Z", attempts: { date: "2026-11-05", count: 2, calls: 4 } });
+  const retrying = state({
+    lastAttemptAt: "2026-11-05T15:00:00.000Z",
+    lastFinishedAt: "2026-11-05T15:02:00.000Z",
+    lastError: "both models failed",
+    attempts: { date: "2026-11-05", count: 1, calls: 2 },
+  });
+  const exhausted = state({ ...retrying, attempts: { date: "2026-11-05", count: 3, calls: 6 } });
+  const all = (s: DailySnowState) => Object.fromEntries((["utah", "tahoe", "mammoth", "tetons", "montana", "colorado", "washington", "oregon"] as RegionId[]).map((id) => [id, s]));
+  const worth = () => true;
+
+  it("waits only for a region whose edition may still land", () => {
+    expect(regionsStillPublishing({ ...all(posted), oregon: running }, worth, t)).toEqual(["oregon"]);
+    expect(regionsStillPublishing({ ...all(posted), oregon: retrying }, worth, t)).toEqual(["oregon"]);
+    // Not yet attempted but expected: its first attempt is coming.
+    expect(regionsStillPublishing({ ...all(posted), oregon: undefined }, worth, t)).toEqual(["oregon"]);
+    expect(regionsStillPublishing({ ...all(posted), oregon: exhausted }, worth, t)).toEqual([]);
+    // Off-season or no inputs: the region will not post today.
+    expect(regionsStillPublishing({ ...all(posted), oregon: retrying }, (r) => r !== "oregon", t)).toEqual([]);
+    // A running attempt counts even when the region would not start a new one.
+    expect(regionsStillPublishing({ ...all(posted), oregon: running }, () => false, t)).toEqual(["oregon"]);
+    // Past the regional 11 AM cutoff (10 AM PST is 11 AM MST): no new Mountain attempts.
+    expect(regionsStillPublishing({ ...all(posted), utah: retrying }, worth, new Date("2026-11-05T18:00:00Z"))).toEqual([]);
+  });
+
+  it("stops waiting at 7:45 AM Pacific", () => {
+    const states = { ...all(posted), oregon: retrying };
+    expect(westernWaitingOn(states, worth, new Date("2026-11-05T15:44:00Z"))).toEqual(["oregon"]);
+    expect(westernWaitingOn(states, worth, new Date("2026-11-05T15:45:00Z"))).toEqual([]);
+    // The limit stays 7:45 AM local after the switch to daylight time (UTC-7).
+    const spring = { oregon: state({ ...retrying, attempts: { date: "2027-03-15", count: 1, calls: 2 } }) };
+    const others = (r: RegionId) => r === "oregon";
+    expect(westernWaitingOn(spring, others, new Date("2027-03-15T14:44:00Z"))).toEqual(["oregon"]);
+    expect(westernWaitingOn(spring, others, new Date("2027-03-15T14:45:00Z"))).toEqual([]);
+  });
+
+  const western = (states: Partial<Record<RegionId, DailySnowState>>) => {
+    const editions = vi.fn(async () => ({ utah: { date: "2026-11-05" } as DailySnowPost }));
+    const w = new ChannelPublisher("western-us", new MemoryChannelStorage(), { SNOW_KV: new MemoryKV(), AI: { run: vi.fn() } }, {
+      snapshot: async () => base,
+      editions,
+      regionStates: async () => states,
+    });
+    return { w, editions };
+  };
+
+  it("skips a scheduled run while a region is still running, then runs at the limit", async () => {
+    const { w, editions } = western({ ...all(posted), oregon: running });
+    expect(await w.request({ now: at })).toEqual({ channel: "western-us", skipped: "Waiting for regional editions: oregon" });
+    expect(editions).not.toHaveBeenCalled();
+    expect((await w.state()).attempts.count).toBe(0);
+    const limit = "2026-11-05T15:45:00.000Z";
+    expect(await w.request({ now: limit })).toEqual({ channel: "western-us", scheduled: limit });
+  });
+
+  it("runs as soon as every region has settled", async () => {
+    const { w } = western({ ...all(posted), oregon: exhausted });
+    expect(await w.request({ now: at })).toEqual({ channel: "western-us", scheduled: at });
+  });
+
+  it("never makes a forced run wait", async () => {
+    const { w } = western({ ...all(posted), oregon: running });
+    expect(await w.request({ now: at, force: true })).toEqual({ channel: "western-us", scheduled: at });
   });
 });

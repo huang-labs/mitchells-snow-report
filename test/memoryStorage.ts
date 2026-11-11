@@ -43,12 +43,14 @@ export function memoryChannels(env: PublisherEnv & { COLLECTOR?: CollectorNamesp
   const publishers = new Map<ChannelId, ChannelPublisher>();
   const alarms: Promise<unknown>[] = [];
   const outcomes: PublicationOutcome[] = [];
+  const regionStates = async () => Object.fromEntries(await Promise.all(REGIONS.map(async (r) => [r.id, await publisher(r.id).state()])));
   const publisher = (id: ChannelId): ChannelPublisher => {
     let p = publishers.get(id);
     if (!p) {
       p = new ChannelPublisher(id, new MemoryChannelStorage(), env, {
         snapshot: () => env.COLLECTOR!.getByName("snapshot").latest(),
-        editions: async (now) => currentEditions(Object.fromEntries(await Promise.all(REGIONS.map(async (r) => [r.id, await publisher(r.id).state()]))), REGIONS, now),
+        editions: async (now) => currentEditions(await regionStates(), REGIONS, now),
+        regionStates,
         fetchImpl: seams.fetchImpl,
       });
       publishers.set(id, p);

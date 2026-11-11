@@ -2,8 +2,9 @@ import { channelById, type ChannelId, type RegionId } from "../catalog";
 import { localDate } from "../time";
 import type { DailySnowPost, DailySnowState, Snapshot } from "../types";
 import { emptyDailySnowState, planDailySnow, type DailySnowEnv } from ".";
+import { dailySnowActivity } from "./digest";
 import { channelKV, channelStateKey, regionalSnapshot } from "./regions";
-import { attemptsToday, DAILY_CALL_CAP, inFlight, MAX_ATTEMPTS, shouldRunDailySnow } from "./schedule";
+import { attemptsToday, DAILY_CALL_CAP, inFlight, MAX_ATTEMPTS, shouldRunDailySnow, westernWaitingOn } from "./schedule";
 import { writeWestern } from "./western";
 
 /**
@@ -37,6 +38,11 @@ export interface PublisherDeps {
   snapshot(): Promise<Snapshot | null>;
   /** Today's regional editions, for the Western overview. */
   editions(now: Date): Promise<Partial<Record<RegionId, DailySnowPost>>>;
+  /**
+   * Every region's state, so a scheduled Western run can wait for regional
+   * editions still in progress. Without it, Western does not wait.
+   */
+  regionStates?(): Promise<Partial<Record<RegionId, DailySnowState>>>;
   fetchImpl?: typeof fetch;
 }
 
@@ -179,6 +185,10 @@ export class ChannelPublisher {
     let editions: Partial<Record<RegionId, DailySnowPost>> = {};
     if (western) {
       // Network I/O: re-decide afterwards, since another request may have reserved meanwhile.
+      if (!req.force && this.deps.regionStates) {
+        const waiting = await this.waitingOn(now);
+        if (waiting.length) return { channel, skipped: `Waiting for regional editions: ${waiting.join(", ")}` };
+      }
       editions = await this.deps.editions(now);
       if (!Object.keys(editions).length) return { channel, skipped: "No current regional editions" };
       skip = this.decide(now, req);
@@ -193,6 +203,14 @@ export class ChannelPublisher {
     };
     await this.save(reserved, { attemptAt: reserved.lastAttemptAt!, force: !!req.force, base });
     return { channel, scheduled: reserved.lastAttemptAt! };
+  }
+
+  /** Regions whose edition may still land before the Western wait limit. */
+  private async waitingOn(now: Date) {
+    const [states, snapshot] = await Promise.all([this.deps.regionStates!(), this.deps.snapshot()]);
+    // The same test each region applies before it reserves an attempt.
+    const worth = (region: RegionId) => snapshot ? dailySnowActivity(regionalSnapshot(snapshot, region), now).worthPosting : undefined;
+    return westernWaitingOn(states, worth, now);
   }
 
   /** undefined: reserve. null: not due. Otherwise the skip to report. */
