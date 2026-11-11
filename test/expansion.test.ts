@@ -721,6 +721,8 @@ describe("West pattern outlook", () => {
     expect(map.caption).toContain("8–14-day 500-mb height outlook · Nov 12–18 · issued");
     // The CPC chart is contoured, not shaded.
     expect(map.caption).toContain("dashed lines show departures from normal, red above (ridging) and blue below (troughing)");
+    // The national prompt is large; "high" reasoning left no budget for the answer.
+    expect(JSON.parse(input).reasoning_effort).toBe("medium");
     const sent = JSON.parse(JSON.parse(input).messages[1].content);
     expect(sent.patternOutlook).toMatchObject({ validLabel: "Nov 12–18", sixToTen: { validLabel: "Nov 10–14" } });
     expect(sent.patternOutlook.sixToTen.discussion).toMatch(/^The 0Z ECMWF, GEFS, and Canadian ensemble mean forecasts/);

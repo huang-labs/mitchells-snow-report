@@ -178,6 +178,10 @@ CRITICAL OUTPUT RULE: Do not write any snowfall amount anywhere, including repor
     schema,
     temperature: 0.4,
     maxTokens: 8000,
+    // The national prompt carries every regional edition. At DeepSeek's default "high"
+    // its answer came back empty on 2026-11-11, most likely because reasoning used up
+    // the shared budget; "medium" leaves room for the JSON.
+    reasoningEffort: "medium",
   });
 }
 export function validateWestern(raw: unknown, _input: ReturnType<typeof buildWesternInput>): WesternOutput {
