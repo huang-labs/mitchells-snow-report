@@ -5,7 +5,7 @@ import type { DailySnowPost } from "../types";
 import { SHARE_COLORS as C, SHARE_FRAME, ShareBrand, ShareFooter } from "./style";
 
 type PreviewPost = Pick<DailySnowPost, "date" | "title" | "summary" | "model" | "channel">;
-const MODEL_NAME: Record<string, string> = { "glm-5.3-flash": "GLM 5.3 Flash", "gpt-oss-120b": "gpt-oss-120b" };
+const MODEL_NAME: Record<string, string> = { "deepseek-v4.1-flash-1017": "DeepSeek V4.1 Flash", "glm-5.3-flash": "GLM 5.3 Flash", "gpt-oss-120b": "gpt-oss-120b" };
 
 /** Bounded copy keeps unusually long generated posts inside the image. */
 export function DailySnowShareCard({ post,channel="western-us" }: { post: PreviewPost | null;channel?:ChannelId }) {
