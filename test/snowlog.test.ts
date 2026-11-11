@@ -295,6 +295,36 @@ describe("timeline model", () => {
     expect(model.last24.detail).toBe("Last 24 h · 3″ reported by Alta (“Last 24 hrs”, report Sun, Nov 1, 3:00 PM MST)");
   });
 
+  it("totals the forecast days NWS covers, saying how many when it ends early", () => {
+    // 0.5″ of the current day's remaining hours + five full days at 1.2″; the 7th has no total.
+    expect(model.nextTotal).toEqual({
+      amountIn: 6.5,
+      days: 6,
+      label: "Next 6 days",
+      title: "NWS forecast total through 6 AM Sat, Nov 7",
+      detail: "Next 6 days · 6.5″ NWS forecast total, now to 6 AM Sat, Nov 7 (LCC grid point)",
+    });
+    const none = buildSnowTimeline({ resort: "alta", name: "Alta", canyon: "LCC", timeZone: ZONE, log, now, forecast: null, report: null });
+    expect(none.nextTotal).toBeNull();
+  });
+
+  it("totals the past week's reported days, never counting a missing day as zero", () => {
+    // The label stays "Past 7 days"; hover and screen-reader text name the days covered.
+    // Only Nov 1 reported; Oct 31 had no report and earlier days weren't recorded.
+    expect(model.pastTotal).toEqual({
+      amountIn: 7,
+      days: 1,
+      label: "Past 7 days",
+      title: "Reported total on 1 of 7 days; the other days have no report",
+      detail: "Past 7 days · 7″ reported by Alta on 1 of 7 days",
+    });
+    const week = Object.fromEntries(model.past.map((d, i) => [d.key, { state: "reported" as const, valueIn: i === 6 ? 0.4 : 2, label: "Last 24 hrs", windowEnd: null, collectedAt: "2026-11-01T13:00:00Z" }]));
+    const full = buildSnowTimeline({ resort: "alta", name: "Alta", canyon: "LCC", timeZone: ZONE, now, forecast: null, report: null, log: { resorts: { alta: week }, forecasts: {} } });
+    expect(full.pastTotal).toMatchObject({ amountIn: 12.4, days: 7, label: "Past 7 days", detail: "Past 7 days · 12.4″ reported by Alta" });
+    const none = buildSnowTimeline({ resort: "alta", name: "Alta", canyon: "LCC", timeZone: ZONE, now, forecast: null, report: null, log: null });
+    expect(none.pastTotal).toBeNull();
+  });
+
   it("dates an old report in the screen-reader description, so it can't pass for today's", () => {
     const stale = buildSnowTimeline({
       resort: "alta", name: "Alta", canyon: "LCC", timeZone: ZONE, log, now, forecast: null,

@@ -31,9 +31,27 @@ export interface TimelineDay {
   detail: string;
 }
 
+/**
+ * A week's total, shown beside its span label: the past 7 days' reported snow or the
+ * next 7 days' NWS forecast. Null when no day in the span has an amount.
+ */
+export interface SpanTotal {
+  amountIn: number;
+  /** Days with an amount; the label says so when it is fewer than 7. */
+  days: number;
+  /** Span label: "Past 7 days", "Next 6 days". */
+  label: string;
+  /** Hover text naming what the total covers. */
+  title: string;
+  /** Screen-reader description. */
+  detail: string;
+}
+
 export interface SnowTimelineModel {
   past: TimelineDay[];
   future: TimelineDay[];
+  pastTotal: SpanTotal | null;
+  nextTotal: SpanTotal | null;
   last24: { metric: Metric | null; reportTime: string | null; detail: string; warning?: string };
   canyon: CanyonId;
   /** The resort's IANA zone; report times display in it. */
@@ -104,6 +122,49 @@ function futureDay(key: string, canyon: CanyonId, hourly: PointForecast["hourlyS
     : { ...base, state: "forecast", amountIn, detail: `${date} · ${inches(amountIn)} NWS forecast, ${span} (${canyon} grid point)` };
 }
 
+const sum = (days: TimelineDay[]) => Math.round(days.reduce((total, d) => total + d.amountIn!, 0) * 10) / 10;
+const dayCount = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
+
+/**
+ * Sum of the past days the resort reported. Days without a report are left out (never
+ * counted as zero); the label stays "Past 7 days" for a quick read, while the hover
+ * text and screen-reader description say how many days the total covers. The NWS
+ * outlines are not included.
+ */
+export function pastTotal(past: TimelineDay[], name: string): SpanTotal | null {
+  const days = past.filter((d) => d.state === "reported" && d.amountIn !== null);
+  if (!days.length) return null;
+  const amountIn = sum(days);
+  const full = days.length === past.length;
+  const covers = full ? "" : ` on ${days.length} of ${past.length} days`;
+  return {
+    amountIn,
+    days: days.length,
+    label: `Past ${dayCount(past.length)}`,
+    title: full ? `Reported total, past ${past.length} days` : `Reported total${covers}; the other days have no report`,
+    detail: `Past ${past.length} days · ${inches(amountIn)} reported by ${name}${covers}`,
+  };
+}
+
+/**
+ * Sum of the forecast days that have an NWS total, counting only the current day's
+ * remaining hours. NWS often ends partway through the 7th day; that day is left out
+ * and the label counts the days covered ("Next 6 days").
+ */
+export function forecastTotal(future: TimelineDay[], canyon: CanyonId, zone: string): SpanTotal | null {
+  const days = future.filter((d) => d.state === "forecast" && d.amountIn !== null);
+  if (!days.length) return null;
+  const amountIn = sum(days);
+  const through = dayLabels(snowDayWindow(days.at(-1)!.key, zone).end, zone).date;
+  return {
+    amountIn,
+    days: days.length,
+    label: `Next ${dayCount(days.length)}`,
+    title: `NWS forecast total through 6 AM ${through}`,
+    detail: `Next ${dayCount(days.length)} · ${inches(amountIn)} NWS forecast total, now to 6 AM ${through} (${canyon} grid point)`,
+  };
+}
+
 /**
  * One resort's timeline: the 7 snow days before the current one (each resort's morning
  * report), its latest 24 h figure, then 7 days of NWS forecast starting with the current
@@ -128,6 +189,7 @@ export function buildSnowTimeline(input: {
     return pastDay(key, name, readings[key], ghosts[key]?.snowIn ?? null,timeZone);
   });
   const future = Array.from({ length: TIMELINE_DAYS }, (_, i) => futureDay(addDays(current, i), canyon, forecast?.hourlySnow, now,timeZone));
+  const totals = { pastTotal: pastTotal(past, name), nextTotal: forecastTotal(future, canyon, timeZone) };
   const metric = usableSnowReport(report)?.snowfall.h24 ?? null;
   // The date matters here: an old report would otherwise read like today's.
   const at = report?.reportTime ? `, report ${formatLocal(report.reportTime, now,timeZone)}` : "";
@@ -138,7 +200,7 @@ export function buildSnowTimeline(input: {
       : metric.state === "not_reported"
         ? `Last 24 h · ${name} left its 24 h total empty${at}`
         : `Last 24 h · ${metric.note?.startsWith("Withheld:") ? metric.note : `${name} doesn’t publish a 24 h total`}`;
-  return { past, future, last24: { metric, reportTime: report?.reportTime ?? null, detail, ...(report && snowfallIssues(report.snowfall).length ? { warning: "Resort snowfall data warning: affected totals are withheld. See the resort report for published figures." } : {}) }, canyon, timeZone };
+  return { past, future, ...totals, last24: { metric, reportTime: report?.reportTime ?? null, detail, ...(report && snowfallIssues(report.snowfall).length ? { warning: "Resort snowfall data warning: affected totals are withheld. See the resort report for published figures." } : {}) }, canyon, timeZone };
 }
 
 /** One scale for timelines shown together, so equal amounts draw equal bars. */
