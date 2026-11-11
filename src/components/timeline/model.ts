@@ -39,7 +39,7 @@ export interface SpanTotal {
   amountIn: number;
   /** Days with an amount; the label says so when it is fewer than 7. */
   days: number;
-  /** Span label: "Past 7 days", "5 of 7 days", "Next 6 days". */
+  /** Span label: "Past 7 days", "Next 6 days". */
   label: string;
   /** Hover text naming what the total covers. */
   title: string;
@@ -127,8 +127,9 @@ const dayCount = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
 
 /**
  * Sum of the past days the resort reported. Days without a report are left out (never
- * counted as zero), and the label then says how many days the total covers, so a
- * partial week can't pass for a full one. The NWS outlines are not included.
+ * counted as zero); the label stays "Past 7 days" for a quick read, while the hover
+ * text and screen-reader description say how many days the total covers. The NWS
+ * outlines are not included.
  */
 export function pastTotal(past: TimelineDay[], name: string): SpanTotal | null {
   const days = past.filter((d) => d.state === "reported" && d.amountIn !== null);
@@ -139,7 +140,7 @@ export function pastTotal(past: TimelineDay[], name: string): SpanTotal | null {
   return {
     amountIn,
     days: days.length,
-    label: full ? `Past ${dayCount(past.length)}` : `${days.length} of ${past.length} days`,
+    label: `Past ${dayCount(past.length)}`,
     title: full ? `Reported total, past ${past.length} days` : `Reported total${covers}; the other days have no report`,
     detail: `Past ${past.length} days · ${inches(amountIn)} reported by ${name}${covers}`,
   };

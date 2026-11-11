@@ -309,11 +309,12 @@ describe("timeline model", () => {
   });
 
   it("totals the past week's reported days, never counting a missing day as zero", () => {
+    // The label stays "Past 7 days"; hover and screen-reader text name the days covered.
     // Only Nov 1 reported; Oct 31 had no report and earlier days weren't recorded.
     expect(model.pastTotal).toEqual({
       amountIn: 7,
       days: 1,
-      label: "1 of 7 days",
+      label: "Past 7 days",
       title: "Reported total on 1 of 7 days; the other days have no report",
       detail: "Past 7 days · 7″ reported by Alta on 1 of 7 days",
     });
