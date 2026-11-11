@@ -18,7 +18,7 @@ Validation checks schemas, section/figure identities, supplied inch amounts, mis
 
 ## Scheduling and limits
 
-Primary: `@cf/deepseek-ai/deepseek-v4.1-flash-1017`. A timeout, API error or invalid result permits one fallback, `@cf/zai-org/glm-5.3-flash`. Each call has a five-minute timeout. Source text is untrusted input.
+Primary: `@cf/deepseek-ai/deepseek-v4.1-flash-1017`. A timeout, API error or invalid result permits one fallback, `@cf/openai/gpt-oss-120b`. Each call has a five-minute timeout. Source text is untrusted input.
 
 Automatic publication has a four-hour morning window, ten-minute retries, at most three attempts per channel/local date, and a twelve-minute in-flight window. Each channel's `ChannelObject` records these and reserves an attempt atomically before its alarm calls the model. Successful editions are not rewritten automatically. Manual forced editions count toward the same limits and are refused while that channel's attempt is in flight. Two model requests are conservatively recorded even when the primary succeeds, so nine channels can use at most 54 per local day. The dedicated Gateway's 64-request sliding-day limit is the hard ceiling. Channels generate independently, each in its own alarm.
 

@@ -210,7 +210,7 @@ later that morning.
 ### 5. Generation coordination and limits
 
 Keep `@cf/deepseek-ai/deepseek-v4.1-flash-1017` as primary and
-`@cf/zai-org/glm-5.3-flash` as the single fallback. Models write prose; code
+`@cf/openai/gpt-oss-120b` as the single fallback. Models write prose; code
 computes facts, eligibility, phases, totals, figure captions, and availability.
 Use strict schemas and validation.
 

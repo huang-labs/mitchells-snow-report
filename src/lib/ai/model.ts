@@ -11,15 +11,8 @@ export interface AiLike {
 
 export const PRIMARY_MODEL = "@cf/deepseek-ai/deepseek-v4.1-flash-1017";
 /** Different model family, used once if the primary fails or returns invalid output. */
-export const FALLBACK_MODEL = "@cf/zai-org/glm-5.3-flash";
+export const FALLBACK_MODEL = "@cf/openai/gpt-oss-120b";
 export const MODELS = [PRIMARY_MODEL, FALLBACK_MODEL] as const;
-
-/**
- * Reasoning level per model. DeepSeek accepts none/low/high/max, GLM low/high/max.
- * "high" is valid for both and avoids GLM's default "max"; an unknown model (a
- * replay with `--model`) also gets "high".
- */
-const REASONING_EFFORT: Record<string, string> = { [PRIMARY_MODEL]: "high", [FALLBACK_MODEL]: "high" };
 
 export interface ChatRequest {
   system: string;
@@ -33,9 +26,9 @@ export interface ChatRequest {
 }
 
 /**
- * Workers AI request body. DeepSeek already defaults to "high"; GLM defaults to
- * "max" and cannot disable reasoning, so "high" is the better latency/quality
- * trade for both.
+ * Workers AI request body. DeepSeek already defaults to "high"; gpt-oss-120b
+ * keeps its "medium" default, which is the better latency/quality trade for a
+ * fallback. Both models reason, so neither level disables it.
  */
 export function chatInput(model: string, req: ChatRequest): Record<string, unknown> {
   return {
@@ -46,7 +39,7 @@ export function chatInput(model: string, req: ChatRequest): Record<string, unkno
     response_format: { type: "json_schema", json_schema: { name: req.schemaName, strict: true, schema: req.schema } },
     temperature: req.temperature,
     max_tokens: req.maxTokens,
-    reasoning_effort: REASONING_EFFORT[model] ?? "high",
+    reasoning_effort: model === PRIMARY_MODEL ? "high" : "medium",
   };
 }
 

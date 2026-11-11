@@ -7,8 +7,9 @@ import type { DailyDigest } from "./digest";
 export const DAILY_SNOW_MAX_TOKENS = 8000;
 /**
  * Long-form output with high reasoning takes far longer than the resort pick:
- * on 2026-11-02 GLM 5.3 Flash needed 128 s for a valid post (8.3k prompt, 3.9k
- * output tokens). Two timeouts in a row still fit the 15-minute cron wall-time limit.
+ * on 2026-11-02 the then-primary GLM 5.3 Flash needed 128 s for a valid post
+ * (8.3k prompt, 3.9k output tokens). Two timeouts in a row still fit the
+ * 15-minute cron wall-time limit.
  */
 export const DAILY_SNOW_TIMEOUT_MS = 5 * 60_000;
 export const MAX_FIGURES = 6;
