@@ -28,7 +28,7 @@ const post: ApiDailySnow = {
     resorts: [{ id: "alta", name: "Alta", h24: 9, storm: 11, reportTime: null }],
   },
   generatedAt: "2026-11-01T13:00:00Z",
-  model: "@cf/zai-org/glm-5.3-flash",
+  model: "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
   trigger: "morning",
   outdated: false,
   failing: false,
@@ -121,7 +121,7 @@ it("shows the post as page content with the AI badge, sections and figures", () 
   const article = within(document.querySelector<HTMLElement>(".dailysnow__article")!);
   expect(article.getByRole("img", { name: "NWS forecast snow level" })).toBeTruthy();
   expect(article.getByRole("img", { name: "Alta snow stake · 5:55 AM today" }).getAttribute("src")).toBe("/api/daily-snow/figure/2026-11-01/stake-alta");
-  expect(screen.getByText(/AI-generated from NWS forecasts.*GLM 5\.3 Flash/)).toBeTruthy();
+  expect(screen.getByText(/AI-generated from NWS forecasts.*DeepSeek V4\.1 Flash/)).toBeTruthy();
 });
 
 it("labels a delayed replacement on the latest article", () => {

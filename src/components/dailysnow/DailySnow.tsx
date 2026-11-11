@@ -16,8 +16,8 @@ import { StatusBadge } from "../ui";
 const SECTION_TITLE: Record<DailySnowSectionId, string> = { update: "Today", "short-term": "Next Few Days", extended: "Extended Forecast" };
 /** West covers this week with NWS points and week two with NOAA's outlook. */
 const WEST_SECTION_TITLE: Record<DailySnowSectionId, string> = { update: "Overview", "short-term": "Short Term Forecast", extended: "Extended Forecast" };
-/** Display names by Workers AI model id suffix. */
-const MODEL_NAME: Record<string, string> = { "glm-5.3-flash": "GLM 5.3 Flash", "gpt-oss-120b": "gpt-oss-120b" };
+/** Display names by Workers AI model id suffix. Older editions keep their own model's name. */
+const MODEL_NAME: Record<string, string> = { "deepseek-v4.1-flash-1017": "DeepSeek V4.1 Flash", "glm-5.3-flash": "GLM 5.3 Flash", "gpt-oss-120b": "gpt-oss-120b" };
 const modelName = (id: string) => MODEL_NAME[id.split("/").pop() ?? ""] ?? id;
 
 /** An immutable edition keeps its date when a replacement is delayed. */

@@ -9,7 +9,7 @@ export interface AiLike {
   run(model: string, input: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
 }
 
-export const PRIMARY_MODEL = "@cf/zai-org/glm-5.3-flash";
+export const PRIMARY_MODEL = "@cf/deepseek-ai/deepseek-v4.1-flash-1017";
 /** Different model family, used once if the primary fails or returns invalid output. */
 export const FALLBACK_MODEL = "@cf/openai/gpt-oss-120b";
 export const MODELS = [PRIMARY_MODEL, FALLBACK_MODEL] as const;
@@ -25,7 +25,11 @@ export interface ChatRequest {
   maxTokens: number;
 }
 
-/** Workers AI request body. GLM always reasons; "high" is a better latency/quality trade than its default "max". */
+/**
+ * Workers AI request body. DeepSeek already defaults to "high"; gpt-oss-120b
+ * keeps its "medium" default, which is the better latency/quality trade for a
+ * fallback. Both models reason, so neither level disables it.
+ */
 export function chatInput(model: string, req: ChatRequest): Record<string, unknown> {
   return {
     messages: [

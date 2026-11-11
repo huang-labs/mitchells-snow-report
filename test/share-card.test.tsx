@@ -39,12 +39,12 @@ describe("share preview", () => {
   });
 
   it("labels generated prose with AI and its model, and keeps the empty fallback unlabelled", () => {
-    const post = { date: "2026-11-01", title: "Snow returns", summary: "Fresh snow.", model: "@cf/zai-org/glm-5.3-flash" };
+    const post = { date: "2026-11-01", title: "Snow returns", summary: "Fresh snow.", model: "@cf/deepseek-ai/deepseek-v4.1-flash-1017" };
     const html = renderToStaticMarkup(<DailySnowShareCard post={post} />);
     expect(html).toContain(">AI</span>");
     expect(html).toContain("United States West");
     expect(html).not.toContain("Western United States");
-    expect(html).toContain("AI-generated forecast · GLM 5.3 Flash");
+    expect(html).toContain("AI-generated forecast · DeepSeek V4.1 Flash");
     expect(html).toContain("November 1, 2026");
     const empty = renderToStaticMarkup(<DailySnowShareCard post={null} />);
     expect(empty).not.toContain("AI-generated");
