@@ -86,7 +86,7 @@ describe("destination forecasts and report times", () => {
     render(<RegionalPage now={now} report={withTahoe("Palisades Tahoe: HTTP 503")} />);
     expect(tahoe().querySelectorAll(".snowtl__day--no_forecast")).toHaveLength(7);
     // No forecast: the total is the "no data" mark, never 0″.
-    expect(tahoe().querySelector(".snowtl__total")!.textContent).toBe("—");
+    expect(tahoe().querySelector(".snowtl__span--next .snowtl__total")!.textContent).toBe("—");
   });
 
   it("shows a Pacific resort's report time in Pacific time", () => {
