@@ -36,13 +36,25 @@ function Chart({ label, height, children }: { label: string; height: number; chi
 const TOP = 20; // room for value labels above the tallest bar
 const AXIS = 24; // day labels under the axis
 
-export const SNOW_LEVEL_COLORS=["var(--accent)","var(--hold)","var(--ok)"];
+/** One color and one dash per line, in fixed order (never cycled within eight), so every location
+ * stays distinct by color and again by dash where lines cross or the reader can't tell hues apart. */
+export const SNOW_LEVEL_STYLES: ReadonlyArray<{ color: string; dash?: string }> = [
+  { color: "var(--series-1)" },
+  { color: "var(--series-2)", dash: "8 4" },
+  { color: "var(--series-3)", dash: "2 3" },
+  { color: "var(--series-4)", dash: "12 3 2 3" },
+  { color: "var(--series-5)", dash: "4 4" },
+  { color: "var(--series-6)", dash: "12 4" },
+  { color: "var(--series-7)", dash: "1 4" },
+  { color: "var(--series-8)", dash: "6 2 2 2 2 2" },
+];
+export const snowLevelStyle = (i: number) => SNOW_LEVEL_STYLES[i % SNOW_LEVEL_STYLES.length];
 export interface SnowLevelSeries {
   canyon: string;
   points: Array<{ start: string; ft: number }>;
 }
 
-/** Forecast snow level, one line per canyon (CSS colors each canyon). */
+/** Forecast snow level, one line per point, styled by its position (see SNOW_LEVEL_STYLES). */
 export function SnowLevel({ series, label,timeZone="America/Denver" }: { series: SnowLevelSeries[]; label: string;timeZone?:string }) {
   const dayFmt=cachedDateFormat("en-US",{timeZone,weekday:"short"});
   const keyFmt=cachedDateFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit"});
@@ -74,7 +86,7 @@ export function SnowLevel({ series, label,timeZone="America/Denver" }: { series:
               <text key={p.start} x={x(p.start) + 4} y={TOP + h + 17} className="chart__label">{dayFmt.format(new Date(p.start))}</text>
             ))}
             {series.map((s,i) => (
-              <polyline key={s.canyon} style={{stroke:SNOW_LEVEL_COLORS[i%SNOW_LEVEL_COLORS.length],strokeDasharray:i?`${7-i*2} 5`:undefined}} className={`snow-level__line snow-level__line--${s.canyon.toLowerCase()}`} points={s.points.map((p) => `${x(p.start)},${y(p.ft)}`).join(" ")} />
+              <polyline key={s.canyon} style={{ stroke: snowLevelStyle(i).color, strokeDasharray: snowLevelStyle(i).dash }} className="snow-level__line" points={s.points.map((p) => `${x(p.start)},${y(p.ft)}`).join(" ")} />
             ))}
           </>
         );

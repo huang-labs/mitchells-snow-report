@@ -16,6 +16,9 @@
   --bg: #f8fafc; --panel: #edf3f9; --panel-2: #e1ebf5; --line: #dbe3ec;
   --text: #172b42; --muted: #586b7d; --accent: #1266a3; /* snow */
   --ok: #287040; --warn: #81520a; --bad: #b23831; --hold: #755396;
+  /* Chart lines: categorical, fixed order, validated for color-vision separation. */
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-4: #eda100;
+  --series-5: #e87ba4; --series-6: #008300; --series-7: #6250d6; --series-8: #e34948;
   --font: "Inter", "Segoe UI", "Helvetica Neue", Roboto, Arial, sans-serif;
 
   --fs-display: clamp(28px, 1.5vw + 22px, 40px);
@@ -37,6 +40,8 @@
   --bg: #101c2a; --panel: #192b3f; --panel-2: #22394f; --line: #304257;
   --text: #edf4fb; --muted: #a7b9cc; --accent: #82c5f5;
   --ok: #92c9a4; --warn: #e5c17d; --bad: #f29b90; --hold: #c7abd9;
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+  --series-5: #d55181; --series-6: #008300; --series-7: #9085e9; --series-8: #e66767;
   color-scheme: dark;
 }
 @media (prefers-color-scheme: dark) {
@@ -44,6 +49,8 @@
     --bg: #101c2a; --panel: #192b3f; --panel-2: #22394f; --line: #304257;
     --text: #edf4fb; --muted: #a7b9cc; --accent: #82c5f5;
     --ok: #92c9a4; --warn: #e5c17d; --bad: #f29b90; --hold: #c7abd9;
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+    --series-5: #d55181; --series-6: #008300; --series-7: #9085e9; --series-8: #e66767;
     color-scheme: dark;
   }
 }
@@ -197,12 +204,10 @@ a { color: var(--accent); }
 .chart__label { fill: var(--muted); font-size: 12px; }
 .chart__value { fill: var(--text); font-size: 12px; font-weight: 700; }
 .snow-level__line { fill: none; stroke-width: 2.5; stroke-linejoin: round; }
-/* Dashed so it stays readable where the two canyons' snow levels coincide. */
-.snow-level__line--bcc { stroke-dasharray: 7 5; }
-.snow-level__line--lcc, .snow-level__key--lcc::before { stroke: var(--accent); background: var(--accent); }
-.snow-level__line--bcc, .snow-level__key--bcc::before { stroke: var(--hold); background: var(--hold); }
-.snow-level__legend { display: inline-flex; gap: 12px; }
- .snow-level__key::before { background:currentColor; content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 5px; vertical-align: middle; }
+.snow-level__legend { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.snow-level__key { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.snow-level__swatch { flex: none; }
+.snow-level__swatch line { stroke-width: 2.5; }
 
 /* ---- Snowfall (regional) ---- */
 /* Resort blocks share the page gutters and keep names aligned. */
