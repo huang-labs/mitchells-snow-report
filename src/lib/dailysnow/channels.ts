@@ -44,6 +44,7 @@ export async function runChannels(
   const deps = {
     snapshot: async () => snapshot,
     editions: async (at: Date) => currentEditions(await readChannelStates(env.SNOW_KV), REGIONS, at),
+    regionStates: () => readChannelStates(env.SNOW_KV),
     fetchImpl: opts.fetchImpl,
   };
   const channels: ChannelId[] = [...REGIONS.map((r) => r.id), "western-us"];

@@ -25,15 +25,17 @@ export class ChannelObject extends DurableObject<WorkerEnv> {
       if (!stored) await this.ctx.storage.put(CHANNEL, id);
       this.publisher = new ChannelPublisher(id, this.ctx.storage, this.env, {
         snapshot: () => this.env.COLLECTOR!.getByName(COLLECTOR_NAME).latest(),
-        editions: async (now) => {
-          const states = await Promise.all(REGIONS.map(async (r) => [r.id, await this.env.CHANNEL!.getByName(r.id).state(r.id)] as const));
-          return currentEditions(Object.fromEntries(states), REGIONS, now);
-        },
+        editions: async (now) => currentEditions(await this.regionStates(), REGIONS, now),
+        regionStates: () => this.regionStates(),
       });
     }
     if (channel && channel !== this.publisher.channel)
       throw new Error(`ChannelObject for ${this.publisher.channel} asked about ${channel}`);
     return this.publisher;
+  }
+
+  private async regionStates() {
+    return Object.fromEntries(await Promise.all(REGIONS.map(async (r) => [r.id, await this.env.CHANNEL!.getByName(r.id).state(r.id)] as const)));
   }
 
   async request(channel: ChannelId, request: PublicationRequest) {
