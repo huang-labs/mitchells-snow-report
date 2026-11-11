@@ -314,6 +314,11 @@ it("shows each resort as a snowfall timeline: 7 recorded days, the last 24 h, 7 
   expect(alta.textContent).not.toMatch(/Morning reports|NWS forecast ·/);
   // One collection outside a morning window records no history yet.
   expect(alta.querySelectorAll(".snowtl__day--not_recorded")).toHaveLength(7);
+  // No reported days: the past total is the no-data mark, never 0″.
+  const past = alta.querySelector(".snowtl__span--past")!;
+  expect(past.querySelector(".snowtl__span-label")!.textContent).toBe("Past 7 days");
+  expect(past.querySelector(".snowtl__total")!.textContent).toBe("—");
+  expect(past.querySelector(".snowtl__sr")!.textContent).toBe("Past 7 days · No reported total");
   // The header is the name and region only; the report time sits at its right on phones.
   expect(alta.querySelector(".snowtl__meta")!.textContent).toBe("Utah · United States");
   expect(alta.querySelector(".snowtl__reported-label")!.textContent).toBe("Reported");

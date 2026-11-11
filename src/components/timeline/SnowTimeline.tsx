@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { formatLocalRelative } from "@/lib/time";
 import { MetricValue } from "../ui";
-import { barLabel, type SnowTimelineModel, type TimelineDay } from "./model";
+import { barLabel, type SnowTimelineModel, type SpanTotal, type TimelineDay } from "./model";
 import "./timeline.css";
 
 const ratio = (v: number, scale: number) => Math.min(v, scale) / scale;
@@ -42,18 +42,19 @@ function Day({ day, scale }: { day: TimelineDay; scale: number }) {
 }
 
 /**
- * "Next 7 days" with the NWS forecast total beside it. When NWS ends early the label
- * counts the days the total covers; with no forecast at all the total is "—".
+ * A span label with its week's total beside it ("Past 7 days 12″", "Next 7 days 9″").
+ * The model words the label when the total covers fewer days; with no amounts at all
+ * the total is the no-data mark, never 0″.
  */
-function NextSpan({ total }: { total: SnowTimelineModel["nextTotal"] }) {
-  const days = total?.days ?? 7;
+function SpanTotalLabel({ kind, total, empty }: { kind: "past" | "next"; total: SpanTotal | null; empty: string }) {
+  const label = kind === "past" ? "Past 7 days" : "Next 7 days";
   return (
-    <li className="snowtl__span snowtl__span--next">
-      <span className="snowtl__sr">{total ? total.detail : "Next 7 days · No NWS forecast total"}</span>
+    <li className={`snowtl__span snowtl__span--${kind}`}>
+      <span className="snowtl__sr">{total ? total.detail : `${label} · ${empty}`}</span>
       <span className="snowtl__span-text" aria-hidden="true">
-        <span className="snowtl__span-label">Next {days} {days === 1 ? "day" : "days"}</span>
+        <span className="snowtl__span-label">{total?.label ?? label}</span>
         {total ? (
-          <span className={`snowtl__total${total.amountIn === 0 ? " snowtl__total--zero" : ""}`} title={`NWS forecast total through 6 AM ${total.through}`}>
+          <span className={`snowtl__total${total.amountIn === 0 ? " snowtl__total--zero" : ""}`} title={total.title}>
             {barLabel(total.amountIn)}″
           </span>
         ) : (
@@ -107,9 +108,9 @@ export function SnowTimeline({
         )}
       </div>
       <ol className="snowtl__strip" aria-label={`${label} snowfall by day: past 7 days, last 24 hours, next 7 days`}>
-        <li className="snowtl__span snowtl__span--past" aria-hidden="true">Past 7 days</li>
+        <SpanTotalLabel kind="past" total={model.pastTotal} empty="No reported total" />
         <li className="snowtl__span snowtl__span--now" aria-hidden="true">Last 24 h</li>
-        <NextSpan total={model.nextTotal} />
+        <SpanTotalLabel kind="next" total={model.nextTotal} empty="No NWS forecast total" />
         {model.past.map((day) => <Day key={day.key} day={day} scale={scale} />)}
         <li className="snowtl__day snowtl__day--today">
           <span className="snowtl__sr">{model.last24.detail}</span>
