@@ -302,6 +302,11 @@ it("shows each resort as a snowfall timeline: 7 recorded days, the last 24 h, 7 
   // The fixture NWS grid covers the whole week: no day is missing its forecast.
   expect(alta.querySelectorAll(".snowtl__day--forecast.snowtl__day--forecast")).toHaveLength(7);
   expect(alta.querySelectorAll(".snowtl__day--no_forecast")).toHaveLength(0);
+  // "Next 7 days" carries the week's forecast total, the sum of the day bars.
+  const next = alta.querySelector(".snowtl__span--next")!;
+  expect(next.querySelector(".snowtl__span-label")!.textContent).toBe("Next 7 days");
+  expect(next.querySelector(".snowtl__total")!.textContent).toMatch(/^(<1|\d+)″$/);
+  expect(next.querySelector(".snowtl__sr")!.textContent).toMatch(/^Next 7 days · [\d.]+″ NWS forecast total, now to 6 AM .* \(LCC grid point\)$/);
   // The first forecast day is the snow day under way, ending at 6 AM (MDT).
   expect(alta.querySelector(".snowtl__day--forecast .snowtl__sr")!.textContent).toMatch(/now to 6 AM \(LCC grid point\)/);
   // BCC resorts use the BCC grid point; the strip carries no source captions.

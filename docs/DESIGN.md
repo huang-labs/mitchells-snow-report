@@ -6,7 +6,7 @@ The web app serves phones and laptop browsers in light and dark themes. Appearan
 
 Long-form resort reports and Daily Snow are page content with one reading width, no enclosing card border, and aligned child edges. Pale panels are reserved for summaries and charts. AI prose carries the AI badge and model footer, separate from measured and forecast data.
 
-The Resorts page shows all 16 favorites in fixed order, with unchanged resort names, geographic labels, past-week history, current 24-hour report and seven forecast days. Each timeline is one keyboard stop linking to its detail page. It has no recommendation or article teaser. Reported snow is solid, forecasts striped, past starting forecasts outlined, zero muted, and missing/unrecorded states explicit.
+The Resorts page shows all 16 favorites in fixed order, with unchanged resort names, geographic labels, past-week history, current 24-hour report and seven forecast days. The "Next 7 days" label carries the NWS forecast total for those days (current day's remaining hours included); when NWS ends before the seventh day the label counts the days the total covers, and with no forecast the total is —. Each timeline is one keyboard stop linking to its detail page. It has no recommendation or article teaser. Reported snow is solid, forecasts striped, past starting forecasts outlined, zero muted, and missing/unrecorded states explicit.
 
 Snow days end at 6 AM destination local time. Source measurement windows remain unchanged. Report provenance belongs on detail pages, including fixed reporting station, verified elevation and composite exceptions. All resort pages share the same window order and sections, while unavailable optional measurements remain unavailable.
 

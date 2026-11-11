@@ -295,6 +295,18 @@ describe("timeline model", () => {
     expect(model.last24.detail).toBe("Last 24 h · 3″ reported by Alta (“Last 24 hrs”, report Sun, Nov 1, 3:00 PM MST)");
   });
 
+  it("totals the forecast days NWS covers, saying how many when it ends early", () => {
+    // 0.5″ of the current day's remaining hours + five full days at 1.2″; the 7th has no total.
+    expect(model.nextTotal).toEqual({
+      amountIn: 6.5,
+      days: 6,
+      through: "Sat, Nov 7",
+      detail: "Next 6 days · 6.5″ NWS forecast total, now to 6 AM Sat, Nov 7 (LCC grid point)",
+    });
+    const none = buildSnowTimeline({ resort: "alta", name: "Alta", canyon: "LCC", timeZone: ZONE, log, now, forecast: null, report: null });
+    expect(none.nextTotal).toBeNull();
+  });
+
   it("dates an old report in the screen-reader description, so it can't pass for today's", () => {
     const stale = buildSnowTimeline({
       resort: "alta", name: "Alta", canyon: "LCC", timeZone: ZONE, log, now, forecast: null,

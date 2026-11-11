@@ -42,6 +42,29 @@ function Day({ day, scale }: { day: TimelineDay; scale: number }) {
 }
 
 /**
+ * "Next 7 days" with the NWS forecast total beside it. When NWS ends early the label
+ * counts the days the total covers; with no forecast at all the total is "—".
+ */
+function NextSpan({ total }: { total: SnowTimelineModel["nextTotal"] }) {
+  const days = total?.days ?? 7;
+  return (
+    <li className="snowtl__span snowtl__span--next">
+      <span className="snowtl__sr">{total ? total.detail : "Next 7 days · No NWS forecast total"}</span>
+      <span className="snowtl__span-text" aria-hidden="true">
+        <span className="snowtl__span-label">Next {days} {days === 1 ? "day" : "days"}</span>
+        {total ? (
+          <span className={`snowtl__total${total.amountIn === 0 ? " snowtl__total--zero" : ""}`} title={`NWS forecast total through 6 AM ${total.through}`}>
+            {barLabel(total.amountIn)}″
+          </span>
+        ) : (
+          <span className="snowtl__total snowtl__total--na">—</span>
+        )}
+      </span>
+    </li>
+  );
+}
+
+/**
  * Daily snowfall around now: 7 past snow days (each resort's morning report), the
  * latest 24 h figure, and 7 days of NWS forecast. The page supplies the heading and
  * a line shown beside it, an optional footer beneath the strip, and a shared `scale`
@@ -86,7 +109,7 @@ export function SnowTimeline({
       <ol className="snowtl__strip" aria-label={`${label} snowfall by day: past 7 days, last 24 hours, next 7 days`}>
         <li className="snowtl__span snowtl__span--past" aria-hidden="true">Past 7 days</li>
         <li className="snowtl__span snowtl__span--now" aria-hidden="true">Last 24 h</li>
-        <li className="snowtl__span snowtl__span--next" aria-hidden="true">Next 7 days</li>
+        <NextSpan total={model.nextTotal} />
         {model.past.map((day) => <Day key={day.key} day={day} scale={scale} />)}
         <li className="snowtl__day snowtl__day--today">
           <span className="snowtl__sr">{model.last24.detail}</span>

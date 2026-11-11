@@ -31,9 +31,20 @@ export interface TimelineDay {
   detail: string;
 }
 
+/** NWS forecast total over the forecast days that have one; null when none do. */
+export interface ForecastTotal {
+  amountIn: number;
+  /** Forecast days the total covers (NWS often ends partway through the 7th). */
+  days: number;
+  /** Last day the total covers ("Tue, Nov 17"). */
+  through: string;
+  detail: string;
+}
+
 export interface SnowTimelineModel {
   past: TimelineDay[];
   future: TimelineDay[];
+  nextTotal: ForecastTotal | null;
   last24: { metric: Metric | null; reportTime: string | null; detail: string; warning?: string };
   canyon: CanyonId;
   /** The resort's IANA zone; report times display in it. */
@@ -105,6 +116,24 @@ function futureDay(key: string, canyon: CanyonId, hourly: PointForecast["hourlyS
 }
 
 /**
+ * Sum of the forecast days that have an NWS total, counting only the current day's
+ * remaining hours. Days without one are left out and the covered count says so,
+ * rather than the total passing for a full 7 days.
+ */
+export function forecastTotal(future: TimelineDay[], canyon: CanyonId, zone: string): ForecastTotal | null {
+  const days = future.filter((d) => d.state === "forecast" && d.amountIn !== null);
+  if (!days.length) return null;
+  const amountIn = Math.round(days.reduce((sum, d) => sum + d.amountIn!, 0) * 10) / 10;
+  const through = dayLabels(snowDayWindow(days.at(-1)!.key, zone).end, zone).date;
+  return {
+    amountIn,
+    days: days.length,
+    through,
+    detail: `Next ${days.length} ${days.length === 1 ? "day" : "days"} · ${inches(amountIn)} NWS forecast total, now to 6 AM ${through} (${canyon} grid point)`,
+  };
+}
+
+/**
  * One resort's timeline: the 7 snow days before the current one (each resort's morning
  * report), its latest 24 h figure, then 7 days of NWS forecast starting with the current
  * snow day's remaining hours. A day is labeled by the morning it ends.
@@ -128,6 +157,7 @@ export function buildSnowTimeline(input: {
     return pastDay(key, name, readings[key], ghosts[key]?.snowIn ?? null,timeZone);
   });
   const future = Array.from({ length: TIMELINE_DAYS }, (_, i) => futureDay(addDays(current, i), canyon, forecast?.hourlySnow, now,timeZone));
+  const nextTotal = forecastTotal(future, canyon, timeZone);
   const metric = usableSnowReport(report)?.snowfall.h24 ?? null;
   // The date matters here: an old report would otherwise read like today's.
   const at = report?.reportTime ? `, report ${formatLocal(report.reportTime, now,timeZone)}` : "";
@@ -138,7 +168,7 @@ export function buildSnowTimeline(input: {
       : metric.state === "not_reported"
         ? `Last 24 h · ${name} left its 24 h total empty${at}`
         : `Last 24 h · ${metric.note?.startsWith("Withheld:") ? metric.note : `${name} doesn’t publish a 24 h total`}`;
-  return { past, future, last24: { metric, reportTime: report?.reportTime ?? null, detail, ...(report && snowfallIssues(report.snowfall).length ? { warning: "Resort snowfall data warning: affected totals are withheld. See the resort report for published figures." } : {}) }, canyon, timeZone };
+  return { past, future, nextTotal, last24: { metric, reportTime: report?.reportTime ?? null, detail, ...(report && snowfallIssues(report.snowfall).length ? { warning: "Resort snowfall data warning: affected totals are withheld. See the resort report for published figures." } : {}) }, canyon, timeZone };
 }
 
 /** One scale for timelines shown together, so equal amounts draw equal bars. */
