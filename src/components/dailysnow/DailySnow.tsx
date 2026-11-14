@@ -33,7 +33,9 @@ function Eyebrow({ post, now, archived }: { post: ApiDailySnow; now: Date; archi
         Daily Snow<span className="badge badge--ai">AI</span> · {postDate(post.date)}{post.channel!=="western-us"&&` · ${PHASE_LABEL[post.phase]}`}
       </span>
       <span className="dailysnow__posted">
-        Posted {formatLocal(post.generatedAt,now,post.timeZone)}
+        {post.firstPostedAt
+          ? `Storm update ${formatLocal(post.generatedAt, now, post.timeZone)} · first posted ${formatLocal(post.firstPostedAt, now, post.timeZone)}`
+          : `Posted ${formatLocal(post.generatedAt, now, post.timeZone)}`}
         {archived && " · Archive"}
         {!archived && <PublicationNotice post={post} />}
       </span>

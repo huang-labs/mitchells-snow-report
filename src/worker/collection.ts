@@ -1,7 +1,7 @@
 import type { CollectOptions, CollectSummary } from "../lib/collect";
 import type { CollectorRequest } from "../lib/collector";
 import { CHANNELS, REGIONS, type ChannelId } from "../lib/catalog";
-import { channelWorthPosting } from "../lib/dailysnow/channels";
+import { publicationRequest } from "../lib/dailysnow/channels";
 import type { PublicationOutcome } from "../lib/dailysnow/publisher";
 import type { Snapshot } from "../lib/types";
 import type { WorkerEnv } from "./env";
@@ -42,11 +42,7 @@ export async function requestPublications(
   if (!env.CHANNEL) throw new Error("CHANNEL Durable Object binding is not configured");
   const channels = CHANNELS.map((c) => c.id).filter((c) => !opts.channel || c === opts.channel);
   const ask = (channel: ChannelId) =>
-    env.CHANNEL!.getByName(channel).request(channel, {
-      now: now.toISOString(),
-      force: opts.force,
-      worthPosting: channelWorthPosting(snapshot, channel, now),
-    });
+    env.CHANNEL!.getByName(channel).request(channel, publicationRequest(snapshot, channel, now, opts.force));
   // Regions first: a forced Western overview in the same request then sees their editions
   // once they publish (its own attempt reads them when its alarm runs).
   const regional = await Promise.all(channels.filter((c) => REGIONS.some((r) => r.id === c)).map(ask));

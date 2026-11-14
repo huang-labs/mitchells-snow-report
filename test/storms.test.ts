@@ -61,6 +61,23 @@ describe("persistent storm observations", () => {
     expect(tuesday.events[0].lastSnowAt).toBe(at(24).toISOString());
   });
 
+  it("takes a source's correction of a rolling amount, which also lowers its season total", () => {
+    // Snowbird, 2026-11-14: today's 5″ became 4″ 41 minutes later (48 h 10″ → 9″, season 46″ → 45″).
+    const first = run(snapshot(0, { snowbird: { h24: 5, h48: 10, season: 46 } }));
+    const fixed = run(snapshot(1, { snowbird: { h24: 4, h48: 9, season: 45 } }), first);
+    expect(resort(fixed, "snowbird").rolling).toMatchObject({ amountIn: 9, window: "48h", previousAmountIn: 10 });
+    // Merging the older copy back in cannot restore the replaced amount.
+    expect(mergeStormTracking(first, fixed)!.events[0].resorts.find((r) => r.id === "snowbird")!.rolling?.amountIn).toBe(9);
+    expect(mergeStormTracking(fixed, first)!.events[0].resorts.find((r) => r.id === "snowbird")!.rolling?.amountIn).toBe(9);
+  });
+
+  it("keeps the larger rolling amount when snow ages out of the window, even an hour later", () => {
+    const first = run(snapshot(0, { alta: { h24: 5, season: 28 } }));
+    const aged = run(snapshot(1, { alta: { h24: 4, season: 28 } }), first);
+    expect(resort(aged, "alta").rolling).toMatchObject({ amountIn: 5, window: "24h" });
+    expect(resort(aged, "alta").rolling?.previousAmountIn).toBeUndefined();
+  });
+
   it("tracks a three-day storm, updates 15 to 16, and never adds overlapping totals", () => {
     let state = run(snapshot(0, { alta: { storm: 5, h24: 5, season: 10 } }, 1));
     const id = state.events[0].id;

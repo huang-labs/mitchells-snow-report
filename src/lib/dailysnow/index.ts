@@ -1,7 +1,7 @@
 import { createFetchContext, type CollectorSecrets } from "../http";
 import type { AiLike } from "../ai/model";
 import { channelById, type ChannelId } from "../catalog";
-import { denverDate } from "./facts";
+import { denverDate, localTime } from "./facts";
 import { DAILY_SNOW_ARCHIVE_POSTS, dailySnowArchiveTtlS } from "../report";
 import type { KVLike } from "../store";
 import type { DailySnowFigure, DailySnowLink, DailySnowPost, DailySnowState, Snapshot } from "../types";
@@ -12,6 +12,7 @@ import { FIGURE_LIMIT, significantStorm } from "./figure-plan";
 import { isSnowPlume } from "./plume";
 import { stormForPost } from "./storms";
 import { attemptsToday, DAILY_CALL_CAP, shouldRunDailySnow } from "./schedule";
+import { newSnowSince, regionalSignals, STORM_UPDATE_TRIGGER } from "./storm-update";
 
 export interface DailySnowEnv extends CollectorSecrets {
   AI_ENABLED?: string;
@@ -140,7 +141,7 @@ export function planDailySnow(
   snapshot: Snapshot,
   env: DailySnowEnv,
   now: Date,
-  opts: { force?: boolean; fetchImpl?: typeof fetch } = {},
+  opts: { force?: boolean; trigger?: typeof STORM_UPDATE_TRIGGER; fetchImpl?: typeof fetch } = {},
 ): DailySnowPlan | undefined {
   const ai = env.AI;
   if (!ai) return undefined;
@@ -150,13 +151,18 @@ export function planDailySnow(
     ? used.count >= 3 || used.calls + 2 > DAILY_CALL_CAP
       ? null
       : "manual"
-    : shouldRunDailySnow(base, now, env.DAILY_SNOW_CHANNEL);
+    : (opts.trigger ?? shouldRunDailySnow(base, now, env.DAILY_SNOW_CHANNEL));
   if (!trigger) return { state: base };
 
   const build = buildDailyDigest(snapshot, base.current, base.history, now);
   if (!build.worthPosting && !opts.force) return { state: base, skipped: "off-season" };
 
   const date = denverDate(now, channelById(env.DAILY_SNOW_CHANNEL ?? "utah")!.timeZone);
+  // A storm update rewrites today's edition with the reports that arrived after it.
+  // Re-checked against the snapshot it writes from: a report since corrected is no reason to rewrite.
+  const morning = trigger === STORM_UPDATE_TRIGGER && base.current?.date === date ? base.current : null;
+  const newReports = morning ? newSnowSince(morning, regionalSignals(snapshot, now)) : [];
+  if (trigger === STORM_UPDATE_TRIGGER && !newReports.length) return { state: base, skipped: "storm update no longer due" };
   const startedAt = Date.now();
   const attempt: Partial<DailySnowState> = {
     lastAttemptAt: now.toISOString(),
@@ -176,6 +182,16 @@ export function planDailySnow(
         stormRecap,
         figures: candidates,
       } = buildDailyDigest(snapshot, previous, base.history, now);
+      if (morning)
+        digest.stormUpdate = {
+          morningPostedLocal: localTime(morning.generatedAt, now, digest.timeZone),
+          newReports,
+          morningEdition: {
+            title: morning.title,
+            summary: morning.summary,
+            paragraphs: morning.sections.flatMap((s) => s.paragraphs.map((p) => p.text)),
+          },
+        };
       const { value: r, model, fallbackReason } = await askDailySnow(ai, digest, env.AI_GATEWAY_ID);
       const wanted = new Set(
         r.sections.flatMap((s) => s.paragraphs.map((p) => p.figure)).filter((f): f is string => !!f),
@@ -243,6 +259,7 @@ export function planDailySnow(
         numbers,
         ...(stormRecap ? { stormRecap } : {}),
         generatedAt: now.toISOString(),
+        ...(morning ? { firstPostedAt: morning.firstPostedAt ?? morning.generatedAt } : {}),
         model,
         trigger,
         ...(fallbackReason ? { fallbackReason } : {}),

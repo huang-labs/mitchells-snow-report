@@ -22,11 +22,18 @@ const newer = <T extends { collectedAt: string }>(a: T | null | undefined, b: T 
 /** Permanent, versioned event record. No TTL and no database migration. */
 export const stormKey = (id: string) => `dailysnow-storm:v1:${id}`;
 
+/** `later` is a source correction of `earlier`: same window, recorded afterwards, naming it as the amount it replaced. */
+const corrects = (later: StormObservation, earlier: StormObservation) =>
+  later.window === earlier.window && later.previousAmountIn === earlier.amountIn && ms(later.collectedAt) > ms(earlier.collectedAt);
+
 function rolling(a: StormObservation | null, b: StormObservation | null): StormObservation | null {
   if (!a) return b;
   if (!b) return a;
   // A 48-hour observation takes precedence over a 24-hour one; neither is a storm total.
   if (a.window !== b.window) return a.window === "48h" ? a : b;
+  // A recorded correction outlasts the amount it replaced, including when an older copy is merged back in.
+  if (corrects(a, b)) return a;
+  if (corrects(b, a)) return b;
   return a.amountIn >= b.amountIn ? a : b;
 }
 
@@ -91,7 +98,12 @@ function blankEvent(at: string, ids:PrimaryResortId[]): StormRecord {
   };
 }
 
-function capture(r: StormResort, c: StormCursor, sourceUrl: string, notBefore?: string | null): StormResort {
+/**
+ * `corrected`: the source lowered its season total since our last check. Snow
+ * aging out of a rolling window never does that, so a lower rolling amount for the
+ * same window in that report is the source correcting the amount we retained.
+ */
+function capture(r: StormResort, c: StormCursor, sourceUrl: string, notBefore?: string | null, corrected = false): StormResort {
   const observation = (amountIn: number, window: StormObservation["window"]): StormObservation => ({
     amountIn, window, reportTime: c.reportTime, collectedAt: c.collectedAt, sourceUrl,
   });
@@ -107,7 +119,9 @@ function capture(r: StormResort, c: StormCursor, sourceUrl: string, notBefore?: 
   }
   const candidate = (c.h48In ?? 0) > 0 && (!notBefore || ms(c.collectedAt) - 48 * HOUR >= ms(notBefore)) ? observation(c.h48In!, "48h")
     : (c.h24In ?? 0) > 0 && (!notBefore || ms(c.collectedAt) - 24 * HOUR >= ms(notBefore)) ? observation(c.h24In!, "24h") : null;
-  return { ...r, total, rolling: rolling(r.rolling, candidate), ...(counterResetAt ? { counterResetAt } : {}), ...(latestSegment ? { latestSegment } : {}) };
+  const correction = corrected && candidate && r.rolling && candidate.window === r.rolling.window && candidate.amountIn < r.rolling.amountIn
+    ? { ...candidate, previousAmountIn: r.rolling.amountIn } : null;
+  return { ...r, total, rolling: correction ?? rolling(r.rolling, candidate), ...(counterResetAt ? { counterResetAt } : {}), ...(latestSegment ? { latestSegment } : {}) };
 }
 
 /** Require a current forecast covering the whole near-term window before calling it dry. */
@@ -138,7 +152,7 @@ export function advanceStormTracking(previous: StormTrackingState | undefined, s
   const state: StormTrackingState = structuredClone(previous ?? { checkedAt: now.toISOString(), cursors: {}, events: [] });
   if (ms(state.checkedAt) > now.getTime()) return state;
   state.checkedAt = now.toISOString();
-  const observations: Array<{ id: PrimaryResortId; cursor: StormCursor; sourceUrl: string; increased: boolean; first: boolean; lateReport: boolean }> = [];
+  const observations: Array<{ id: PrimaryResortId; cursor: StormCursor; sourceUrl: string; increased: boolean; first: boolean; lateReport: boolean; corrected: boolean }> = [];
   for (const { id } of RESORTS) {
     const s = snapshot.sources[id];
     const r = usableSnowReport(s?.payload as ResortReport | null);
@@ -161,7 +175,8 @@ export function advanceStormTracking(previous: StormTrackingState | undefined, s
     const lateReport = !!closed?.closedAt && now.getTime() - ms(closed.closedAt) < STORM_RECAP_MS
       && (first || ((old?.stormIn ?? 0) > 0 && (c.stormIn ?? 0) > 0
       && (c.stormIn !== old?.stormIn || c.seasonIn !== old?.seasonIn) && ms(c.reportTime) > ms(old?.reportTime)));
-    observations.push({ id, cursor: c, sourceUrl: r.sourceUrl, increased, first, lateReport });
+    const corrected = !!old && c.seasonIn !== null && old.seasonIn !== null && c.seasonIn < old.seasonIn;
+    observations.push({ id, cursor: c, sourceUrl: r.sourceUrl, increased, first, lateReport, corrected });
   }
 
   let event = state.events.find((e) => e.status !== "closed");
@@ -177,7 +192,7 @@ export function advanceStormTracking(previous: StormTrackingState | undefined, s
     const closed = state.events[0];
     if (closed) for (const o of observations.filter((o) => o.lateReport)) {
       if (!closed.resorts.some(r => r.id === o.id)) closed.resorts.push({ id: o.id, name: RESORTS.find(r => r.id === o.id)!.name, total: null, rolling: null });
-      closed.resorts = closed.resorts.map((r) => r.id === o.id ? capture(r, o.cursor, o.sourceUrl) : r);
+      closed.resorts = closed.resorts.map((r) => r.id === o.id ? capture(r, o.cursor, o.sourceUrl, undefined, o.corrected) : r);
       closed.updatedAt = now.toISOString();
     }
     return state;
@@ -193,7 +208,7 @@ export function advanceStormTracking(previous: StormTrackingState | undefined, s
     const member = event.resorts.find((r) => r.id === o.id);
     if (lastClosed && !member?.total && !member?.rolling && !newSnow.includes(o)) continue;
     if (!member) event.resorts.push({ id: o.id, name: RESORTS.find(r => r.id === o.id)!.name, total: null, rolling: null });
-    event.resorts = event.resorts.map((r) => r.id === o.id ? capture(r, o.cursor, o.sourceUrl, lastClosed) : r);
+    event.resorts = event.resorts.map((r) => r.id === o.id ? capture(r, o.cursor, o.sourceUrl, lastClosed, o.corrected) : r);
   }
   const lull = now.getTime() - ms(event.lastSnowAt);
   const dry = dryAhead(snapshot, now);

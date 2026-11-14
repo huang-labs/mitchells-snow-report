@@ -7,7 +7,10 @@ export interface StormObservation {
   reportTime: string | null;
   collectedAt: string;
   sourceUrl: string;
-  /** Present only when a later positive storm report explicitly revises the amount. */
+  /**
+   * The amount this observation replaced: a later positive storm report revising the total,
+   * or (rolling windows) a source correction that also lowered the season total.
+   */
   previousAmountIn?: number;
 }
 
@@ -15,7 +18,7 @@ export interface StormResort {
   id: PrimaryResortId;
   name: string;
   total: StormObservation | null;
-  /** Highest observed rolling amount, retained as a labeled observation, never a storm total. */
+  /** Highest observed rolling amount (or the source's correction of it), retained as a labeled observation, never a storm total. */
   rolling: StormObservation | null;
   /** A source counter restarted during our event; segments cannot establish a full-event total. */
   counterResetAt?: string;

@@ -60,6 +60,15 @@ export interface DailyDigest extends ContinuityDigest {
   areaStorms?: ReturnType<typeof stormDigest>[];
   observationCoverage?: { currentResorts: string[]; unavailableResorts: string[] };
   discussions?: Array<{ office: string; issued: string; stale: boolean; sections: AfdPayload["sections"] }>;
+  /**
+   * Present on a storm update: this replaces today's earlier edition because resorts
+   * reported new snow after it. Its text is context; its amounts are out of date.
+   */
+  stormUpdate?: {
+    morningPostedLocal: string;
+    newReports: string[];
+    morningEdition: { title: string; summary: string; paragraphs: string[] };
+  };
   nowLocal: string;
   date: string;
   weekday: string;

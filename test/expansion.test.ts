@@ -574,8 +574,8 @@ describe("West comparison figures", () => {
     const input: ReturnType<typeof buildWesternInput> = { asOf: now.toISOString(), asOfLocal: "Thu 7:00 AM PST", timeZone: "America/Los_Angeles", coverage: "Tracked regions", patternOutlook: null, regions: [{
       id: "utah" as const, name: "Utah", edition: {} as never, observations: [],
       forecasts: [
-        { area: "LCC" as const, name: "Alta / Snowbird", source: "NWS", issuedAt: now.toISOString(), issuedLocal: "7 AM PST", start: now.toISOString(), next24In: 0, next72In: 0, next7dIn: 5, days4to7In: 5 },
-        { area: "BCC" as const, name: "Brighton / Solitude", source: "NWS", issuedAt: now.toISOString(), issuedLocal: "7 AM PST", start: now.toISOString(), next24In: null, next72In: null, next7dIn: null, days4to7In: 2 },
+        { area: "LCC" as const, name: "Alta / Snowbird", source: "NWS", issuedAt: now.toISOString(), issuedLocal: "7 AM PST", start: now.toISOString(), next24In: 0, next72In: 0, next7dIn: 5, days4to7In: 5, firstSnowAt: null, firstSnowLocal: "no forecast snow in the next 7 days" },
+        { area: "BCC" as const, name: "Brighton / Solitude", source: "NWS", issuedAt: now.toISOString(), issuedLocal: "7 AM PST", start: now.toISOString(), next24In: null, next72In: null, next7dIn: null, days4to7In: 2, firstSnowAt: null, firstSnowLocal: "no forecast snow in the next 7 days" },
       ],
     }] };
     const figures = westernFigures(input);
