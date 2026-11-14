@@ -53,7 +53,6 @@ export function RegionalPage({ report, now }: { report: ReportResponse; now: Dat
       <p className="legend">
         <span className="legend__key legend__key--reported" /> reported ·{" "}
         <span className="legend__key legend__key--forecast" /> NWS forecast ·{" "}
-        <span className="legend__key legend__key--ghost" /> what NWS forecast ·{" "}
         <span className="metric__value metric__value--zero">0</span> reported zero ·{" "}
         <span className="metric__na">–</span> no data · <span className="legend__key legend__key--none" /> not recorded.
         Days follow each destination's local time; report windows are preserved.
