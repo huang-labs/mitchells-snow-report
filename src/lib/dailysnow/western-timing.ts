@@ -81,21 +81,23 @@ function phraseWindow(m: RegExpMatchArray, now: Date, timeZone: string): { start
 export interface RegionFirstSnow {
   region: RegionId;
   name: string;
+  /** The region's IANA zone: its first-snow label and the prose day-parts about it use local time. */
+  timeZone: string;
   /** Earliest first forecast snow over the region's points; null when none forecast snow. */
   at: string | null;
 }
 
 /**
  * Sentences that put a region's first snow in a window ending well before every
- * mentioned region's first forecast snow. Only arrival sentences with an explicit
- * weekday/part-of-day are checked; regions without forecast snow are ignored.
+ * mentioned region's first forecast snow, each read in that region's local time.
+ * Only arrival sentences with an explicit weekday/part-of-day are checked;
+ * regions without forecast snow are ignored.
  */
-export function westernTimingIssues(texts: string[], regions: RegionFirstSnow[], now: Date, timeZone: string): string[] {
+export function westernTimingIssues(texts: string[], regions: RegionFirstSnow[], now: Date): string[] {
   const issues: string[] = [];
   for (const sentence of texts.flatMap((t) => t.split(/(?<=[.!?])\s+/))) {
     const mentioned = regions.filter((r) => r.at && REGION_ALIASES[r.region].test(sentence));
     if (!mentioned.length) continue;
-    const earliest = Math.min(...mentioned.map((r) => Date.parse(r.at!)));
     const phrases = [...sentence.matchAll(PHRASE)];
     const arrivals = new Set(
       [...sentence.matchAll(ARRIVAL)].flatMap((a) => {
@@ -105,8 +107,8 @@ export function westernTimingIssues(texts: string[], regions: RegionFirstSnow[],
       }),
     );
     for (const m of arrivals) {
-      const w = phraseWindow(m, now, timeZone);
-      if (w.end + TIMING_SLACK_MS <= earliest)
+      // Too early for every region the sentence names, each in its own local time.
+      if (mentioned.every((r) => phraseWindow(m, now, r.timeZone).end + TIMING_SLACK_MS <= Date.parse(r.at!)))
         issues.push(`"${m[0]}" is before the first forecast snow for ${mentioned.map((r) => r.name).join("/")}`);
     }
   }

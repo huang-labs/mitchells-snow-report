@@ -24,23 +24,33 @@ describe("first forecast snow", () => {
     expect(firstSnowLabel("2026-11-15T10:00:00.000Z", now, zone)).toBe("Saturday night (from about 2 AM PST)");
     expect(firstSnowLabel(now.toISOString(), now, zone)).toBe("now (forecast snow in the current hour)");
     expect(firstSnowLabel(null, now, zone)).toBe("no forecast snow in the next 7 days");
+    // Mountain Time regions keep their own zone, like the rest of their forecast fields.
+    expect(firstSnowLabel("2026-11-16T00:00:00.000Z", now, "America/Denver")).toBe("Sunday evening (from about 5 PM MST)");
   });
 });
 
 describe("Western snow timing", () => {
   const regions: RegionFirstSnow[] = [
-    { region: "utah", name: "Utah", at: now.toISOString() },
-    { region: "tahoe", name: "Tahoe", at: "2026-11-16T00:00:00.000Z" }, // Sunday 4 PM PST
-    { region: "mammoth", name: "Mammoth", at: "2026-11-16T18:00:00.000Z" },
-    { region: "colorado", name: "Colorado", at: null },
+    { region: "utah", name: "Utah", timeZone: "America/Denver", at: now.toISOString() },
+    { region: "tahoe", name: "Tahoe", timeZone: zone, at: "2026-11-16T00:00:00.000Z" }, // Sunday 4 PM PST
+    { region: "mammoth", name: "Mammoth", timeZone: zone, at: "2026-11-16T18:00:00.000Z" },
+    { region: "colorado", name: "Colorado", timeZone: "America/Denver", at: null },
+    { region: "montana", name: "Montana", timeZone: "America/Denver", at: "2026-11-17T05:00:00.000Z" }, // Monday 10 PM MST
   ];
-  const issues = (text: string) => westernTimingIssues([text], regions, now, zone);
+  const issues = (text: string) => westernTimingIssues([text], regions, now);
 
   it("rejects the published sentence that had the Sierra's first snow on Saturday night", () => {
     expect(issues("The Sierra, represented by Palisades Tahoe, remains dry today but will catch the first snowfall Saturday night, with snow levels dropping into the mid-elevations.")).toEqual([
       '"Saturday night" is before the first forecast snow for Tahoe/Mammoth',
     ]);
     expect(issues("Snow arrives at Mammoth tonight.")).toHaveLength(1);
+  });
+
+  it("reads day-parts about a Mountain Time region in Mountain Time", () => {
+    // Monday evening ends 9 PM MST, under three hours before Big Sky's 10 PM MST start: allowed.
+    expect(issues("Snow reaches Big Sky Monday evening.")).toEqual([]);
+    // Monday afternoon ends 5 PM MST, five hours early.
+    expect(issues("Snow reaches Big Sky Monday afternoon.")).toEqual(['"Monday afternoon" is before the first forecast snow for Montana']);
   });
 
   it("accepts arrival times that match the forecast, and ignores other day references", () => {
