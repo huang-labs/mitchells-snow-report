@@ -3,6 +3,7 @@ import { inchAmounts, inchAmountsIn, ungroundedInches } from "../ai/grounding";
 import { clipText } from "../clip";
 import type { DailySnowParagraph, DailySnowSectionId } from "../types";
 import type { DailyDigest } from "./digest";
+import { stripTitleLabel } from "./title";
 
 export const DAILY_SNOW_MAX_TOKENS = 8000;
 /**
@@ -164,7 +165,7 @@ export function validateDailySnow(raw: unknown, digest: DailyDigest): LlmDailySn
     }
     return clip(value, max);
   };
-  const title = prose(o.title, 48);
+  const title = prose(stripTitleLabel(o.title), 48);
   const summary = prose(o.summary, 360);
   if (!title || !summary) throw new Error("Model output has no title or summary");
 
