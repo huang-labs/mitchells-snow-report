@@ -140,6 +140,13 @@ it.each(["scheduled", "pending", "paused"] as const)("dates the latest edition w
   expect(screen.getAllByText(/Posted Sun, Nov 1, 6:00 AM MST/)).toHaveLength(1);
 });
 
+it("labels a storm update with its update time and when the edition first posted", () => {
+  const update: ApiDailySnow = { ...post, trigger: "storm-update", generatedAt: "2026-11-01T15:35:00Z", firstPostedAt: "2026-11-01T13:00:00Z" };
+  render(<DailySnowPage report={report(update)} now={now} />);
+  expect(screen.getByText("Storm update Sun, Nov 1, 8:35 AM MST · first posted Sun, Nov 1, 6:00 AM MST")).toBeTruthy();
+  expect(screen.queryByText(/^Posted /)).toBeNull();
+});
+
 it("waits for the first post", () => {
   render(<DailySnowPage report={report(null)} now={now} />);
   expect(screen.getByRole("heading", { level: 1, name: "Waiting for the first post" })).toBeTruthy();

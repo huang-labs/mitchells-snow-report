@@ -466,7 +466,10 @@ export interface DailySnowPost {
   /** Immutable edition-specific copy, shared by the prose digest and recap figure. */
   stormRecap?: StormRecord;
   generatedAt: string;
+  /** Set on a storm update: when today's edition it replaced was first posted. `generatedAt` is the update. */
+  firstPostedAt?: string;
   model: string;
+  /** "morning", "retry", "manual", or "storm-update" (a same-day rewrite after new resort reports). */
   trigger: string;
   /** Set when the fallback model wrote the post: why the primary model failed. */
   fallbackReason?: string;

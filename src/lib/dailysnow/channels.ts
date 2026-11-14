@@ -3,7 +3,8 @@ import type { DailySnowState, Snapshot } from "../types";
 import type { KVLike } from "../store";
 import { dailySnowActivity } from "./digest";
 import { channelStateKey, regionalSnapshot } from "./regions";
-import { ChannelPublisher, currentEditions, MemoryChannelStorage, type PublicationOutcome, type PublisherEnv } from "./publisher";
+import { ChannelPublisher, currentEditions, MemoryChannelStorage, type PublicationOutcome, type PublicationRequest, type PublisherEnv } from "./publisher";
+import { regionalSignals } from "./storm-update";
 
 export type ChannelsEnv = PublisherEnv;
 
@@ -24,6 +25,16 @@ export async function readChannelStates(kv: KVLike): Promise<Partial<Record<Chan
 /** Whether a region has anything to report; the Western overview decides from regional editions instead. */
 export function channelWorthPosting(snapshot: Snapshot, channel: ChannelId, now: Date): boolean | undefined {
   return channel === "western-us" ? undefined : dailySnowActivity(regionalSnapshot(snapshot, channel), now).worthPosting;
+}
+
+/** One scheduled (or forced) request, with what the region's resort reports say right now. */
+export function publicationRequest(snapshot: Snapshot, channel: ChannelId, now: Date, force?: boolean): PublicationRequest {
+  return {
+    now: now.toISOString(),
+    force,
+    worthPosting: channelWorthPosting(snapshot, channel, now),
+    ...(channel === "western-us" ? {} : { signals: regionalSignals(regionalSnapshot(snapshot, channel), now) }),
+  };
 }
 
 /**
@@ -50,7 +61,7 @@ export async function runChannels(
   const channels: ChannelId[] = [...REGIONS.map((r) => r.id), "western-us"];
   for (const channel of channels.filter((c) => !opts.channel || c === opts.channel)) {
     const publisher = new ChannelPublisher(channel, new MemoryChannelStorage(), env, deps);
-    const requested = await publisher.request({ now: now.toISOString(), force: opts.force, worthPosting: channelWorthPosting(snapshot, channel, now) });
+    const requested = await publisher.request(publicationRequest(snapshot, channel, now, opts.force));
     if (!requested) continue;
     if (!requested.scheduled) {
       outcomes.push(requested);

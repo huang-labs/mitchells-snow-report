@@ -6,6 +6,7 @@ import { dailySnowActivity } from "./digest";
 import { channelKV, channelStateKey, regionalSnapshot } from "./regions";
 import { attemptsToday, DAILY_CALL_CAP, inFlight, MAX_ATTEMPTS, shouldRunDailySnow, westernWaitingOn } from "./schedule";
 import { writeWestern } from "./western";
+import { settlingHold, stormUpdateDue, STORM_UPDATE_TRIGGER, type RegionalSignals } from "./storm-update";
 
 /**
  * One channel's publication state machine, shared by the ChannelObject Durable
@@ -52,6 +53,8 @@ export interface PublicationRequest {
   force?: boolean;
   /** Regional channels: whether the region has anything to report (dailySnowActivity). */
   worthPosting?: boolean;
+  /** Regional channels: current resort reports, for the settling hold and storm updates (regionalSignals). */
+  signals?: RegionalSignals;
 }
 
 export interface PublicationOutcome {
@@ -67,6 +70,8 @@ export interface PublicationOutcome {
 export interface PendingAttempt {
   attemptAt: string;
   force: boolean;
+  /** Scheduled trigger ("morning", "retry", "storm-update"); absent on forced runs and attempts reserved before it was kept. */
+  trigger?: string;
   base: DailySnowState;
   /** Set before the model is called: a retried alarm must not call it twice. */
   started?: boolean;
@@ -181,7 +186,7 @@ export class ChannelPublisher {
     const western = channel === "western-us";
 
     let skip = this.decide(now, req);
-    if (skip !== undefined) return skip;
+    if (typeof skip !== "string") return skip;
     let editions: Partial<Record<RegionId, DailySnowPost>> = {};
     if (western) {
       // Network I/O: re-decide afterwards, since another request may have reserved meanwhile.
@@ -192,8 +197,9 @@ export class ChannelPublisher {
       editions = await this.deps.editions(now);
       if (!Object.keys(editions).length) return { channel, skipped: "No current regional editions" };
       skip = this.decide(now, req);
-      if (skip !== undefined) return skip;
+      if (typeof skip !== "string") return skip;
     }
+    const trigger = skip;
     const base = this.current;
     const used = attemptsToday(base, now, channel);
     const reserved: DailySnowState = {
@@ -201,7 +207,7 @@ export class ChannelPublisher {
       lastAttemptAt: now.toISOString(),
       attempts: { date: localDate(now, channelById(channel)!.timeZone), count: used.count + 1, calls: used.calls + 2 },
     };
-    await this.save(reserved, { attemptAt: reserved.lastAttemptAt!, force: !!req.force, base });
+    await this.save(reserved, { attemptAt: reserved.lastAttemptAt!, force: !!req.force, ...(req.force ? {} : { trigger }), base });
     return { channel, scheduled: reserved.lastAttemptAt! };
   }
 
@@ -213,19 +219,22 @@ export class ChannelPublisher {
     return westernWaitingOn(states, worth, now);
   }
 
-  /** undefined: reserve. null: not due. Otherwise the skip to report. */
-  private decide(now: Date, req: PublicationRequest): PublicationOutcome | null | undefined {
+  /** A string: reserve an attempt with this trigger. null: not due. Otherwise the skip to report. */
+  private decide(now: Date, req: PublicationRequest): PublicationOutcome | null | string {
     const channel = this.channel;
     const base = this.current;
     if (this.pending || inFlight(base, now)) return req.force ? { channel, skipped: "in-flight" } : null;
     if (req.force) {
       const used = attemptsToday(base, now, channel);
       if (used.count >= MAX_ATTEMPTS || used.calls + 2 > DAILY_CALL_CAP) return { channel, skipped: "channel daily cap" };
-      return undefined;
+      return "manual";
     }
-    if (!shouldRunDailySnow(base, now, channel)) return null;
+    const trigger = shouldRunDailySnow(base, now, channel);
+    if (!trigger) return stormUpdateDue(base, req.signals, now, channel) ? STORM_UPDATE_TRIGGER : null;
     if (channel !== "western-us" && !req.worthPosting) return { channel, skipped: "off-season or inputs unavailable" };
-    return undefined;
+    const settling = settlingHold(req.signals, now, channel);
+    if (settling) return { channel, skipped: settling };
+    return trigger;
   }
 
   /** Run the reserved attempt, if any. Never throws. */
@@ -265,7 +274,11 @@ export class ChannelPublisher {
       if (channel === "western-us") {
         state = await writeWestern(reserved, snapshot, await this.deps.editions(now), env, now);
       } else {
-        const plan = planDailySnow(p.base, regionalSnapshot(snapshot, channel), env, now, { force: p.force, fetchImpl: this.deps.fetchImpl });
+        const plan = planDailySnow(p.base, regionalSnapshot(snapshot, channel), env, now, {
+          force: p.force,
+          trigger: p.trigger === STORM_UPDATE_TRIGGER ? p.trigger : undefined,
+          fetchImpl: this.deps.fetchImpl,
+        });
         if (plan?.run) state = await plan.run();
         else {
           // Nothing to write after all (inputs changed since the request): refund the attempt.
