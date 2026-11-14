@@ -232,7 +232,6 @@ a { color: var(--accent); }
 .legend__key { display: inline-block; width: 10px; height: 12px; margin-right: 2px; vertical-align: -1px; border-radius: 2px 2px 0 0; }
 .legend__key--reported { background: var(--accent); }
 .legend__key--forecast { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, transparent) 0 3px, color-mix(in srgb, var(--accent) 30%, transparent) 3px 6px); }
-.legend__key--ghost { box-sizing: border-box; border: 1.5px dashed color-mix(in srgb, var(--muted) 70%, transparent); border-bottom: 0; }
 .legend__key--none { height: 6px; vertical-align: 0; border-radius: 0; background: repeating-linear-gradient(135deg, transparent 0 3px, color-mix(in srgb, var(--muted) 30%, transparent) 3px 4px); }
 
 /* ---- Daily Snow (AI post) ---- */

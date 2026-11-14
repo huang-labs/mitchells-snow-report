@@ -23,8 +23,6 @@ export interface TimelineDay {
   state: TimelineDayState;
   /** Bar amount; null when there is no bar. */
   amountIn: number | null;
-  /** Past days: what NWS forecast for that day when it began. */
-  forecastIn: number | null;
   /** Forecast day already under way (only its remaining hours count). */
   partial: boolean;
   /** One-line description for the detail line and screen readers. */
@@ -90,21 +88,20 @@ function dayLabels(end: number, zone:string) {
   };
 }
 
-function pastDay(key: string, name: string, reading: MorningReading | undefined, forecastIn: number | null, zone:string): TimelineDay {
+function pastDay(key: string, name: string, reading: MorningReading | undefined, zone:string): TimelineDay {
   const { date, ...labels } = dayLabels(snowDayWindow(key, zone).end,zone);
-  const ghost = forecastIn === null ? "" : ` · NWS forecast ${inches(forecastIn)}`;
-  const base = { key, kind: "past" as const, ...labels, forecastIn, partial: false };
-  if (!reading) return { ...base, state: "not_recorded", amountIn: null, detail: `${date} · Not recorded${ghost}` };
+  const base = { key, kind: "past" as const, ...labels, partial: false };
+  if (!reading) return { ...base, state: "not_recorded", amountIn: null, detail: `${date} · Not recorded` };
   const report = reading.windowEnd ? ` at ${reportAt(reading.windowEnd, key,zone)}` : "";
   switch (reading.state) {
     case "reported":
-      return { ...base, state: "reported", amountIn: reading.valueIn!, detail: `${date} · ${inches(reading.valueIn!)} reported by ${name} (“${reading.label}”${report})${ghost}` };
+      return { ...base, state: "reported", amountIn: reading.valueIn!, detail: `${date} · ${inches(reading.valueIn!)} reported by ${name} (“${reading.label}”${report})` };
     case "not_reported":
-      return { ...base, state: "not_reported", amountIn: null, detail: `${date} · ${name} left its 24 h total empty${ghost}` };
+      return { ...base, state: "not_reported", amountIn: null, detail: `${date} · ${name} left its 24 h total empty` };
     case "unavailable":
-      return { ...base, state: "unavailable", amountIn: null, detail: `${date} · ${reading.qualityNote ? reading.qualityNote : `${name} doesn’t publish a 24 h total`}${ghost}` };
+      return { ...base, state: "unavailable", amountIn: null, detail: `${date} · ${reading.qualityNote ? reading.qualityNote : `${name} doesn’t publish a 24 h total`}` };
     default:
-      return { ...base, state: "no_report", amountIn: null, detail: `${date} · No new morning report from ${name}${ghost}` };
+      return { ...base, state: "no_report", amountIn: null, detail: `${date} · No new morning report from ${name}` };
   }
 }
 
@@ -116,7 +113,7 @@ function futureDay(key: string, canyon: CanyonId, hourly: PointForecast["hourlyS
   const span = partial
     ? `now to ${boundaryAt(window.end,zone)}`
     : `${boundaryAt(window.start,zone)} to ${boundaryAt(window.end,zone)} local time`;
-  const base = { key, kind: "forecast" as const, ...labels, forecastIn: null, partial };
+  const base = { key, kind: "forecast" as const, ...labels, partial };
   return amountIn === null
     ? { ...base, state: "no_forecast", amountIn: null, detail: `${date} · No NWS forecast for this day` }
     : { ...base, state: "forecast", amountIn, detail: `${date} · ${inches(amountIn)} NWS forecast, ${span} (${canyon} grid point)` };
@@ -128,8 +125,7 @@ const dayCount = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
 /**
  * Sum of the past days the resort reported. Days without a report are left out (never
  * counted as zero); the label stays "Past 7 days" for a quick read, while the hover
- * text and screen-reader description say how many days the total covers. The NWS
- * outlines are not included.
+ * text and screen-reader description say how many days the total covers.
  */
 export function pastTotal(past: TimelineDay[], name: string): SpanTotal | null {
   const days = past.filter((d) => d.state === "reported" && d.amountIn !== null);
@@ -183,10 +179,9 @@ export function buildSnowTimeline(input: {
   const { resort, name, canyon, report, log, forecast, now, timeZone } = input;
   const current = snowDayOf(now.getTime(),timeZone);
   const readings = log?.resorts[resort] ?? {};
-  const ghosts = log?.forecasts[canyon] ?? {};
   const past = Array.from({ length: TIMELINE_DAYS }, (_, i) => {
     const key = addDays(current, i - TIMELINE_DAYS);
-    return pastDay(key, name, readings[key], ghosts[key]?.snowIn ?? null,timeZone);
+    return pastDay(key, name, readings[key], timeZone);
   });
   const future = Array.from({ length: TIMELINE_DAYS }, (_, i) => futureDay(addDays(current, i), canyon, forecast?.hourlySnow, now,timeZone));
   const totals = { pastTotal: pastTotal(past, name), nextTotal: forecastTotal(future, canyon, timeZone) };
@@ -206,7 +201,7 @@ export function buildSnowTimeline(input: {
 /** One scale for timelines shown together, so equal amounts draw equal bars. */
 export function timelineScale(models: SnowTimelineModel[]): number {
   const amounts = models.flatMap((m) => [
-    ...[...m.past, ...m.future].flatMap((d) => [d.amountIn ?? 0, d.forecastIn ?? 0]),
+    ...[...m.past, ...m.future].map((d) => d.amountIn ?? 0),
     m.last24.metric?.state === "reported" ? m.last24.metric.value : 0,
   ]);
   return Math.min(SCALE_MAX_IN, Math.max(SCALE_MIN_IN, ...amounts));

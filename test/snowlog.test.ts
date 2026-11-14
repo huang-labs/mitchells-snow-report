@@ -270,8 +270,10 @@ describe("timeline model", () => {
     expect(model.past.map((d) => d.key)).toEqual(["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01"]);
     expect(model.future.map((d) => d.key)[0]).toBe("2026-11-02");
     expect(model.future).toHaveLength(7);
-    expect(model.past.at(-1)).toMatchObject({ weekday: "Sun", dayOfMonth: "1", weekend: true, state: "reported", amountIn: 7, forecastIn: 9.5 });
-    expect(model.past.at(-1)!.detail).toBe("Sun, Nov 1 · 7″ reported by Alta (“Last 24 hrs” at 1:00 AM) · NWS forecast 9.5″");
+    expect(model.past.at(-1)).toMatchObject({ weekday: "Sun", dayOfMonth: "1", weekend: true, state: "reported", amountIn: 7 });
+    expect(model.past.at(-1)!.detail).toBe("Sun, Nov 1 · 7″ reported by Alta (“Last 24 hrs” at 1:00 AM)");
+    // The forecast the day began with stays in the log but is not part of the timeline.
+    expect(model.past.at(-1)).not.toHaveProperty("forecastIn");
     expect(model.past.at(-2)).toMatchObject({ state: "no_report", amountIn: null });
     expect(model.past[0]).toMatchObject({ state: "not_recorded", amountIn: null });
   });
@@ -334,7 +336,7 @@ describe("timeline model", () => {
   });
 
   it("shares one bar scale, between 6″ and 18″", () => {
-    expect(timelineScale([model])).toBe(9.5);
+    expect(timelineScale([model])).toBe(7); // the tallest reported bar; the log's old forecasts don't set the scale
     expect(timelineScale([{ ...model, past: [], future: [], last24: { ...model.last24, metric: inches(30) } }])).toBe(18);
     expect(timelineScale([{ ...model, past: [], future: [], last24: { ...model.last24, metric: inches(1) } }])).toBe(6);
   });

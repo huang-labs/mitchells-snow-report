@@ -6,18 +6,14 @@ import "./timeline.css";
 
 const ratio = (v: number, scale: number) => Math.min(v, scale) / scale;
 
-/** A day's plot: the bar, the forecast outline behind it, and the amount just above the taller of them. */
-function Plot({ amountIn, forecastIn = null, label, scale }: { amountIn: number | null; forecastIn?: number | null; label: string; scale: number }) {
+/** A day's plot: the bar and the amount just above it. */
+function Plot({ amountIn, label, scale }: { amountIn: number | null; label: string; scale: number }) {
   const bar = amountIn !== null && amountIn > 0 ? ratio(amountIn, scale) : 0;
-  // Sub-inch historical forecasts add clutter at the baseline; retain them in day.detail.
-  const showGhost = forecastIn !== null && forecastIn >= 1;
-  const ghost = showGhost ? ratio(forecastIn, scale) : 0;
   return (
     <span className="snowtl__plot">
-      {showGhost && <span className="snowtl__ghost" style={{ "--r": ghost } as CSSProperties} />}
       {bar > 0 && <span className={`snowtl__bar${amountIn! > scale ? " snowtl__bar--over" : ""}`} style={{ "--r": bar } as CSSProperties} />}
       {label && (
-        <span className={`snowtl__amount${amountIn === 0 ? " snowtl__amount--zero" : ""}`} style={{ "--r": Math.max(bar, ghost) } as CSSProperties}>{label}</span>
+        <span className={`snowtl__amount${amountIn === 0 ? " snowtl__amount--zero" : ""}`} style={{ "--r": bar } as CSSProperties}>{label}</span>
       )}
     </span>
   );
@@ -33,7 +29,7 @@ function Day({ day, scale }: { day: TimelineDay; scale: number }) {
     <li className={`snowtl__day snowtl__day--${day.kind} snowtl__day--${day.state}${day.weekend ? " snowtl__day--weekend" : ""}`}>
       <span className="snowtl__sr">{day.detail}</span>
       <span className="snowtl__visual" aria-hidden="true">
-        <Plot amountIn={day.amountIn} forecastIn={day.forecastIn} label={amountText(day)} scale={scale} />
+        <Plot amountIn={day.amountIn} label={amountText(day)} scale={scale} />
         <span className="snowtl__weekday">{day.weekday[0]}</span>
         <span className="snowtl__date">{day.dayOfMonth}</span>
       </span>
