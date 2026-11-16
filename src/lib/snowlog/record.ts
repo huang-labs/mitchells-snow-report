@@ -44,7 +44,8 @@ function reading(id: PrimaryResortId, report: ResortReport, collectedAt: string,
   const window = snowDayWindow(day, resortTimeZone(id));
   const fresh = windowEnd !== null && Date.parse(windowEnd) <= Date.parse(collectedAt)+120000 && Date.parse(windowEnd) >= window.end - MAX_WINDOW_LEAD_MS;
   if (!fresh) return { state: "no_report", label: m.label, windowEnd, collectedAt, reportingLocation };
-  if (m.state === "reported") return { state: "reported", valueIn: m.value, label: m.label, windowEnd, collectedAt, reportingLocation };
+  const h48 = report.snowfall.h48;
+  if (m.state === "reported") return { state: "reported", valueIn: m.value, ...(h48?.state === "reported" ? { h48In: h48.value } : {}), label: m.label, windowEnd, collectedAt, reportingLocation };
   return { state: m.state, label: m.label, ...(m.note?.startsWith("Withheld:") ? { qualityNote: m.note } : {}), windowEnd, collectedAt, reportingLocation };
 }
 

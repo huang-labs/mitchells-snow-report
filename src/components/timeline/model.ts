@@ -1,7 +1,8 @@
 import { snowfallIssues, usableSnowReport } from "@/lib/snowfall-quality";
 import { addDays, forecastForDay, snowDayWindow, snowDayOf } from "@/lib/snowlog/days";
+import { consecutive, newSnow, type NewSnow } from "@/lib/snowlog/overlap";
 import { cachedDateFormat, formatLocal } from "@/lib/time";
-import type { MorningReading, SnowLogState } from "@/lib/snowlog/types";
+import type { MorningReading, SnowDayKey, SnowLogState } from "@/lib/snowlog/types";
 import type { CanyonId, Metric, PointForecast, PrimaryResortId, ResortReport } from "@/lib/types";
 
 /** Days shown on each side of the last 24 hours. */
@@ -88,13 +89,22 @@ function dayLabels(end: number, zone:string) {
   };
 }
 
-function pastDay(key: string, name: string, reading: MorningReading | undefined, zone:string): TimelineDay {
+/** How a published 24 h total that repeats earlier snow reads: "1″ new; Brighton’s 24 h total of 5″ repeats 4″ …". */
+function repeatNote(net: NewSnow, name: string): string {
+  return net.kind === "new"
+    ? `${inches(net.valueIn)} new; ${name}’s 24 h total of ${inches(net.publishedIn)} repeats ${inches(net.repeatedIn)} from the previous morning’s report`
+    : `${name}’s 24 h total (${inches(net.publishedIn)}) and 48 h total (${inches(net.h48In)}) conflict with the previous morning’s ${inches(net.previousIn)}`;
+}
+
+function pastDay(key: string, name: string, reading: MorningReading | undefined, net: NewSnow | undefined, zone:string): TimelineDay {
   const { date, ...labels } = dayLabels(snowDayWindow(key, zone).end,zone);
   const base = { key, kind: "past" as const, ...labels, partial: false };
   if (!reading) return { ...base, state: "not_recorded", amountIn: null, detail: `${date} · Not recorded` };
   const report = reading.windowEnd ? ` at ${reportAt(reading.windowEnd, key,zone)}` : "";
   switch (reading.state) {
     case "reported":
+      if (net?.kind === "conflict") return { ...base, state: "unavailable", amountIn: null, detail: `${date} · ${repeatNote(net, name)} (“${reading.label}”${report})` };
+      if (net?.repeatedIn) return { ...base, state: "reported", amountIn: net.valueIn, detail: `${date} · ${repeatNote(net, name)} (“${reading.label}”${report})` };
       return { ...base, state: "reported", amountIn: reading.valueIn!, detail: `${date} · ${inches(reading.valueIn!)} reported by ${name} (“${reading.label}”${report})` };
     case "not_reported":
       return { ...base, state: "not_reported", amountIn: null, detail: `${date} · ${name} left its 24 h total empty` };
@@ -162,6 +172,37 @@ export function forecastTotal(future: TimelineDay[], canyon: CanyonId, zone: str
 }
 
 /**
+ * Each reported morning's new snow, oldest first, so a morning that repeated earlier snow
+ * is compared with the previous morning's net figure. A reading recorded before 48 h
+ * totals were kept takes its 48 h from the live report when that is the same report.
+ */
+function netSnow(readings: Record<SnowDayKey, MorningReading>, report: ResortReport | null): Map<SnowDayKey, NewSnow> {
+  const live48 = usableSnowReport(report)?.snowfall.h48;
+  const net = new Map<SnowDayKey, NewSnow>();
+  let previous: { valueIn: number; windowEnd: string | null } | null = null;
+  for (const key of Object.keys(readings).sort()) {
+    const r = readings[key];
+    if (r.state !== "reported" || r.valueIn === undefined) continue;
+    const h48In = r.h48In ?? (live48?.state === "reported" && r.windowEnd !== null && r.windowEnd === report?.reportTime ? live48.value : undefined);
+    const n = newSnow({ valueIn: r.valueIn, h48In, windowEnd: r.windowEnd }, previous);
+    net.set(key, n);
+    // A conflicting morning can't bound the next one.
+    previous = n.kind === "new" ? { valueIn: n.valueIn, windowEnd: r.windowEnd } : null;
+  }
+  return net;
+}
+
+/** The live report's 24 h figure, net of snow the morning reading before it already counted. */
+function last24Net(metric: Metric | null, report: ResortReport | null, readings: Record<SnowDayKey, MorningReading>, net: Map<SnowDayKey, NewSnow>): NewSnow | null {
+  if (metric?.state !== "reported" || !report?.reportTime) return null;
+  const h48 = usableSnowReport(report)?.snowfall.h48;
+  const before = Object.keys(readings).sort().reverse().find((k) => consecutive(report.reportTime, readings[k].windowEnd));
+  const prior = before ? net.get(before) : undefined;
+  const previous = prior?.kind === "new" ? { valueIn: prior.valueIn, windowEnd: readings[before!].windowEnd } : null;
+  return newSnow({ valueIn: metric.value, h48In: h48?.state === "reported" ? h48.value : undefined, windowEnd: report.reportTime }, previous);
+}
+
+/**
  * One resort's timeline: the 7 snow days before the current one (each resort's morning
  * report), its latest 24 h figure, then 7 days of NWS forecast starting with the current
  * snow day's remaining hours. A day is labeled by the morning it ends.
@@ -179,17 +220,25 @@ export function buildSnowTimeline(input: {
   const { resort, name, canyon, report, log, forecast, now, timeZone } = input;
   const current = snowDayOf(now.getTime(),timeZone);
   const readings = log?.resorts[resort] ?? {};
+  const net = netSnow(readings, report);
   const past = Array.from({ length: TIMELINE_DAYS }, (_, i) => {
     const key = addDays(current, i - TIMELINE_DAYS);
-    return pastDay(key, name, readings[key], timeZone);
+    return pastDay(key, name, readings[key], net.get(key), timeZone);
   });
   const future = Array.from({ length: TIMELINE_DAYS }, (_, i) => futureDay(addDays(current, i), canyon, forecast?.hourlySnow, now,timeZone));
   const totals = { pastTotal: pastTotal(past, name), nextTotal: forecastTotal(future, canyon, timeZone) };
-  const metric = usableSnowReport(report)?.snowfall.h24 ?? null;
+  const published = usableSnowReport(report)?.snowfall.h24 ?? null;
+  const repeat = last24Net(published, report, readings, net);
+  // Snow the previous morning already counted isn't new: show what is, or withhold a conflict.
+  const metric: Metric | null = published?.state === "reported" && repeat?.kind === "conflict"
+    ? { state: "unavailable", label: published.label, note: `Withheld: ${repeatNote(repeat, name)}` }
+    : published?.state === "reported" && repeat?.kind === "new" && repeat.repeatedIn ? { ...published, value: repeat.valueIn } : published;
   // The date matters here: an old report would otherwise read like today's.
   const at = report?.reportTime ? `, report ${formatLocal(report.reportTime, now,timeZone)}` : "";
   const detail = !metric
     ? `Last 24 h · No report from ${name}`
+    : repeat && (repeat.kind === "conflict" || repeat.repeatedIn)
+      ? `Last 24 h · ${repeatNote(repeat, name)} (“${metric.label}”${at})`
     : metric.state === "reported"
       ? `Last 24 h · ${inches(metric.value)} reported by ${name} (“${metric.label}”${at})`
       : metric.state === "not_reported"
