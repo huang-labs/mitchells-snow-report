@@ -17,6 +17,12 @@ export interface MorningReading {
   state: "reported" | "not_reported" | "unavailable" | "no_report";
   /** Present when `state` is `reported`. */
   valueIn?: number;
+  /**
+   * The same report's 48 h total, when the resort published one. It shows when the 24 h
+   * total repeats snow the previous morning already reported (see `overlap.ts`).
+   * Absent on readings recorded before it was added.
+   */
+  h48In?: number;
   /** The resort's own label for the window ("Last 24 hrs", "24 Hour"). */
   label: string;
   /** Why a published measurement was withheld from derived history. */
