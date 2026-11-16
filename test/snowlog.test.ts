@@ -266,12 +266,13 @@ describe("timeline model", () => {
     forecast: { hourlySnow: hourly("2026-11-02T03:00:00Z", 6 * 24, 0.05) } as unknown as NwsPayload["points"][number],
   });
 
-  it("lays out the 7 days before the current snow day and 7 from it, labeled by the morning they end", () => {
+  it("lays out the 7 days before the current snow day and 7 from it, named for the day each starts", () => {
     expect(model.past.map((d) => d.key)).toEqual(["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01"]);
     expect(model.future.map((d) => d.key)[0]).toBe("2026-11-02");
     expect(model.future).toHaveLength(7);
-    expect(model.past.at(-1)).toMatchObject({ weekday: "Sun", dayOfMonth: "1", weekend: true, state: "reported", amountIn: 7 });
-    expect(model.past.at(-1)!.detail).toBe("Sun, Nov 1 · 7″ reported by Alta (“Last 24 hrs” at 1:00 AM)");
+    // Keyed by the morning it ends (Nov 1); named for the day its snow fell (Oct 31).
+    expect(model.past.at(-1)).toMatchObject({ key: "2026-11-01", weekday: "Sat", dayOfMonth: "31", weekend: true, state: "reported", amountIn: 7 });
+    expect(model.past.at(-1)!.detail).toBe("Sat, Oct 31 · 7″ reported by Alta (“Last 24 hrs” at Nov 1, 1:00 AM)");
     // The forecast the day began with stays in the log but is not part of the timeline.
     expect(model.past.at(-1)).not.toHaveProperty("forecastIn");
     expect(model.past.at(-2)).toMatchObject({ state: "no_report", amountIn: null });
@@ -283,14 +284,15 @@ describe("timeline model", () => {
       resort: "alta", name: "Alta", canyon: "LCC", timeZone: ZONE, now, forecast: null, report: null,
       log: { resorts: { alta: { "2026-11-01": { state: "reported", valueIn: 5, label: "Last 24 hrs", windowEnd: "2026-11-01T03:00:00Z", collectedAt: "2026-11-01T13:00:00Z" } } }, forecasts: {} },
     });
-    // 9 PM MDT on Oct 31, stored under the Nov 1 morning.
-    expect(evening.past.at(-1)!.detail).toBe("Sun, Nov 1 · 5″ reported by Alta (“Last 24 hrs” at Oct 31, 9:00 PM)");
+    // 9 PM MDT on Oct 31, stored under the Nov 1 morning: the same day the bar is named for.
+    expect(evening.past.at(-1)!.detail).toBe("Sat, Oct 31 · 5″ reported by Alta (“Last 24 hrs” at 9:00 PM)");
   });
 
   it("names the day boundary in local time across the daylight-saving change", () => {
     // The boundary stays at 6 AM local after DST ends.
     expect(model.future[0]).toMatchObject({ partial: true, state: "forecast", amountIn: 0.5 });
-    expect(model.future[0].detail).toBe("Mon, Nov 2 · 0.5″ NWS forecast, now to 6 AM (LCC grid point)");
+    expect(model.future[0]).toMatchObject({ weekday: "Sun", dayOfMonth: "1" });
+    expect(model.future[0].detail).toBe("Sun, Nov 1 · 0.5″ NWS forecast, now to 6 AM (LCC grid point)");
     expect(model.future[1].detail).toMatch(/1\.2″ NWS forecast, 6 AM to 6 AM local time/);
     // This forecast ends 6 days out, partway through the last day: no partial total.
     expect(model.future.at(-1)).toMatchObject({ state: "no_forecast", amountIn: null });
@@ -337,8 +339,24 @@ describe("timeline model", () => {
 
   it("shares one bar scale, between 6″ and 18″", () => {
     expect(timelineScale([model])).toBe(7); // the tallest reported bar; the log's old forecasts don't set the scale
-    expect(timelineScale([{ ...model, past: [], future: [], last24: { ...model.last24, metric: inches(30) } }])).toBe(18);
-    expect(timelineScale([{ ...model, past: [], future: [], last24: { ...model.last24, metric: inches(1) } }])).toBe(6);
+    const day = model.past.at(-1)!;
+    expect(timelineScale([{ ...model, past: [{ ...day, amountIn: 30 }], future: [] }])).toBe(18);
+    expect(timelineScale([{ ...model, past: [{ ...day, amountIn: 1 }], future: [] }])).toBe(6);
+    // The last 24 h is a figure, not a bar: it doesn't stretch the scale.
+    expect(timelineScale([{ ...model, past: [], future: [], last24: { ...model.last24, metric: inches(30) } }])).toBe(6);
+  });
+
+  it("names a snow day for the day it starts, and waits for the morning's report", () => {
+    // 8 AM MST Sun Nov 15: the day named Sat 14 has ended, its report not yet collected.
+    const morning = new Date("2026-11-15T15:00:00Z");
+    const m = buildSnowTimeline({ resort: "alta", name: "Alta", canyon: "LCC", timeZone: ZONE, now: morning, forecast: null, report: null, log: { resorts: { alta: {} }, forecasts: {} } });
+    expect(m.past.at(-1)).toMatchObject({ key: "2026-11-15", weekday: "Sat", dayOfMonth: "14", state: "no_report", amountIn: null });
+    expect(m.past.at(-1)!.detail).toBe("Sat, Nov 14 · Awaiting this morning’s report from Alta");
+    expect(m.past.at(-2)).toMatchObject({ state: "not_recorded" });
+    expect(m.future[0]).toMatchObject({ weekday: "Sun", dayOfMonth: "15", partial: true });
+    // After the morning window closes, a missing reading is just not recorded.
+    const noon = buildSnowTimeline({ resort: "alta", name: "Alta", canyon: "LCC", timeZone: ZONE, now: new Date("2026-11-15T19:00:00Z"), forecast: null, report: null, log: null });
+    expect(noon.past.at(-1)).toMatchObject({ state: "not_recorded" });
   });
 
   it("labels bars in whole inches, keeping a trace apart from zero", () => {

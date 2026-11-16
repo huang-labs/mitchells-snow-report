@@ -323,7 +323,11 @@ it("shows each resort as a snowfall timeline: 7 recorded days, the last 24 h, 7 
   expect(alta.querySelector(".snowtl__meta")!.textContent).toBe("Utah · United States");
   expect(alta.querySelector(".snowtl__reported-label")!.textContent).toBe("Reported");
   expect(alta.querySelector(".snowtl__reported-time")!.textContent).toMatch(/(Today|Yesterday|, )/);
-  expect(alta.querySelector(".snowtl__hero")!.textContent).not.toMatch(/Last 24 hrs/);
+  expect(alta.querySelector(".snowtl__now")!.textContent).not.toMatch(/Last 24 hrs/);
+  // The last 24 h is a number, never a bar; the forecast day under way is marked as now.
+  expect(alta.querySelector(".snowtl__day--today .snowtl__bar, .snowtl__day--today .snowtl__plot")).toBeNull();
+  expect(alta.querySelectorAll(".snowtl__day--current")).toHaveLength(1);
+  expect(alta.querySelector(".snowtl__day--today + .snowtl__day--current")).not.toBeNull();
   expect(alta.querySelectorAll(".badge")).toHaveLength(0);
   expect(container.querySelector("table")).toBeNull();
 });
@@ -345,13 +349,13 @@ it("labels a 24 h figure without a report time as Time unknown, and no figure as
   const withNoTime = { ...report, sources: { ...report.sources, alta: { ...base, payload: { ...payload, reportTime: null } } } };
   const { container, unmount } = render(renderSection("regional", withNoTime, FIXTURE_NOW, null));
   const alta = container.querySelector(".resort-timeline")!;
-  expect(alta.querySelector(".snowtl__hero-time")!.textContent).toBe("Time unknown");
+  expect(alta.querySelector(".snowtl__now-time")!.textContent).toBe("Time unknown");
   expect(alta.querySelector(".snowtl__reported-time")!.textContent).toBe("Time unknown");
   unmount();
   const noPayload = { ...report, sources: { ...report.sources, alta: { ...base, payload: null } } };
   const view = render(renderSection("regional", noPayload, FIXTURE_NOW, null));
   const empty = view.container.querySelector(".resort-timeline")!;
-  expect(empty.querySelector(".snowtl__hero-time")!.textContent).toBe("No report");
+  expect(empty.querySelector(".snowtl__now-time")!.textContent).toBe("No report");
   expect(empty.querySelector(".snowtl__reported")).toBeNull();
 });
 

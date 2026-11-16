@@ -1,5 +1,5 @@
 import { snowfallIssues, usableSnowReport } from "@/lib/snowfall-quality";
-import { addDays, forecastForDay, snowDayWindow, snowDayOf } from "@/lib/snowlog/days";
+import { addDays, forecastForDay, morningOf, snowDayWindow, snowDayOf } from "@/lib/snowlog/days";
 import { consecutive, newSnow, type NewSnow } from "@/lib/snowlog/overlap";
 import { cachedDateFormat, formatLocal } from "@/lib/time";
 import type { MorningReading, SnowDayKey, SnowLogState } from "@/lib/snowlog/types";
@@ -16,6 +16,7 @@ export type TimelineDayState =
   | "forecast" | "no_forecast"; // future
 
 export interface TimelineDay {
+  /** Snow-log key: the morning the day ends. Labels name the day it starts (`weekday`, `dayOfMonth`). */
   key: string;
   kind: "past" | "forecast";
   weekday: string;
@@ -24,7 +25,7 @@ export interface TimelineDay {
   state: TimelineDayState;
   /** Bar amount; null when there is no bar. */
   amountIn: number | null;
-  /** Forecast day already under way (only its remaining hours count). */
+  /** Forecast day already under way (only its remaining hours count); the strip marks it as now. */
   partial: boolean;
   /** One-line description for the detail line and screen readers. */
   detail: string;
@@ -57,12 +58,12 @@ export interface SnowTimelineModel {
   timeZone: string;
 }
 
-/** A report time within a day's description: the clock time, plus the date when it falls on another day. */
-function reportAt(iso: string, key: string, zone: string): string {
+/** A report time within a day's description: the clock time, plus the date when it falls on another day than `ymd`. */
+function reportAt(iso: string, day: string, zone: string): string {
   const t = new Date(iso);
   const time = cachedDateFormat("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit" }).format(t);
   const ymd = cachedDateFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(t);
-  return ymd === key ? time : `${cachedDateFormat("en-US", { timeZone: zone, month: "short", day: "numeric" }).format(t)}, ${time}`;
+  return ymd === day ? time : `${cachedDateFormat("en-US", { timeZone: zone, month: "short", day: "numeric" }).format(t)}, ${time}`;
 }
 
 /** Whole inches for bar labels: "<1" keeps a trace distinct from a reported zero. */
@@ -77,8 +78,9 @@ const inches = (v: number) => `${Number.isInteger(v) ? v : v.toFixed(1)}″`;
 const boundaryAt = (instant: number, zone: string) =>
   cachedDateFormat("en-US", { timeZone: zone, hour: "numeric" }).format(instant).replace(":00", "");
 
-function dayLabels(end: number, zone:string) {
-  const t = new Date(end);
+/** Labels for a snow day, named for the day it starts: the day its snow falls. */
+function dayLabels(start: number, zone:string) {
+  const t = new Date(start);
   const timeZone = zone;
   const weekday = cachedDateFormat("en-US", { timeZone, weekday: "short" }).format(t);
   return {
@@ -96,11 +98,14 @@ function repeatNote(net: NewSnow, name: string): string {
     : `${name}’s 24 h total (${inches(net.publishedIn)}) and 48 h total (${inches(net.h48In)}) conflict with the previous morning’s ${inches(net.previousIn)}`;
 }
 
-function pastDay(key: string, name: string, reading: MorningReading | undefined, net: NewSnow | undefined, zone:string): TimelineDay {
-  const { date, ...labels } = dayLabels(snowDayWindow(key, zone).end,zone);
+function pastDay(key: string, name: string, reading: MorningReading | undefined, net: NewSnow | undefined, awaiting: boolean, zone:string): TimelineDay {
+  const start = snowDayWindow(key, zone).start;
+  const { date, ...labels } = dayLabels(start,zone);
   const base = { key, kind: "past" as const, ...labels, partial: false };
+  // The morning this day ends has begun, but its report hasn't been collected yet.
+  if (!reading && awaiting) return { ...base, state: "no_report", amountIn: null, detail: `${date} · Awaiting this morning’s report from ${name}` };
   if (!reading) return { ...base, state: "not_recorded", amountIn: null, detail: `${date} · Not recorded` };
-  const report = reading.windowEnd ? ` at ${reportAt(reading.windowEnd, key,zone)}` : "";
+  const report = reading.windowEnd ? ` at ${reportAt(reading.windowEnd, cachedDateFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(start),zone)}` : "";
   switch (reading.state) {
     case "reported":
       if (net?.kind === "conflict") return { ...base, state: "unavailable", amountIn: null, detail: `${date} · ${repeatNote(net, name)} (“${reading.label}”${report})` };
@@ -117,7 +122,7 @@ function pastDay(key: string, name: string, reading: MorningReading | undefined,
 
 function futureDay(key: string, canyon: CanyonId, hourly: PointForecast["hourlySnow"], now: Date, zone:string): TimelineDay {
   const window = snowDayWindow(key, zone);
-  const { date, ...labels } = dayLabels(window.end,zone);
+  const { date, ...labels } = dayLabels(window.start,zone);
   const partial = now.getTime() >= window.start && now.getTime() < window.end;
   const amountIn = hourly ? forecastForDay(hourly, window, partial ? now.getTime() : -Infinity) : null;
   const span = partial
@@ -161,6 +166,7 @@ export function forecastTotal(future: TimelineDay[], canyon: CanyonId, zone: str
   const days = future.filter((d) => d.state === "forecast" && d.amountIn !== null);
   if (!days.length) return null;
   const amountIn = sum(days);
+  // The window's end: "6 AM Sat" for the day named Friday.
   const through = dayLabels(snowDayWindow(days.at(-1)!.key, zone).end, zone).date;
   return {
     amountIn,
@@ -205,7 +211,8 @@ function last24Net(metric: Metric | null, report: ResortReport | null, readings:
 /**
  * One resort's timeline: the 7 snow days before the current one (each resort's morning
  * report), its latest 24 h figure, then 7 days of NWS forecast starting with the current
- * snow day's remaining hours. A day is labeled by the morning it ends.
+ * snow day's remaining hours. Each 6 AM-to-6 AM day is named for the day it starts, the
+ * day its snow falls; the log keys it by the morning it ends, when resorts report it.
  */
 export function buildSnowTimeline(input: {
   resort: PrimaryResortId;
@@ -223,7 +230,7 @@ export function buildSnowTimeline(input: {
   const net = netSnow(readings, report);
   const past = Array.from({ length: TIMELINE_DAYS }, (_, i) => {
     const key = addDays(current, i - TIMELINE_DAYS);
-    return pastDay(key, name, readings[key], net.get(key), timeZone);
+    return pastDay(key, name, readings[key], net.get(key), morningOf(now.getTime(), timeZone) === key, timeZone);
   });
   const future = Array.from({ length: TIMELINE_DAYS }, (_, i) => futureDay(addDays(current, i), canyon, forecast?.hourlySnow, now,timeZone));
   const totals = { pastTotal: pastTotal(past, name), nextTotal: forecastTotal(future, canyon, timeZone) };
@@ -247,11 +254,8 @@ export function buildSnowTimeline(input: {
   return { past, future, ...totals, last24: { metric, reportTime: report?.reportTime ?? null, detail, ...(report && snowfallIssues(report.snowfall).length ? { warning: "Resort snowfall data warning: affected totals are withheld. See the resort report for published figures." } : {}) }, canyon, timeZone };
 }
 
-/** One scale for timelines shown together, so equal amounts draw equal bars. */
+/** One scale for timelines shown together, so equal amounts draw equal bars. The last 24 h is a figure, not a bar. */
 export function timelineScale(models: SnowTimelineModel[]): number {
-  const amounts = models.flatMap((m) => [
-    ...[...m.past, ...m.future].map((d) => d.amountIn ?? 0),
-    m.last24.metric?.state === "reported" ? m.last24.metric.value : 0,
-  ]);
+  const amounts = models.flatMap((m) => [...m.past, ...m.future].map((d) => d.amountIn ?? 0));
   return Math.min(SCALE_MAX_IN, Math.max(SCALE_MIN_IN, ...amounts));
 }

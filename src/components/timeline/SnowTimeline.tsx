@@ -26,7 +26,7 @@ function amountText(day: TimelineDay): string {
 
 function Day({ day, scale }: { day: TimelineDay; scale: number }) {
   return (
-    <li className={`snowtl__day snowtl__day--${day.kind} snowtl__day--${day.state}${day.weekend ? " snowtl__day--weekend" : ""}`}>
+    <li className={`snowtl__day snowtl__day--${day.kind} snowtl__day--${day.state}${day.weekend ? " snowtl__day--weekend" : ""}${day.partial ? " snowtl__day--current" : ""}`}>
       <span className="snowtl__sr">{day.detail}</span>
       <span className="snowtl__visual" aria-hidden="true">
         <Plot amountIn={day.amountIn} label={amountText(day)} scale={scale} />
@@ -63,7 +63,9 @@ function SpanTotalLabel({ kind, total, empty }: { kind: "past" | "next"; total: 
 
 /**
  * Daily snowfall around now: 7 past snow days (each resort's morning report), the
- * latest 24 h figure, and 7 days of NWS forecast. The page supplies the heading and
+ * latest 24 h figure as a number between them (it is the same snow as the last past
+ * bar, so it draws no bar), and 7 days of NWS forecast, the first one marked as now.
+ * Each day is named for the day its snow falls (6 AM to 6 AM local). The page supplies the heading and
  * a line shown beside it, an optional footer beneath the strip, and a shared `scale`
  * when several timelines are shown together. Each day carries a full description for screen readers; the drawing is
  * hidden from them.
@@ -110,14 +112,10 @@ export function SnowTimeline({
         {model.past.map((day) => <Day key={day.key} day={day} scale={scale} />)}
         <li className="snowtl__day snowtl__day--today">
           <span className="snowtl__sr">{model.last24.detail}</span>
-          <span className="snowtl__compact" aria-hidden="true">
-            <Plot amountIn={m?.state === "reported" ? m.value : null} label={m?.state === "reported" ? barLabel(m.value) : "–"} scale={scale} />
-            <span className="snowtl__weekday">24h</span>
-            <span className="snowtl__date">now</span>
-          </span>
-          <span className="snowtl__hero" aria-hidden="true">
+          <span className="snowtl__now" aria-hidden="true">
+            <span className="snowtl__now-label">24 h</span>
             {m ? <MetricValue m={m} size="xl" /> : <span className="metric__na">—</span>}
-            <span className="snowtl__hero-time">{reportTime ?? "No report"}</span>
+            <span className="snowtl__now-time">{reportTime ?? "No report"}</span>
           </span>
         </li>
         {model.future.map((day) => <Day key={day.key} day={day} scale={scale} />)}

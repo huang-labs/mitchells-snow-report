@@ -55,7 +55,7 @@ export function RegionalPage({ report, now }: { report: ReportResponse; now: Dat
         <span className="legend__key legend__key--forecast" /> NWS forecast ·{" "}
         <span className="metric__value metric__value--zero">0</span> reported zero ·{" "}
         <span className="metric__na">–</span> no data · <span className="legend__key legend__key--none" /> not recorded.
-        Days follow each destination's local time; report windows are preserved.
+        Each day runs 6 AM to 6 AM local time and is named for the day its snow falls; report windows are preserved.
       </p>
     </section>
   );
