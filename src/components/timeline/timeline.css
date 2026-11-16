@@ -49,9 +49,9 @@
 .snowtl__date { font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; }
 .snowtl__day--weekend :is(.snowtl__weekday, .snowtl__date) { color: var(--text); font-weight: 750; }
 
-/* The current day: the forecast day under way, marked as now. */
+/* The current day: the forecast day under way, marked as now by its label alone (a
+   tint beside the Last 24 h panel read as a second panel). */
 .snowtl__day--current :is(.snowtl__weekday, .snowtl__date) { color: var(--accent); font-weight: 750; }
-.snowtl__day--current { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 
 .snowtl__day--today { align-self: stretch; background: var(--panel); }
 .snowtl__now { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; height: 100%; text-align: center; }
