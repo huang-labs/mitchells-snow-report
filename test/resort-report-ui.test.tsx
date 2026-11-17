@@ -328,7 +328,9 @@ it("shows each resort as a snowfall timeline: 7 recorded days, the last 24 h, 7 
   expect(alta.querySelector(".snowtl__day--today .snowtl__bar, .snowtl__day--today .snowtl__plot")).toBeNull();
   expect(alta.querySelectorAll(".snowtl__day--current")).toHaveLength(1);
   expect(alta.querySelector(".snowtl__day--today + .snowtl__day--current")).not.toBeNull();
-  expect(alta.querySelectorAll(".badge")).toHaveLength(0);
+  // The only badge is the report's freshness, matching the resort page.
+  expect(alta.querySelectorAll(".badge")).toHaveLength(1);
+  expect(alta.querySelector(".snowtl__fresh .badge")).not.toBeNull();
   expect(container.querySelector("table")).toBeNull();
 });
 
