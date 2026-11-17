@@ -28,7 +28,7 @@
     "@cf-wasm/og": "0.5.0",
     "fast-png": "8.0.0",
     "harfbuzz-runtime": "npm:harfbuzzjs@0.10.0",
-    "next": "16.4.3",
+    "next": "16.4.6",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },
