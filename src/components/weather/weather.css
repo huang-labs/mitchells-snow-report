@@ -1,0 +1,82 @@
+/* Weather page: snow by day, the selected-day bar, and each area's day (WeatherPage, SnowByDay, DayForecast). */
+.wx-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Snow by day: areas × days on one scale. Mobile first; fits a 360px phone without scrolling. */
+.wxdays { --bar-h: 34px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.wxdays__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; }
+.wxdays__head h2 { font-size: var(--fs-title, 20px); }
+.wxdays__head p { margin: 0; color: var(--muted); font-size: var(--fs-caption); }
+.wxdays__table { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }
+.wxdays__table th, .wxdays__table td { padding: 0; }
+.wxdays__corner { width: 30%; }
+.wxdays__table thead th { vertical-align: bottom; }
+.wxdays__pick { display: flex; flex-direction: column; align-items: center; width: 100%; min-height: 44px; padding: 4px 0 6px; border: 0; border-radius: 6px 6px 0 0; background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
+.wxdays__pick:hover { color: var(--text); }
+.wxdays__weekday { font-size: 11px; line-height: 14px; }
+.wxdays__date { font-size: 12px; line-height: 16px; color: var(--text); }
+.wxdays__pick[aria-pressed="true"] :is(.wxdays__weekday, .wxdays__date) { color: var(--accent); font-weight: 750; }
+.wxdays__col--on { background: var(--panel); }
+.wxdays__table tbody tr { border-top: 1px solid var(--line); }
+.wxdays__table tbody th { padding: 10px 8px 10px 0; vertical-align: middle; text-align: left; font-size: var(--fs-caption); font-weight: 600; line-height: 1.3; }
+.wxdays__table tbody th a { color: var(--text); text-decoration: none; }
+.wxdays__table tbody th a:hover { color: var(--accent); text-decoration: underline; }
+.wxdays__table td { position: relative; height: calc(var(--bar-h) + 30px); text-align: center; vertical-align: bottom; cursor: pointer; }
+.wxdays__amount { position: absolute; left: 0; right: 0; bottom: calc(var(--bar-h) * var(--r, 0) + 6px); font-size: 12px; font-weight: 700; line-height: 16px; color: var(--accent); }
+.wxdays__amount--zero { color: var(--muted); font-weight: 500; }
+.wxdays__amount.metric__na { bottom: 6px; }
+.wxdays__bar { position: absolute; bottom: 4px; left: 50%; width: 60%; max-width: 30px; height: calc(var(--bar-h) * var(--r)); min-height: 2px; transform: translateX(-50%); border-radius: 2px 2px 0 0; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, transparent) 0 3px, color-mix(in srgb, var(--accent) 30%, transparent) 3px 6px); }
+.wxdays__note { margin: 0; color: var(--muted); font-size: var(--fs-caption); }
+
+/* The selected day, held at the top while reading the areas below. */
+.wxday-bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; margin: 8px 0 -8px; padding: 8px 0; border-bottom: 1px solid var(--line); background: var(--bg); }
+.wxday-bar__title { flex: 1; min-width: 0; font-size: var(--fs-title, 20px); text-align: center; }
+.wxday-bar__step { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: 600 22px/1 var(--font); cursor: pointer; }
+.wxday-bar__step:disabled { color: var(--muted); opacity: 0.4; cursor: default; }
+
+/* One area's day. */
+.wxarea { gap: 16px; scroll-margin-top: 72px; }
+.wxarea__head h2 { font-size: var(--fs-title, 20px); }
+.wxarea__meta { margin: 4px 0 0; color: var(--muted); font-size: var(--fs-caption); }
+.wxfacts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 16px; margin: 0; }
+.wxfacts > div { min-width: 0; }
+.wxfacts dt { color: var(--muted); font-size: var(--fs-caption); line-height: 1.3; }
+.wxfacts dt small { font-size: 11px; }
+.wxfacts dd { margin: 2px 0 0; font-size: 18px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.wxfacts__snow dd { color: var(--accent); font-size: 28px; font-weight: 750; letter-spacing: -0.02em; }
+.wxfacts__snow { grid-row: span 2; }
+.wxfacts__zero { color: var(--muted); font-weight: 500; }
+.wxfacts__gust { color: var(--muted); font-size: var(--fs-caption); font-weight: 500; }
+.wxarea__charts { display: flex; flex-direction: column; gap: 12px; }
+
+.wxchart { margin: 0; min-width: 0; }
+.wxchart figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px; margin-bottom: 2px; color: var(--muted); font-size: var(--fs-caption); }
+.wxchart__title { color: var(--text); font-weight: 600; }
+.wxchart__key { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; }
+.wxchart__key > span { display: inline-flex; align-items: center; gap: 5px; }
+.wxchart__key svg { overflow: visible; }
+.wxchart__none { margin: 0; font-size: var(--fs-meta); }
+.wxchart__ski { fill: color-mix(in srgb, var(--accent) 8%, transparent); }
+.wxchart__hit { fill: transparent; }
+.wxchart__line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.wxchart__line--temp { stroke: var(--series-8); }
+.wxchart__line--chill { stroke: var(--series-1); stroke-dasharray: 5 3; }
+.wxchart__line--wind { stroke: var(--series-3); }
+.wxchart__line--gust { stroke: var(--series-4); stroke-dasharray: 5 3; }
+.wxchart__arrow { fill: var(--muted); }
+.wxchart__snow { fill: var(--accent); }
+.wxchart__strip-bg { fill: color-mix(in srgb, var(--muted) 8%, transparent); }
+.wxchart__strip--sky { fill: color-mix(in srgb, var(--muted) 70%, transparent); }
+.wxchart__strip--pop { fill: var(--accent); }
+.wxchart__strip--rain { fill: var(--series-3); }
+.wxchart__strip--thunder { fill: var(--series-4); }
+.wxchart__strip--ice { fill: var(--series-5); }
+.wxnote { margin: 0; max-width: 72ch; color: var(--muted); font-size: var(--fs-caption); line-height: 1.5; }
+
+@media (min-width: 901px) {
+  .wxdays__corner { width: 220px; }
+  .wxdays { --bar-h: 48px; }
+  .wxdays__weekday { font-size: 12px; }
+  .wxdays__amount { font-size: 13px; }
+  .wxfacts { grid-template-columns: auto repeat(4, minmax(0, 1fr)); }
+  .wxfacts__snow { grid-row: auto; padding-right: 8px; }
+}
