@@ -14,21 +14,21 @@ function withFreshness(states: Record<"alta" | "snowbird" | "solitude" | "bright
   return report;
 }
 
-it("marks each resort's report freshness with a dot and word, not a badge or source line", () => {
+it("marks each resort's report freshness with the resort page's status badge, not a source line", () => {
   const report = withFreshness({ alta: "current", snowbird: "old-report", solitude: "stale", brighton: "unavailable" });
   report.sources.snowbird.status = "error";
   render(<RegionalPage now={now} report={report} />);
-  expect(document.querySelectorAll(".resort-timeline .badge")).toHaveLength(0);
   const fresh = [...document.querySelectorAll(".resort-timeline")].slice(0, 4).map((b) => {
-    const f = b.querySelector(".snowtl__head .snowtl__fresh")!;
-    return [f.className.replace("snowtl__fresh ", ""), f.textContent];
+    expect(b.querySelectorAll(".badge")).toHaveLength(1);
+    const f = b.querySelector(".snowtl__head .snowtl__fresh .badge")!;
+    return [f.className, f.textContent];
   });
-  // Green current; yellow old or delayed; red unavailable.
+  // The same tone and label as the resort page's FreshnessBadge.
   expect(fresh).toEqual([
-    ["snowtl__fresh--ok", "Current"],
-    ["snowtl__fresh--warn", "Old report"],
-    ["snowtl__fresh--warn", "Updates delayed"],
-    ["snowtl__fresh--bad", "Unavailable"],
+    ["badge badge--ok badge--current", "Current"],
+    ["badge badge--warn badge--old-report", "Old report"],
+    ["badge badge--warn badge--stale", "Updates delayed"],
+    ["badge badge--bad badge--unavailable", "Unavailable"],
   ]);
   expect(document.body.textContent).not.toMatch(/Latest check failed|snow reports \(resort websites\)/);
 });

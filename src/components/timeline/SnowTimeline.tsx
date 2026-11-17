@@ -1,8 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
-import { FRESHNESS_STATUS } from "@/lib/freshness";
 import { formatLocalRelative } from "@/lib/time";
 import type { Freshness } from "@/lib/types";
-import { MetricValue } from "../ui";
+import { FreshnessBadge, MetricValue } from "../ui";
 import { barLabel, type SnowTimelineModel, type SpanTotal, type TimelineDay } from "./model";
 import "./timeline.css";
 
@@ -36,19 +35,6 @@ function Day({ day, scale }: { day: TimelineDay; scale: number }) {
         <span className="snowtl__date">{day.dayOfMonth}</span>
       </span>
     </li>
-  );
-}
-
-/** Green when the report is current, red when there is none, yellow for anything in between. */
-const DOT_TONE: Record<Freshness, "ok" | "warn" | "bad"> = { current: "ok", "old-report": "warn", "time-unknown": "warn", stale: "warn", unavailable: "bad" };
-
-function FreshnessDot({ freshness }: { freshness: Freshness }) {
-  const status = FRESHNESS_STATUS[freshness];
-  return (
-    <span className={`snowtl__fresh snowtl__fresh--${DOT_TONE[freshness]}`} title={status.description}>
-      <span className="snowtl__fresh-dot" aria-hidden="true" />
-      {status.label}
-    </span>
   );
 }
 
@@ -102,7 +88,7 @@ export function SnowTimeline({
   heading: ReactNode;
   meta?: ReactNode;
   footer?: ReactNode;
-  /** The resort report's freshness, shown as a dot and word at the header's right. */
+  /** The resort report's freshness, shown as the resort page's status badge at the header's right. */
   freshness?: Freshness;
   now: Date;
 }) {
@@ -118,7 +104,7 @@ export function SnowTimeline({
         </div>
         {(freshness || reportTime) && (
           <span className="snowtl__reported">
-            {freshness && <FreshnessDot freshness={freshness} />}
+            {freshness && <span className="snowtl__fresh"><FreshnessBadge freshness={freshness} /></span>}
             {reportTime && <span className="snowtl__reported-time" aria-hidden="true">{reportTime}</span>}
           </span>
         )}
