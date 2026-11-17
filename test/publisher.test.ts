@@ -198,7 +198,7 @@ describe("Western waits for regional editions", () => {
     attempts: { date: "2026-11-05", count: 1, calls: 2 },
   });
   const exhausted = state({ ...retrying, attempts: { date: "2026-11-05", count: 3, calls: 6 } });
-  const all = (s: DailySnowState) => Object.fromEntries((["utah", "tahoe", "mammoth", "tetons", "montana", "colorado", "washington", "oregon"] as RegionId[]).map((id) => [id, s]));
+  const all = (s: DailySnowState) => Object.fromEntries((["utah", "tahoe", "mammoth", "tetons", "montana", "colorado", "new-mexico", "washington", "oregon"] as RegionId[]).map((id) => [id, s]));
   const worth = () => true;
 
   it("waits only for a region whose edition may still land", () => {

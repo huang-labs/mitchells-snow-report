@@ -79,7 +79,7 @@ describe("useReport polling", () => {
 describe("sections", () => {
   it("maps sections to routes and back", () => {
     expect(SECTIONS.find((s) => s.id === "daily-snow")).toMatchObject({ label: "Daily Snow", title: "Daily Snow" });
-    expect(SECTIONS.map((s) => sectionHref(s.id))).toEqual(["/", "/daily-snow", "/weather", "/plumes", "/alta", "/snowbird", "/solitude", "/brighton", "/park-city", "/deer-valley", "/snowbasin", "/palisades-tahoe", "/mammoth-mountain", "/jackson-hole", "/big-sky", "/winter-park", "/steamboat", "/telluride", "/crystal-mountain", "/mt-bachelor"]);
+    expect(SECTIONS.map((s) => sectionHref(s.id))).toEqual(["/", "/daily-snow", "/weather", "/plumes", "/alta", "/snowbird", "/solitude", "/brighton", "/park-city", "/deer-valley", "/snowbasin", "/palisades-tahoe", "/mammoth-mountain", "/jackson-hole", "/big-sky", "/winter-park", "/steamboat", "/telluride", "/taos-ski-valley", "/crystal-mountain", "/mt-bachelor"]);
     for (const [i, s] of SECTIONS.entries()) expect(sectionIndexFromPath(sectionHref(s.id))).toBe(i);
     expect(sectionIndexFromPath("/alta/")).toBe(4);
     expect(sectionIndexFromPath("/nope")).toBe(-1);
@@ -246,8 +246,8 @@ describe("app shell", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(FIXTURE_NOW);
     mockApi(REPORT);
-    const expected = ["Resorts", "Waiting for the first post", "Utah mountain weather", "Utah ensemble snow plumes", "Alta", "Snowbird", "Solitude", "Brighton", "Park City", "Deer Valley", "Snowbasin", "Palisades Tahoe", "Mammoth Mountain", "Jackson Hole", "Big Sky", "Winter Park", "Steamboat", "Telluride", "Crystal Mountain", "Mt. Bachelor"];
-    expect(SECTIONS).toHaveLength(20);
+    const expected = ["Resorts", "Waiting for the first post", "Utah mountain weather", "Utah ensemble snow plumes", "Alta", "Snowbird", "Solitude", "Brighton", "Park City", "Deer Valley", "Snowbasin", "Palisades Tahoe", "Mammoth Mountain", "Jackson Hole", "Big Sky", "Winter Park", "Steamboat", "Telluride", "Taos Ski Valley", "Crystal Mountain", "Mt. Bachelor"];
+    expect(SECTIONS).toHaveLength(21);
     for (const [i, title] of expected.entries()) {
       const view = renderAt(sectionHref(SECTIONS[i].id));
       expect(await loadedHeading(title)).toBeTruthy();

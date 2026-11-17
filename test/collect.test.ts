@@ -27,7 +27,8 @@ describe("collection with independent failure handling", () => {
     const failed = summary.results.filter((r) => !r.ok);
     expect(failed).toEqual([]);
     expect(summary.results.map((r) => r.id).sort()).toEqual(SOURCES.map((s) => s.id).sort());
-  });
+    // Cropping every plume station's real chart takes a few seconds on its own, more under parallel test load.
+  }, 20_000);
 
   it("preserves the last good payload when a source fails, and other sources keep updating", async () => {
     let altaFails = false;
@@ -126,7 +127,7 @@ describe("freshness semantics", () => {
   it("never-collected sources are unavailable and required ones are reported missing", () => {
     expect(classify(def, undefined, now).freshness).toBe("unavailable");
     const report = buildReport(null, now);
-    expect(report.requiredMissing.sort()).toEqual(["alta", "big-sky", "brighton", "crystal-mountain", "deer-valley", "jackson-hole", "mammoth-mountain", "mt-bachelor", "palisades-tahoe", "park-city", "plumes", "snowbasin", "snowbird", "solitude", "steamboat", "telluride", "winter-park"]);
+    expect(report.requiredMissing.sort()).toEqual(["alta", "big-sky", "brighton", "crystal-mountain", "deer-valley", "jackson-hole", "mammoth-mountain", "mt-bachelor", "palisades-tahoe", "park-city", "plumes", "snowbasin", "snowbird", "solitude", "steamboat", "taos-ski-valley", "telluride", "winter-park"]);
     expect(report.sources.nws.freshness).toBe("unavailable");
     expect(report.sources.nws.payload).toBeNull();
   });

@@ -104,7 +104,7 @@ describe("partial failures and editorial eligibility", () => {
     const fetchImpl = createFixtureFetch([[/r=PALT(?:&|$)/, () => new Response("down", { status: 503 })]]).fetchImpl;
     const result = await collectSource(plumesSource, base.sources.plumes, {}, now, fetchImpl);
     const payload = result.payload as PlumePayload;
-    expect(payload.charts).toHaveLength(12);
+    expect(payload.charts).toHaveLength(13);
     expect(payload.charts.find((c) => c.stationCode === "PALT")?.lastError).toMatch(/503/);
     expect(payload.charts.find((c) => c.stationCode === "MTH04")?.lastError).toBeNull();
     const source = buildReport({ ...base, sources: { ...base.sources, plumes: result } }, now).sources.plumes;
@@ -171,7 +171,7 @@ describe("partial failures and editorial eligibility", () => {
 });
 
 describe("fixed favorites and measured source locations", () => {
-  it("keeps exactly the approved 16 favorites and eight regions", () => {
+  it("keeps exactly the approved 17 favorites and nine regions", () => {
     expect(RESORTS.map((r) => r.name)).toEqual([
       "Alta",
       "Snowbird",
@@ -187,11 +187,12 @@ describe("fixed favorites and measured source locations", () => {
       "Winter Park",
       "Steamboat",
       "Telluride",
+      "Taos Ski Valley",
       "Crystal Mountain",
       "Mt. Bachelor",
     ]);
-    expect(REGIONS).toHaveLength(8);
-    expect(CHANNELS).toHaveLength(9);
+    expect(REGIONS).toHaveLength(9);
+    expect(CHANNELS).toHaveLength(10);
   });
   it.each([
     ["palisades-tahoe", "Palisades Mid-Mountain", 8000, 0],

@@ -12,7 +12,7 @@ on:
         required: true
         default: none
         type: choice
-        options: [none, western-us, utah, tahoe, mammoth, tetons, montana, colorado, washington, oregon, all]
+        options: [none, western-us, utah, tahoe, mammoth, tetons, montana, colorado, new-mexico, washington, oregon, all]
 
 permissions:
   contents: read

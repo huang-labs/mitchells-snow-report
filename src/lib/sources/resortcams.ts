@@ -3,7 +3,7 @@ import type { FetchContext } from "../http";
 import { decodeEntities } from "../metric";
 import type { PrimaryResortId, ResortCam, ResortCamsPayload } from "../types";
 import { extractAltaJson } from "./alta";
-import { JACKSON_CAMS_API, parseJacksonCams, snowbasinImages, type CameraImage } from "./favorite-cams";
+import { JACKSON_CAMS_API, parseJacksonCams, snowbasinImages, TAOS_CAMS, type CameraImage } from "./favorite-cams";
 import { youtubeTitle } from "./youtube-title";
 import { assertValid, type SourceDefinition } from "./types";
 
@@ -150,6 +150,7 @@ export async function embeddedCams(
   if (resort === "jackson-hole") {
     return verifiedImages(ctx, resort, pageUrl, parseJacksonCams(await ctx.fetchJson(JACKSON_CAMS_API)));
   }
+  if (resort === "taos-ski-valley") return verifiedImages(ctx, resort, pageUrl, TAOS_CAMS);
   const html = await ctx.fetchText(pageUrl, { browserLike: true });
   assertValid(
     !/Request unsuccessful[\s\S]*Incapsula incident ID|<title>Just a moment\.{3}<\/title>/i.test(html),
