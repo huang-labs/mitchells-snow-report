@@ -1,0 +1,34 @@
+/* Hourly forecast charts on the Weather page (HourlyForecast.tsx). */
+.hourly { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.hourly__header { display: flex; flex-direction: column; gap: 6px; }
+.hourly__header h3 { font-size: var(--fs-meta); font-weight: 700; }
+.hourly__summary { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 0; font-size: var(--fs-meta); color: var(--muted); }
+.hourly__summary strong { color: var(--text); font-weight: 650; }
+.hourly__panel { margin: 0; min-width: 0; }
+.hourly__panel figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px; margin-bottom: 4px; font-size: var(--fs-caption); color: var(--muted); }
+.hourly__title { color: var(--text); font-weight: 600; }
+.hourly__legend { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; }
+.hourly__legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.hourly__legend svg { overflow: visible; }
+.hourly__legend--steps { gap: 3px; }
+.hourly__legend--steps i { display: inline-block; width: 12px; height: 10px; background: var(--accent); }
+.hourly__legend--steps i:first-of-type { margin-left: 4px; }
+.hourly__legend--steps i:last-of-type { margin-right: 4px; }
+.hourly__none { margin: 0; font-size: var(--fs-meta); }
+.hourly__note { margin: 0; font-size: var(--fs-caption); color: var(--muted); line-height: 1.5; }
+.hourly__ski { fill: color-mix(in srgb, var(--accent) 8%, transparent); }
+.hourly__hit { fill: transparent; }
+.hourly__day { fill: var(--text); font-weight: 600; }
+.hourly__line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.hourly__line--temp { stroke: var(--series-8); }
+.hourly__line--chill { stroke: var(--series-1); stroke-dasharray: 5 3; }
+.hourly__line--wind { stroke: var(--series-3); }
+.hourly__line--gust { stroke: var(--series-4); stroke-dasharray: 5 3; }
+.hourly__line--pop { stroke: var(--accent); }
+.hourly__sky { fill: color-mix(in srgb, var(--muted) 22%, transparent); }
+.hourly__arrow { fill: var(--muted); }
+.hourly__base { stroke: var(--line); stroke-width: 1; }
+.hourly__cov--snow { fill: var(--accent); }
+.hourly__cov--rain { fill: var(--series-3); }
+.hourly__cov--thunder { fill: var(--series-4); }
+.hourly__cov--ice { fill: var(--series-5); }

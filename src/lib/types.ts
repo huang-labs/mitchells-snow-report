@@ -1,3 +1,4 @@
+import type { HourlyWeather } from "./hourlyWeather";
 import type { ChannelId, ForecastAreaId, RegionId, ResortId, TimeZone } from "./catalog";
 import type { StormRecord, StormTrackingState } from "./dailysnow/storm-types";
 import type { SnowLogState } from "./snowlog/types";
@@ -272,6 +273,8 @@ export interface PointForecast {
   hourlyLiquidIn?: Array<number | null>;
   nextStorm: NextStorm | null;
   periods: Array<{ name: string; detailedForecast: string; start: string }>;
+  /** Next 48 hours, hour by hour; absent on snapshots collected before it was added. */
+  hourly?: HourlyWeather;
 }
 
 export interface NwsPayload {

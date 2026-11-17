@@ -4,6 +4,7 @@ import type { ApiSource, NwsPayload, PointForecast } from "@/lib/types";
 import { formatLocal } from "@/lib/time";
 import { SNOWFALL_UNITS, SnowfallChart } from "../snowfall/SnowfallChart";
 import { SourceLine, Unavailable } from "../ui";
+import { HourlyForecast } from "../weather/HourlyForecast";
 
 const fmt = (v: number | null, suffix = "") => (v === null ? "—" : `${v}${suffix}`);
 const range = (a: number | null, b: number | null, suffix = "") =>
@@ -71,6 +72,7 @@ function Point({ p, now }: { p: PointForecast; now: Date }) {
           </tbody>
         </table>
       </div>
+      {p.hourly && <HourlyForecast hourly={p.hourly} now={now} timeZone={p.timeZone ?? "America/Denver"} name={p.name} elevationFt={p.elevationFt} />}
       {p.sixHourSnow.length > 0 && (
         <figure className="weather-point__chart">
           <figcaption>

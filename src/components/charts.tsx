@@ -14,7 +14,7 @@ const newDay = (xs: Array<{ start: string }>, i: number) =>
  * pixel: text stays 12px and bars stay proportionate on phones and desktops, with
  * no horizontal scrolling. Before the first measurement it assumes a desktop width.
  */
-function Chart({ label, height, children }: { label: string; height: number; children: (width: number) => ReactNode }) {
+export function Chart({ label, height, children }: { label: string; height: number; children: (width: number) => ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(640);
   useEffect(() => {

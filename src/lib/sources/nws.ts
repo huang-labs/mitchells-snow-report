@@ -2,6 +2,7 @@ import { FORECAST_AREAS, regionById } from "../catalog";
 import { zonedParts, zonedToUtc } from "../time";
 import { denverParts, denverToUtc } from "../time";
 import type { ForecastBlock, NextStorm, NwsPayload, PointForecast, SixHourSnow } from "../types";
+import { buildHourlyWeather, type GridWeatherEntry } from "../hourlyWeather";
 import { assertValid, HOUR, MINUTE, type SourceDefinition } from "./types";
 
 /** Gridpoints resolved from api.weather.gov/points for each resort area (2026-10-30). */
@@ -29,6 +30,10 @@ interface GridData {
     snowLevel?: Series;
     probabilityOfPrecipitation?: Series;
     quantitativePrecipitation?: Series;
+    windChill?: Series;
+    windDirection?: Series;
+    skyCover?: Series;
+    weather?: { values: Array<{ validTime: string; value: GridWeatherEntry[] | null }> };
   };
 }
 
@@ -85,6 +90,19 @@ function convertWith(uom: string | undefined, fallback: (v: number) => number) {
     default:
       return fallback;
   }
+}
+
+/** Hourly map of NWS weather entries (each entry applies to every hour of its interval). */
+export function expandWeather(series: GridData["properties"]["weather"]): Map<number, GridWeatherEntry[]> {
+  const out = new Map<number, GridWeatherEntry[]>();
+  for (const v of series?.values ?? []) {
+    if (!v.value) continue;
+    const [start, dur] = v.validTime.split("/");
+    const t0 = Date.parse(start);
+    const hours = Math.max(1, Math.round(durationHours(dur)));
+    for (let h = 0; h < hours; h++) out.set(t0 + h * HOUR, v.value);
+  }
+  return out;
 }
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
@@ -176,6 +194,16 @@ export function summarizeGrid(grid: GridData, now: Date, blockCount = 6, timeZon
     hourlySnow: hourly.map(([t, snowIn]) => ({ start: new Date(t).toISOString(), snowIn })),
     hourlyLiquidIn: hourly.map(([t]) => (qpf.has(t) ? Math.round(qpf.get(t)! * 10_000) / 10_000 : null)),
     nextStorm: findNextStorm(snow, snowLevel, now),
+    hourly: buildHourlyWeather({
+      tempF: temp,
+      windChillF: expandHourly(p.windChill, "level", convertWith(p.windChill?.uom, cToF)),
+      windMph: wind,
+      gustMph: gust,
+      windFromDeg: expandHourly(p.windDirection, "level", ident),
+      skyPct: expandHourly(p.skyCover, "level", ident),
+      popPct: pop,
+      weather: expandWeather(p.weather),
+    }, now) ?? undefined,
   };
 }
 
