@@ -371,7 +371,7 @@ it("requires an open same-repository PR at the exact checked-out head", () => {
 it("orders all regions before Western and rejects unknown channels", () => {
   expect(selectedChannels("none")).toEqual([]);
   expect(selectedChannels("all").at(-1)).toBe("western-us");
-  expect(selectedChannels("all")).toHaveLength(9);
+  expect(selectedChannels("all")).toHaveLength(10);
   expect(() => selectedChannels("bogus")).toThrow();
 });
 

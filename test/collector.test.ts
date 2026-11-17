@@ -185,7 +185,7 @@ describe("collectAndPublish (Worker side)", () => {
     // The run that started the work asks every channel.
     e.COLLECTOR = c.namespace;
     await collectAndPublish(e, { now: T0, scheduled: true });
-    expect(asked).toHaveBeenCalledTimes(9);
+    expect(asked).toHaveBeenCalledTimes(10);
   });
 
   it("fails clearly when the Durable Object binding is missing", async () => {

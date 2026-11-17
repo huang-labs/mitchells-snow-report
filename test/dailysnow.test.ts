@@ -92,7 +92,7 @@ describe("NWS forecast discussion", () => {
     await writeSnapshot(kv, captured);
     const { fetchImpl, calls } = createFixtureFetch();
     await runCollection({ SNOW_KV: kv }, { now: SIX_AM, fetchImpl, only: ["nwsafd"] });
-    expect(calls.filter((u) => u.includes("/products/types/AFD/locations/"))).toHaveLength(9);
+    expect(calls.filter((u) => u.includes("/products/types/AFD/locations/"))).toHaveLength(10);
     expect(calls.filter(u=>u.includes("/products/")&&!u.includes("/types/"))).toHaveLength(0);
   });
 });

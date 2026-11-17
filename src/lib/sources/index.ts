@@ -1,3 +1,4 @@
+import { RESORTS } from "../catalog";
 import { parkCitySource } from "./park-city";
 import { cpcSource } from "./cpc";
 import { favoriteSources } from "./favorites";
@@ -11,6 +12,7 @@ import { plumesSource } from "./plumes";
 import { resortCamsSource } from "./resortcams";
 import { snowbirdSource } from "./snowbird";
 import { solitudeSource } from "./solitude";
+import { taosSource } from "./taos";
 import type { SourceDefinition } from "./types";
 
 export const SOURCES: SourceDefinition[] = [
@@ -19,7 +21,10 @@ export const SOURCES: SourceDefinition[] = [
   solitudeSource,
   brightonSource,
   parkCitySource,
-  ...favoriteSources,
+  // Resort sources follow the catalog order.
+  ...[...favoriteSources, taosSource].sort(
+    (a, b) => RESORTS.findIndex((r) => r.id === a.id) - RESORTS.findIndex((r) => r.id === b.id),
+  ),
   plumesSource,
   nwsSource,
   resortCamsSource,

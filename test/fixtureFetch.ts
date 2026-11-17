@@ -42,8 +42,8 @@ export function fixtureRoutes(): Array<[RegExp, Handler]> {
   return [
     [/jacksonhole-prod\.zaneray\.com\/api\/trail-lift\.json/,()=>json(fixture("jackson-lifts.json"))],
     [/api\.mtbachelor\.com\/api\/v1\/dor\/drupal\/lifts/,()=>json(fixture("bachelor-lifts.json"))],
-    [/api\.weather\.gov\/products\/types\/AFD\/locations\/(STO|REV|RIW|TFX|BOU|GJT|SEW|PDT)/,(u)=>json(JSON.parse(fixture("nws-afd-"+u.pathname.split("/").pop()+".json")).list)],
-    [/api\.weather\.gov\/products\/[0-9a-f-]+$/,(u)=>{for(const office of ["STO","REV","RIW","TFX","BOU","GJT","SEW","PDT"]){const d=JSON.parse(fixture("nws-afd-"+office+".json"));if(u.pathname.endsWith(d.product.id))return json(d.product);}return json(fixture("nws-afd-SLC.json"));}],
+    [/api\.weather\.gov\/products\/types\/AFD\/locations\/(STO|REV|RIW|TFX|BOU|GJT|ABQ|SEW|PDT)/,(u)=>json(JSON.parse(fixture("nws-afd-"+u.pathname.split("/").pop()+".json")).list)],
+    [/api\.weather\.gov\/products\/[0-9a-f-]+$/,(u)=>{for(const office of ["STO","REV","RIW","TFX","BOU","GJT","ABQ","SEW","PDT"]){const d=JSON.parse(fixture("nws-afd-"+office+".json"));if(u.pathname.endsWith(d.product.id))return json(d.product);}return json(fixture("nws-afd-SLC.json"));}],
     [/api\.weather\.gov\/points\//,(u)=>{const a=captured.find(x=>u.pathname.endsWith(`${x.area.latitude},${x.area.longitude}`));return a?json(a.data.point):new Response("No point fixture",{status:404});}],
     [/api\.weather\.gov\/gridpoints\//,(u)=>{
       const match=/gridpoints\/([^/]+)\/(\d+),(\d+)/.exec(u.pathname)!;
@@ -58,6 +58,7 @@ export function fixtureRoutes(): Array<[RegExp, Handler]> {
     [/parkcitymountain\.com\/the-mountain\/mountain-conditions\/weather-report\.aspx/,()=>html(fixture("park-city-snow-report.html"))],
     [/snowbasin\.com\/the-mountain\/mountain-report/ ,()=>html(fixture("snowbasin-mountain-report.html"))],
     [/tellurideskiresort\.com\/snow-report/,()=>html(fixture("telluride-snow-report.html"))],
+    [/skitaos\.com\/api\/conditions/,()=>json(fixture("taos-conditions.json"))],
     [/jacksonhole-prod\.zaneray\.com\/api\/snow\.json/,()=>json(fixture("jackson-feed.json"))],
     [/api\.mtbachelor\.com\/api\/v1\/dor\/drupal\/snow-reports/,()=>json(fixture("bachelor-feed.json"))],
     [/bigskyresort\.com\/api\/reportpal/,()=>json(fixture("bigsky_reportpal.json"))],
@@ -107,6 +108,7 @@ export function fixtureRoutes(): Array<[RegExp, Handler]> {
     [/manage\.hdrelay\.com\/snapshot\//, () => new Response(null, { headers: { "content-type": "image/jpeg", "last-modified": "Sat, 31 Oct 2026 00:52:00 GMT" } })],
     // Snowbird's Hidden Peak card.
     [/backend\.roundshot\.com\/cams\//, () => new Response(null, { headers: { "content-type": "image/jpeg", "last-modified": "Sat, 31 Oct 2026 00:52:00 GMT" } })],
+    [/(live4|tsvweather)\.brownrice\.com\//, () => new Response(null, { headers: { "content-type": "image/jpeg", "last-modified": "Sat, 31 Oct 2026 00:52:00 GMT" } })],
     [/alta-webcams\.sfo3\.cdn\.digitaloceanspaces\.com\//, () => new Response(null, { headers: { "content-type": "image/jpeg", "last-modified": "Sat, 31 Oct 2026 00:55:00 GMT" } })],
     // prismcam sends a Last-Modified ahead of real time.
     [/app\.prismcam\.com\//, () => new Response(null, { headers: { "content-type": "image/jpeg", "last-modified": "Sat, 31 Oct 2026 02:00:00 GMT" } })],

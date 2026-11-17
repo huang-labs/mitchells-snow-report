@@ -51,6 +51,7 @@ export const REGION_ALIASES: Record<RegionId, RegExp> = {
   tetons: /\b(?:tetons?|jackson(?: hole)?|wyoming)\b/i,
   montana: /\b(?:montana|big sky)\b/i,
   colorado: /\b(?:colorado|winter park|steamboat|telluride|san juans?)\b/i,
+  "new-mexico": /\b(?:new mexico|taos(?: ski valley)?|sangre de cristo)\b/i,
   washington: /\b(?:washington|crystal(?: mountain)?|cascades?)\b/i,
   oregon: /\b(?:oregon|(?:mt\.?|mount) bachelor|bachelor|cascades?)\b/i,
 };

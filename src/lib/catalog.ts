@@ -7,6 +7,7 @@ export const REGIONS = [
   { id: "tetons", name: "Tetons", timeZone: "America/Denver" },
   { id: "montana", name: "Montana", timeZone: "America/Denver" },
   { id: "colorado", name: "Colorado", timeZone: "America/Denver" },
+  { id: "new-mexico", name: "New Mexico", timeZone: "America/Denver" },
   { id: "washington", name: "Washington", timeZone: "America/Los_Angeles" },
   { id: "oregon", name: "Oregon", timeZone: "America/Los_Angeles" },
 ] as const;
@@ -147,6 +148,15 @@ export const RESORTS = [
     elevationFt: null,
   },
   {
+    id: "taos-ski-valley",
+    name: "Taos Ski Valley",
+    region: "new-mexico",
+    state: "New Mexico",
+    canyon: "taos-ski-valley",
+    station: "Official snow report",
+    elevationFt: null,
+  },
+  {
     id: "crystal-mountain",
     name: "Crystal Mountain",
     region: "washington",
@@ -190,6 +200,7 @@ export const FORECAST_AREAS: ReadonlyArray<{
   { id: "winter-park", name: "Winter Park", region: "colorado", latitude: 39.864, longitude: -105.775 },
   { id: "steamboat", name: "Steamboat", region: "colorado", latitude: 40.459, longitude: -106.769 },
   { id: "telluride", name: "Telluride", region: "colorado", latitude: 37.922, longitude: -107.84 },
+  { id: "taos-ski-valley", name: "Taos Ski Valley", region: "new-mexico", latitude: 36.594, longitude: -105.452 },
   { id: "crystal-mountain", name: "Crystal Mountain", region: "washington", latitude: 46.936, longitude: -121.479 },
   { id: "mt-bachelor", name: "Mt. Bachelor", region: "oregon", latitude: 43.994, longitude: -121.68 },
 ];
@@ -214,6 +225,7 @@ export const PLUME_LOCATIONS: ReadonlyArray<{ code: string; name: string; region
     region: "colorado",
     note: "San Juan regional reference; not a Telluride terrain forecast",
   },
+  { code: "TAONM", name: "Taos Ski Area, NM", region: "new-mexico" },
   { code: "CMT", name: "Crystal Mt Base, WA", region: "washington" },
   { code: "MBB", name: "Mt. Bachelor Base, OR", region: "oregon" },
 ];
@@ -229,6 +241,7 @@ export const CAM_PAGES: Partial<Record<ResortId, string>> = {
   "winter-park": "https://www.winterparkresort.com/the-mountain/mountain-cams",
   steamboat: "https://www.steamboat.com/the-mountain/live-cams",
   telluride: "https://tellurideskiresort.com/webcams/",
+  "taos-ski-valley": "https://www.skitaos.com/weather",
   "crystal-mountain": "https://www.crystalmountainresort.com/the-mountain/mountain-report-and-webcams/webcams",
   "mt-bachelor": "https://www.mtbachelor.com/the-mountain/webcams/",
 };

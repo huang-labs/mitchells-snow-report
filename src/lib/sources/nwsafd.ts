@@ -61,7 +61,7 @@ export const nwsAfdSource: SourceDefinition<AfdPayload> = {
   reportMaxAgeMs: 18 * HOUR,
   async collect(ctx) {
     // Offices verified against the catalog mountain points; shared offices fetch once.
-    const offices=["SLC","STO","REV","RIW","TFX","BOU","GJT","SEW","PDT"];
+    const offices=["SLC","STO","REV","RIW","TFX","BOU","GJT","ABQ","SEW","PDT"];
     const previous=ctx.previous as AfdPayload|null;
     const failures:string[]=[];
     const results=await Promise.all(offices.map(async (office):Promise<AfdPayload|null>=>{

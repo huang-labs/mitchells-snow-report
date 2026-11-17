@@ -2,7 +2,7 @@
 
 [← README](../README.md)
 
-Status: design approved on November 5, 2026; implementation delivered in the expansion PR. The follow-up design uses the name United States West, top-of-page dropdowns without visible labels, and a standalone West article with comparison figures instead of regional highlights and links. Resort navigation uses homepage links rather than a resort subnav. This document retains the approved scope; current operations and source findings live in the linked guides.
+Status: design approved on November 5, 2026; implementation delivered in the expansion PR. The follow-up design uses the name United States West, top-of-page dropdowns without visible labels, and a standalone West article with comparison figures instead of regional highlights and links. Resort navigation uses homepage links rather than a resort subnav. Taos Ski Valley, the 17th favorite, and a New Mexico region and Daily Snow channel were added after launch on November 17, 2026; the order and region table below include them. This document otherwise retains the approved launch scope; current operations and source findings live in the linked guides.
 
 Expand the Cottonwoods web app into Mitchell's Snow Report at
 `mitchells-snow-report.huang.mx`. Launch with a fixed list of 16 United States
@@ -36,8 +36,9 @@ order:
 12. Winter Park
 13. Steamboat
 14. Telluride
-15. Crystal Mountain
-16. Mt. Bachelor
+15. Taos Ski Valley
+16. Crystal Mountain
+17. Mt. Bachelor
 
 Each resort has a detail page with the same structure, showing the snow reports,
 operations, observations, and webcams its sources support. Missing data remains
@@ -55,6 +56,7 @@ on what each resort publishes.
 | Tetons | Jackson Hole | America/Denver |
 | Montana | Big Sky | America/Denver |
 | Colorado | Winter Park, Steamboat, Telluride | America/Denver |
+| New Mexico | Taos Ski Valley | America/Denver |
 | Washington | Crystal Mountain | America/Los_Angeles |
 | Oregon | Mt. Bachelor | America/Los_Angeles |
 

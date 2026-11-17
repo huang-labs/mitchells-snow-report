@@ -49,3 +49,18 @@ export function parseJacksonCams(raw: unknown): CameraImage[] {
     }
   });
 }
+
+/**
+ * Taos Ski Valley's weather page renders its cameras from a list compiled into the
+ * site's script bundle, not page data. These are that list's official stills,
+ * verified 2026-11-17; each is probed on every run, so a retired or frozen
+ * camera drops out or shows its capture age.
+ */
+export const TAOS_CAMS: CameraImage[] = [
+  { title: "Base Cam", imageUrl: "https://live4.brownrice.com/cam-images/tsv.jpg" },
+  { title: "Highline Cam", imageUrl: "https://live4.brownrice.com/cam-images/tsvridge.jpg" },
+  { title: "Kachina Basin Cam", imageUrl: "https://live4.brownrice.com/cam-images/tsvbav.jpg" },
+  { title: "Kachina Peak Cam", imageUrl: "https://live4.brownrice.com/cam-images/tsvlonestar.jpg" },
+  { title: "Poco Cam", imageUrl: "https://tsvweather.brownrice.com/img/poco.jpg" },
+  { title: "Lower Plaza", imageUrl: "https://live4.brownrice.com/cam-images/tsvconstruction.jpg" },
+];
