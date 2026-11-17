@@ -87,12 +87,12 @@ describe("resort webcam collection", () => {
       ["brighton", "Top of Crest Lift", "Zv8HYwaXjBg"],
       ["brighton", "Explorer Lift", "vMwQRjlfqtA"],
       // Taos' official stills, from the list its weather page renders.
-      ["taos-ski-valley", "Base Cam", "2026-10-31T00:52:00.000Z"],
-      ["taos-ski-valley", "Highline Cam", "2026-10-31T00:52:00.000Z"],
-      ["taos-ski-valley", "Kachina Basin Cam", "2026-10-31T00:52:00.000Z"],
-      ["taos-ski-valley", "Kachina Peak Cam", "2026-10-31T00:52:00.000Z"],
-      ["taos-ski-valley", "Poco Cam", "2026-10-31T00:52:00.000Z"],
-      ["taos-ski-valley", "Lower Plaza", "2026-10-31T00:52:00.000Z"],
+      ["taos", "Base Cam", "2026-10-31T00:52:00.000Z"],
+      ["taos", "Highline Cam", "2026-10-31T00:52:00.000Z"],
+      ["taos", "Kachina Basin Cam", "2026-10-31T00:52:00.000Z"],
+      ["taos", "Kachina Peak Cam", "2026-10-31T00:52:00.000Z"],
+      ["taos", "Poco Cam", "2026-10-31T00:52:00.000Z"],
+      ["taos", "Lower Plaza", "2026-10-31T00:52:00.000Z"],
     ]);
   });
 

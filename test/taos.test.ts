@@ -16,10 +16,10 @@ import { createFixtureFetch, fixture } from "./fixtureFetch";
 const feed = (): TaosConditions => JSON.parse(fixture("taos-conditions.json"));
 const now = new Date("2026-11-17T13:30:00Z"); // 6:30 AM MST
 
-describe("Taos Ski Valley official conditions", () => {
+describe("Taos official conditions", () => {
   it("reads the published windows, base, season and lift counts, keeping zero distinct from missing", () => {
     const r = parseTaos(feed(), null, now);
-    expect(r.resort).toBe("Taos Ski Valley");
+    expect(r.resort).toBe("Taos");
     expect(r.sourceUrl).toBe("https://www.skitaos.com/weather");
     expect(r.snowfall.h24).toMatchObject({ state: "reported", value: 0 });
     expect(r.snowfall.h48).toMatchObject({ state: "reported", value: 0 });
@@ -89,17 +89,17 @@ describe("Taos Ski Valley official conditions", () => {
       schemaVersion: 1,
       writtenAt: at.toISOString(),
       sources: {
-        "taos-ski-valley": {
-          id: "taos-ski-valley", status: "ok", payload: r, lastAttemptAt: at.toISOString(),
+        "taos": {
+          id: "taos", status: "ok", payload: r, lastAttemptAt: at.toISOString(),
           lastSuccessfulFetchAt: at.toISOString(), sourceUpdatedAt: r.reportTime, lastError: null,
           lastErrorAt: null, consecutiveFailures: 0, diagnostics: null,
         },
       },
     } as Snapshot);
     const unchanged = parseTaos(feed(), { ...parseTaos(feed(), null, now), reportTime: "2026-11-16T13:05:00.000Z" }, now);
-    expect(recordSnowLog(undefined, report(unchanged, now), now).resorts["taos-ski-valley"]?.["2026-11-17"]?.state).toBe("no_report");
+    expect(recordSnowLog(undefined, report(unchanged, now), now).resorts["taos"]?.["2026-11-17"]?.state).toBe("no_report");
     const changed = parseTaos({ ...feed(), snowData: { ...feed().snowData, overnight: 2, last24Hours: 2, last48Hours: 2, last72Hours: 10, last7Days: 10 } }, unchanged, now);
-    expect(recordSnowLog(undefined, report(changed, now), now).resorts["taos-ski-valley"]?.["2026-11-17"]).toMatchObject({ state: "reported", valueIn: 2 });
+    expect(recordSnowLog(undefined, report(changed, now), now).resorts["taos"]?.["2026-11-17"]).toMatchObject({ state: "reported", valueIn: 2 });
   });
 });
 
@@ -108,38 +108,38 @@ describe("New Mexico region", () => {
   beforeAll(async () => {
     const kv = new MemoryKV();
     // Plume scoping is covered by the plume tests; their image cropping is the slow part of a full run.
-    await runCollection({ SNOW_KV: kv }, { now: new Date("2026-11-17T00:35:00Z"), fetchImpl: createFixtureFetch().fetchImpl, only: ["taos-ski-valley", "winter-park", "steamboat", "telluride", "nws", "nwsafd", "resortcams"] });
+    await runCollection({ SNOW_KV: kv }, { now: new Date("2026-11-17T00:35:00Z"), fetchImpl: createFixtureFetch().fetchImpl, only: ["taos", "winter-park", "steamboat", "telluride", "nws", "nwsafd", "resortcams"] });
     base = (await readSnapshot(kv))!;
   });
 
   it("follows Telluride and Colorado in the fixed lists", () => {
     const ids = RESORTS.map((r) => r.id);
-    expect(ids.indexOf("taos-ski-valley")).toBe(ids.indexOf("telluride") + 1);
+    expect(ids.indexOf("taos")).toBe(ids.indexOf("telluride") + 1);
     const regions = REGIONS.map((r) => r.id);
     expect(regions.indexOf("new-mexico")).toBe(regions.indexOf("colorado") + 1);
     expect(CHANNELS.find((c) => c.id === "new-mexico")).toMatchObject({ name: "New Mexico", timeZone: "America/Denver" });
-    expect(FORECAST_AREAS.find((a) => a.id === "taos-ski-valley")?.region).toBe("new-mexico");
+    expect(FORECAST_AREAS.find((a) => a.id === "taos")?.region).toBe("new-mexico");
     expect(PLUME_LOCATIONS.filter((p) => p.region === "new-mexico").map((p) => p.code)).toEqual(["TAONM"]);
-    expect(SOURCE_BY_ID["taos-ski-valley"]).toBe(taosSource);
+    expect(SOURCE_BY_ID["taos"]).toBe(taosSource);
     expect(REGION_ALIASES["new-mexico"].test("Snow reaches Taos Ski Valley tonight")).toBe(true);
     expect(REGION_ALIASES.colorado.test("Snow reaches Taos Ski Valley tonight")).toBe(false);
   });
 
   it("scopes its own resort, NWS Albuquerque point and discussion, and cameras", () => {
     const nm = regionalSnapshot(base, "new-mexico");
-    expect(Object.keys(nm.sources).filter((id) => RESORTS.some((r) => r.id === id))).toEqual(["taos-ski-valley"]);
+    expect(Object.keys(nm.sources).filter((id) => RESORTS.some((r) => r.id === id))).toEqual(["taos"]);
     const points = (nm.sources.nws?.payload as NwsPayload).points;
-    expect(points.map((p) => [p.id, p.gridId, p.gridX, p.gridY])).toEqual([["taos-ski-valley", "ABQ", 147, 185]]);
+    expect(points.map((p) => [p.id, p.gridId, p.gridX, p.gridY])).toEqual([["taos", "ABQ", 147, 185]]);
     expect((nm.sources.nwsafd?.payload as AfdPayload).discussions!.map((d) => d.office)).toEqual(["ABQ"]);
-    expect(new Set((nm.sources.resortcams?.payload as ResortCamsPayload).cameras.map((c) => c.resort))).toEqual(new Set(["taos-ski-valley"]));
+    expect(new Set((nm.sources.resortcams?.payload as ResortCamsPayload).cameras.map((c) => c.resort))).toEqual(new Set(["taos"]));
     // Colorado keeps its own points and offices.
     const co = regionalSnapshot(base, "colorado");
-    expect((co.sources.nws?.payload as NwsPayload).points.map((p) => p.id)).not.toContain("taos-ski-valley");
+    expect((co.sources.nws?.payload as NwsPayload).points.map((p) => p.id)).not.toContain("taos");
     expect((co.sources.nwsafd?.payload as AfdPayload).discussions!.map((d) => d.office)).not.toContain("ABQ");
   });
 
   it("builds a regional Daily Snow digest for Taos", () => {
     const d = buildDailyDigest(regionalSnapshot(base, "new-mexico"), null, [], new Date("2026-11-17T00:35:00Z"));
-    expect(d.digest.areas?.map((a) => a.id)).toEqual(["taos-ski-valley"]);
+    expect(d.digest.areas?.map((a) => a.id)).toEqual(["taos"]);
   });
 });

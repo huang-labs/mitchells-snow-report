@@ -51,7 +51,7 @@ export function parseJacksonCams(raw: unknown): CameraImage[] {
 }
 
 /**
- * Taos Ski Valley's weather page renders its cameras from a list compiled into the
+ * Taos's weather page renders its cameras from a list compiled into the
  * site's script bundle, not page data. These are that list's official stills,
  * verified 2026-11-17; each is probed on every run, so a retired or frozen
  * camera drops out or shows its capture age.
