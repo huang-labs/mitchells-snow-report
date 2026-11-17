@@ -246,7 +246,7 @@ describe("app shell", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(FIXTURE_NOW);
     mockApi(REPORT);
-    const expected = ["Resorts", "Waiting for the first post", "Utah mountain weather", "Utah ensemble snow plumes", "Alta", "Snowbird", "Solitude", "Brighton", "Park City", "Deer Valley", "Snowbasin", "Palisades Tahoe", "Mammoth Mountain", "Jackson Hole", "Big Sky", "Winter Park", "Steamboat", "Telluride", "Taos Ski Valley", "Crystal Mountain", "Mt. Bachelor"];
+    const expected = ["Resorts", "Waiting for the first post", "Utah mountain weather", "Utah ensemble snow plumes", "Alta", "Snowbird", "Solitude", "Brighton", "Park City", "Deer Valley", "Snowbasin", "Palisades Tahoe", "Mammoth Mountain", "Jackson Hole", "Big Sky", "Winter Park", "Steamboat", "Telluride", "Taos", "Crystal Mountain", "Mt. Bachelor"];
     expect(SECTIONS).toHaveLength(21);
     for (const [i, title] of expected.entries()) {
       const view = renderAt(sectionHref(SECTIONS[i].id));

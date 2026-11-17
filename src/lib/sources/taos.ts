@@ -4,7 +4,7 @@ import type { Metric, ResortReport, SnowfallSet } from "../types";
 import { assertValid, HOUR, type SourceDefinition } from "./types";
 
 /**
- * Taos Ski Valley's official weather page loads its snow report from the site's
+ * Taos's official weather page loads its snow report from the site's
  * own JSON route. The route publishes snowfall windows, base depth, season total
  * and lift counts, but no report time. Its current-weather and forecast blocks
  * come from a third-party forecast service and are not used.
@@ -44,7 +44,7 @@ function signature(r: Pick<ResortReport, "snowfall" | "base">): string {
  */
 export function parseTaos(feed: TaosConditions, previous: ResortReport | null, now: Date): ResortReport {
   const snow = feed.snowData;
-  assertValid(snow && typeof snow === "object", "Taos Ski Valley conditions missing snowData");
+  assertValid(snow && typeof snow === "object", "Taos conditions missing snowData");
   const def = resortById("taos-ski-valley")!;
   // An absent field is not published; a null one is published but not reported.
   const field = (key: keyof typeof snow, label: string) =>
@@ -58,11 +58,11 @@ export function parseTaos(feed: TaosConditions, previous: ResortReport | null, n
     d7: field("last7Days", "Last 7 days"),
     season: field("seasonTotal", "Season total"),
   };
-  assertValid(snowfall.h24.state !== "unavailable", "Taos Ski Valley 24 h field missing");
+  assertValid(snowfall.h24.state !== "unavailable", "Taos 24 h field missing");
   const base = field("base", "Base depth");
   const report: ResortReport = {
     resort: def.name,
-    sourceName: "Taos Ski Valley official conditions",
+    sourceName: "Taos official conditions",
     sourceUrl: TAOS_PAGE,
     reportTimeLabel: "Figures last changed",
     reportTime: null,
@@ -86,11 +86,11 @@ export function parseTaos(feed: TaosConditions, previous: ResortReport | null, n
 
 export const taosSource: SourceDefinition<ResortReport> = {
   id: "taos-ski-valley",
-  label: "Taos Ski Valley",
+  label: "Taos",
   category: "resort",
   required: true,
   sourceUrl: TAOS_PAGE,
-  attribution: "Taos Ski Valley — official snow report",
+  attribution: "Taos — official snow report",
   reportMaxAgeMs: 26 * HOUR,
   async collect(ctx) {
     const report = parseTaos(

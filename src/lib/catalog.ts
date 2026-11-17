@@ -149,7 +149,7 @@ export const RESORTS = [
   },
   {
     id: "taos-ski-valley",
-    name: "Taos Ski Valley",
+    name: "Taos",
     region: "new-mexico",
     state: "New Mexico",
     canyon: "taos-ski-valley",
@@ -200,7 +200,7 @@ export const FORECAST_AREAS: ReadonlyArray<{
   { id: "winter-park", name: "Winter Park", region: "colorado", latitude: 39.864, longitude: -105.775 },
   { id: "steamboat", name: "Steamboat", region: "colorado", latitude: 40.459, longitude: -106.769 },
   { id: "telluride", name: "Telluride", region: "colorado", latitude: 37.922, longitude: -107.84 },
-  { id: "taos-ski-valley", name: "Taos Ski Valley", region: "new-mexico", latitude: 36.594, longitude: -105.452 },
+  { id: "taos-ski-valley", name: "Taos", region: "new-mexico", latitude: 36.594, longitude: -105.452 },
   { id: "crystal-mountain", name: "Crystal Mountain", region: "washington", latitude: 46.936, longitude: -121.479 },
   { id: "mt-bachelor", name: "Mt. Bachelor", region: "oregon", latitude: 43.994, longitude: -121.68 },
 ];

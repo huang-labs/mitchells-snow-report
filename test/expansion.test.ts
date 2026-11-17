@@ -187,7 +187,7 @@ describe("fixed favorites and measured source locations", () => {
       "Winter Park",
       "Steamboat",
       "Telluride",
-      "Taos Ski Valley",
+      "Taos",
       "Crystal Mountain",
       "Mt. Bachelor",
     ]);

@@ -16,10 +16,10 @@ import { createFixtureFetch, fixture } from "./fixtureFetch";
 const feed = (): TaosConditions => JSON.parse(fixture("taos-conditions.json"));
 const now = new Date("2026-11-17T13:30:00Z"); // 6:30 AM MST
 
-describe("Taos Ski Valley official conditions", () => {
+describe("Taos official conditions", () => {
   it("reads the published windows, base, season and lift counts, keeping zero distinct from missing", () => {
     const r = parseTaos(feed(), null, now);
-    expect(r.resort).toBe("Taos Ski Valley");
+    expect(r.resort).toBe("Taos");
     expect(r.sourceUrl).toBe("https://www.skitaos.com/weather");
     expect(r.snowfall.h24).toMatchObject({ state: "reported", value: 0 });
     expect(r.snowfall.h48).toMatchObject({ state: "reported", value: 0 });
