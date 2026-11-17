@@ -202,6 +202,7 @@ export function summarizeGrid(grid: GridData, now: Date, blockCount = 6, timeZon
       windFromDeg: expandHourly(p.windDirection, "level", ident),
       skyPct: expandHourly(p.skyCover, "level", ident),
       popPct: pop,
+      snowLevelFt: snowLevel,
       weather: expandWeather(p.weather),
     }, now) ?? undefined,
   };

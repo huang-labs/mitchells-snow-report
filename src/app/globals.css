@@ -304,19 +304,6 @@ a { color: var(--accent); }
 /* ---- Weather ---- */
 .weather-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 48px; }
 .weather-point { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-.weather-point__grid { margin-top: 4px; font-size: var(--fs-caption); color: var(--muted); }
-.next-storm { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; padding: 16px; border-radius: 8px; background: var(--panel); font-size: var(--fs-meta); }
-.next-storm .eyebrow { width: 100%; }
-.next-storm__value { font-size: 36px; font-weight: 750; letter-spacing: -0.02em; color: var(--accent); line-height: 1; }
-/* Forecast tables scroll locally on phones rather than widening the page. */
-.table-scroll { max-width: 100%; overflow-x: auto; }
-.wx-table { width: 100%; border-collapse: collapse; font-size: var(--fs-meta); }
-.wx-table th, .wx-table td { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: center; white-space: nowrap; }
-.wx-table thead th { color: var(--muted); font-weight: 650; font-size: var(--fs-caption); }
-.wx-table tbody th { padding-left: 0; text-align: left; color: var(--muted); font-weight: 500; font-size: var(--fs-caption); }
-.wx-table__snow td { color: var(--accent); font-weight: 750; font-size: var(--fs-title); }
-.weather-point__chart { margin: 0; }
-.weather-point__chart figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; margin-bottom: 12px; font-size: var(--fs-caption); color: var(--muted); }
 .weather-point .periods { max-width: 72ch; }
 .periods { margin: 0; display: grid; gap: 8px; font-size: var(--fs-meta); }
 .periods dt { font-weight: 700; display: inline; }
