@@ -273,7 +273,7 @@ export interface PointForecast {
   hourlyLiquidIn?: Array<number | null>;
   nextStorm: NextStorm | null;
   periods: Array<{ name: string; detailedForecast: string; start: string }>;
-  /** Next 48 hours, hour by hour; absent on snapshots collected before it was added. */
+  /** Next seven days, hour by hour (see `HOURLY_HOURS`); absent on snapshots collected before it was added. */
   hourly?: HourlyWeather;
 }
 

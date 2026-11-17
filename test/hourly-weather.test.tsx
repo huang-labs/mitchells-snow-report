@@ -66,6 +66,19 @@ describe("hourly NWS series", () => {
     ])).toEqual({ snow: 3, rain: 0, thunder: 1, ice: 2 });
   });
 
+  it("reads a null weather interval as reported none, and an uncovered hour as missing", () => {
+    const t = "2026-11-03T12:00:00Z";
+    const s = summarizeGrid({ properties: {
+      temperature: { values: [] },
+      snowfallAmount: { uom: "wmoUnit:mm", values: [] },
+      weather: { values: [
+        { validTime: `${t}/PT2H`, value: null },
+        { validTime: "2026-11-03T14:00:00Z/PT1H", value: [{ coverage: "chance", weather: "rain_showers" }] },
+      ] },
+    } }, new Date(t));
+    expect(s.hourly!.precip!.rain.slice(0, 4)).toEqual([0, 0, 2, null]);
+  });
+
   it("returns nothing when the grid has no planning data", () => {
     expect(buildHourlyWeather({}, FIXTURE_NOW)).toBeNull();
   });

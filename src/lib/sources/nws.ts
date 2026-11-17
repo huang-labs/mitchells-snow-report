@@ -92,15 +92,18 @@ function convertWith(uom: string | undefined, fallback: (v: number) => number) {
   }
 }
 
-/** Hourly map of NWS weather entries (each entry applies to every hour of its interval). */
+/**
+ * Hourly map of NWS weather entries (each entry applies to every hour of its interval).
+ * A null value is a reported interval with no weather, so it maps to no entries (coverage
+ * 0), not to a missing hour.
+ */
 export function expandWeather(series: GridData["properties"]["weather"]): Map<number, GridWeatherEntry[]> {
   const out = new Map<number, GridWeatherEntry[]>();
   for (const v of series?.values ?? []) {
-    if (!v.value) continue;
     const [start, dur] = v.validTime.split("/");
     const t0 = Date.parse(start);
     const hours = Math.max(1, Math.round(durationHours(dur)));
-    for (let h = 0; h < hours; h++) out.set(t0 + h * HOUR, v.value);
+    for (let h = 0; h < hours; h++) out.set(t0 + h * HOUR, v.value ?? []);
   }
   return out;
 }
