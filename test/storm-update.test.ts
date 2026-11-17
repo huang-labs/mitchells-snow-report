@@ -31,6 +31,15 @@ function collectedAt(at: Date, inches?: number): Snapshot {
   return s;
 }
 
+/** Telluride's conflicting fixture report (overnight 6″ against 24 h 0″), republished at `iso`. */
+function tellurideAt(s: Snapshot, iso: string | null): Snapshot {
+  const out = structuredClone(s);
+  (out.sources.telluride!.payload as ResortReport).reportTime = iso;
+  return out;
+}
+// 7:20 AM MST on the test morning.
+const thisMorning = "2026-11-05T14:20:00Z";
+
 const reply = (title: string) => ({
   title,
   summary: "Mountain weather varies across the tracked locations.",
@@ -57,13 +66,21 @@ function setup() {
 describe("regional signals", () => {
   it("reports current new snow and holds only for a conflict the previous morning didn't have", () => {
     expect(regionalSignals(regionalSnapshot(base, "utah"), now)).toEqual({ newSnow: { "park-city": 0 }, settling: [] });
-    // Telluride's fixture publishes overnight 6″ against 24 h 0″.
-    expect(regionalSignals(regionalSnapshot(base, "colorado"), now).settling).toEqual(["Telluride"]);
-    const stuck = structuredClone(base);
+    expect(regionalSignals(regionalSnapshot(tellurideAt(base, thisMorning), "colorado"), now).settling).toEqual(["Telluride"]);
+    const stuck = tellurideAt(base, thisMorning);
     stuck.snowLog!.resorts.telluride = {
       "2026-11-04": { state: "unavailable", label: "Last 24 hours", qualityNote: "Withheld", windowEnd: null, collectedAt: now.toISOString() },
     };
     expect(regionalSignals(regionalSnapshot(stuck, "colorado"), now).settling).toEqual([]);
+  });
+
+  it("never holds for a conflict in a report from an earlier day or without a report time", () => {
+    // The fixture's own report time is 10:34 PM MST the previous evening.
+    expect(regionalSignals(regionalSnapshot(base, "colorado"), now).settling).toEqual([]);
+    // 11:59 PM MST yesterday versus 12:01 AM MST today.
+    expect(regionalSignals(regionalSnapshot(tellurideAt(base, "2026-11-05T06:59:00Z"), "colorado"), now).settling).toEqual([]);
+    expect(regionalSignals(regionalSnapshot(tellurideAt(base, "2026-11-05T07:01:00Z"), "colorado"), now).settling).toEqual(["Telluride"]);
+    expect(regionalSignals(regionalSnapshot(tellurideAt(base, null), "colorado"), now).settling).toEqual([]);
   });
 
   it("holds a morning edition for settling reports until 8 AM local", () => {
@@ -115,12 +132,12 @@ describe("settling hold", () => {
   it("skips a morning edition while a report newly conflicts, then posts at 8 AM", async () => {
     const env: PublisherEnv = { SNOW_KV: new MemoryKV(), AI: { async run() { return { response: JSON.stringify(reply("Colorado")) }; } } };
     const publisher = new ChannelPublisher("colorado", new MemoryChannelStorage(), env, { snapshot: async () => base, editions: async () => ({}) });
-    // 7:30 AM MST, Telluride's conflicting fixture report is new.
+    // 7:30 AM MST, Telluride's conflicting report was published at 7:20 AM.
     const early = new Date("2026-11-05T14:30:00Z");
-    const s = collectedAt(early);
+    const s = tellurideAt(collectedAt(early), thisMorning);
     expect(await publisher.request(publicationRequest(s, "colorado", early))).toEqual({ channel: "colorado", skipped: "Waiting for resort reports to settle: Telluride" });
     const eight = new Date("2026-11-05T15:00:00Z");
-    expect(await publisher.request(publicationRequest(collectedAt(eight), "colorado", eight))).toEqual({ channel: "colorado", scheduled: eight.toISOString() });
+    expect(await publisher.request(publicationRequest(tellurideAt(collectedAt(eight), thisMorning), "colorado", eight))).toEqual({ channel: "colorado", scheduled: eight.toISOString() });
     // A forced run never waits.
     const forced = new ChannelPublisher("colorado", new MemoryChannelStorage(), { ...env, SNOW_KV: new MemoryKV() }, { snapshot: async () => base, editions: async () => ({}) });
     expect(await forced.request(publicationRequest(s, "colorado", early, true))).toEqual({ channel: "colorado", scheduled: early.toISOString() });
