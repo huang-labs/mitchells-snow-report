@@ -1,4 +1,4 @@
-import { snowfallIssues, usableSnowReport } from "@/lib/snowfall-quality";
+import { usableSnowReport } from "@/lib/snowfall-quality";
 import { addDays, forecastForDay, morningOf, snowDayWindow, snowDayOf } from "@/lib/snowlog/days";
 import { consecutive, newSnow, type NewSnow } from "@/lib/snowlog/overlap";
 import { cachedDateFormat, formatLocal } from "@/lib/time";
@@ -52,7 +52,7 @@ export interface SnowTimelineModel {
   future: TimelineDay[];
   pastTotal: SpanTotal | null;
   nextTotal: SpanTotal | null;
-  last24: { metric: Metric | null; reportTime: string | null; detail: string; warning?: string };
+  last24: { metric: Metric | null; reportTime: string | null; detail: string };
   canyon: CanyonId;
   /** The resort's IANA zone; report times display in it. */
   timeZone: string;
@@ -251,7 +251,7 @@ export function buildSnowTimeline(input: {
       : metric.state === "not_reported"
         ? `Last 24 h · ${name} left its 24 h total empty${at}`
         : `Last 24 h · ${metric.note?.startsWith("Withheld:") ? metric.note : `${name} doesn’t publish a 24 h total`}`;
-  return { past, future, ...totals, last24: { metric, reportTime: report?.reportTime ?? null, detail, ...(report && snowfallIssues(report.snowfall).length ? { warning: "Resort snowfall data warning: affected totals are withheld. See the resort report for published figures." } : {}) }, canyon, timeZone };
+  return { past, future, ...totals, last24: { metric, reportTime: report?.reportTime ?? null, detail }, canyon, timeZone };
 }
 
 /** One scale for timelines shown together, so equal amounts draw equal bars. The last 24 h is a figure, not a bar. */

@@ -46,6 +46,7 @@ export function RegionalPage({ report, now }: { report: ReportResponse; now: Dat
                 </div>
               }
               meta={`${r.state} · United States`}
+              freshness={report.sources[r.id]?.freshness ?? "unavailable"}
             />
           </article>
         ))}

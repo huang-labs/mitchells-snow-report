@@ -2,8 +2,6 @@
 
 import { createContext, useContext } from "react";
 import type { ReportResponse } from "@/lib/types";
-import { summarizeFreshness } from "./sections/freshness-summary";
-import { FreshnessBadge } from "./ui";
 import { formatAge } from "@/lib/time";
 
 export interface DashboardData {
@@ -31,13 +29,6 @@ export function DataBanners({ data }: { data: DashboardData }) {
       {(error || apiStale) && report && (
         <div className="banner banner--offline" role="status">
           Web app can’t reach its server ({error ?? "no response"}). Showing data loaded {formatAge(new Date(loadedAt!).toISOString(), now)}.
-        </div>
-      )}
-      {report && report.requiredMissing.length > 0 && (
-        <div className="banner banner--required-missing" role="status" aria-label="Required feed status">
-          {summarizeFreshness(report.requiredMissing.map((id) => report.sources[id])).groups.map(({ freshness, labels }) => (
-            <span className="feed-status" key={freshness}><FreshnessBadge freshness={freshness} /> {labels.join(", ")}</span>
-          ))}
         </div>
       )}
     </>

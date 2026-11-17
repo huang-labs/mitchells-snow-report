@@ -2,7 +2,6 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { RegionalPage } from "@/components/sections/RegionalPage";
-import { summarizeFreshness } from "@/components/sections/freshness-summary";
 import { buildReport } from "@/lib/report";
 import type { Freshness, NwsPayload, ReportResponse, ResortReport } from "@/lib/types";
 
@@ -15,12 +14,23 @@ function withFreshness(states: Record<"alta" | "snowbird" | "solitude" | "bright
   return report;
 }
 
-it("shows no resort freshness badges or resort source line, whatever their state", () => {
+it("marks each resort's report freshness with a dot and word, not a badge or source line", () => {
   const report = withFreshness({ alta: "current", snowbird: "old-report", solitude: "stale", brighton: "unavailable" });
   report.sources.snowbird.status = "error";
   render(<RegionalPage now={now} report={report} />);
   expect(document.querySelectorAll(".resort-timeline .badge")).toHaveLength(0);
-  expect(document.body.textContent).not.toMatch(/Old report|Updates delayed|Latest check failed|snow reports \(resort websites\)/);
+  const fresh = [...document.querySelectorAll(".resort-timeline")].slice(0, 4).map((b) => {
+    const f = b.querySelector(".snowtl__head .snowtl__fresh")!;
+    return [f.className.replace("snowtl__fresh ", ""), f.textContent];
+  });
+  // Green current; yellow old or delayed; red unavailable.
+  expect(fresh).toEqual([
+    ["snowtl__fresh--ok", "Current"],
+    ["snowtl__fresh--warn", "Old report"],
+    ["snowtl__fresh--warn", "Updates delayed"],
+    ["snowtl__fresh--bad", "Unavailable"],
+  ]);
+  expect(document.body.textContent).not.toMatch(/Latest check failed|snow reports \(resort websites\)/);
 });
 
 it("ends with the legend explaining missing data and local days", () => {
@@ -38,27 +48,6 @@ it("titles the page Resorts with snowfall windows above the timelines", () => {
   expect(document.querySelector("h1")?.textContent).toBe("Resorts");
   expect(document.querySelector(".page__sub")?.textContent).toBe("Reported snowfall: past 7 days and last 24 hours · NWS forecast: next 7 days.");
   expect(document.querySelector(".page__header")?.nextElementSibling?.className).toBe("resort-timelines");
-});
-
-describe("summarizeFreshness", () => {
-  const src = (label: string, freshness: Freshness, lastSuccessfulFetchAt: string | null = "2026-12-01T14:58:00Z") => ({ label, freshness, lastSuccessfulFetchAt });
-
-  it("reports current with no groups beyond Current when every source is current", () => {
-    const s = summarizeFreshness([src("A", "current", "2026-12-01T14:58:00Z"), src("B", "current", "2026-12-01T14:51:00Z")]);
-    expect(s.worst).toBe("current");
-    expect(s.groups).toEqual([{ freshness: "current", labels: ["A", "B"] }]);
-    expect(s.oldestCheck).toBe("2026-12-01T14:51:00Z");
-  });
-
-  it("orders groups worst first and keeps source order within a group", () => {
-    const s = summarizeFreshness([src("A", "time-unknown"), src("B", "old-report"), src("C", "stale"), src("D", "old-report")]);
-    expect(s.worst).toBe("stale");
-    expect(s.groups.map((g) => [g.freshness, g.labels])).toEqual([["stale", ["C"]], ["old-report", ["B", "D"]], ["time-unknown", ["A"]]]);
-  });
-
-  it("has no oldest check when a source was never collected", () => {
-    expect(summarizeFreshness([src("A", "current"), src("B", "unavailable", null)]).oldestCheck).toBeNull();
-  });
 });
 
 describe("destination forecasts and report times", () => {

@@ -321,7 +321,7 @@ it("shows each resort as a snowfall timeline: 7 recorded days, the last 24 h, 7 
   expect(past.querySelector(".snowtl__sr")!.textContent).toBe("Past 7 days · No reported total");
   // The header is the name and region only; the report time sits at its right on phones.
   expect(alta.querySelector(".snowtl__meta")!.textContent).toBe("Utah · United States");
-  expect(alta.querySelector(".snowtl__reported-label")!.textContent).toBe("Reported");
+  expect(alta.querySelector(".snowtl__fresh")!.textContent).toMatch(/^(Current|Old report|Updates delayed|Time unknown|Unavailable)$/);
   expect(alta.querySelector(".snowtl__reported-time")!.textContent).toMatch(/(Today|Yesterday|, )/);
   expect(alta.querySelector(".snowtl__now")!.textContent).not.toMatch(/Last 24 hrs/);
   // The last 24 h is a number, never a bar; the forecast day under way is marked as now.
@@ -356,7 +356,8 @@ it("labels a 24 h figure without a report time as Time unknown, and no figure as
   const view = render(renderSection("regional", noPayload, FIXTURE_NOW, null));
   const empty = view.container.querySelector(".resort-timeline")!;
   expect(empty.querySelector(".snowtl__now-time")!.textContent).toBe("No report");
-  expect(empty.querySelector(".snowtl__reported")).toBeNull();
+  expect(empty.querySelector(".snowtl__reported-time")).toBeNull();
+  expect(empty.querySelector(".snowtl__fresh")).not.toBeNull();
 });
 
 it("describes every day for screen readers, with no interactive controls", () => {

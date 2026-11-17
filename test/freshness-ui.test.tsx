@@ -8,16 +8,12 @@ import { buildReport } from "@/lib/report";
 const now = new Date("2026-11-03T15:00:00Z");
 afterEach(cleanup);
 
-it("separates delayed required feeds from unavailable ones without discarding retained data", () => {
+it("shows no banner for delayed or unavailable required feeds", () => {
   const report = buildReport(null, now);
   report.requiredMissing = ["alta", "snowbird"];
   report.sources.alta.freshness = "stale";
-  render(<DataBanners data={{ report, now, loadedAt: now.getTime(), error: null }} />);
-  const banner = screen.getByRole("status");
-  expect(banner.querySelector(".badge--warn")?.textContent).toBe("Updates delayed");
-  expect(banner.querySelector(".badge--bad")?.textContent).toBe("Unavailable");
-  expect(banner.textContent).toContain("Updates delayed Alta");
-  expect(banner.textContent).toContain("Unavailable Snowbird");
+  const { container } = render(<DataBanners data={{ report, now, loadedAt: now.getTime(), error: null }} />);
+  expect(container.textContent).toBe("");
 });
 
 it("shows a confirmed failed check separately while recently collected information remains current", () => {
