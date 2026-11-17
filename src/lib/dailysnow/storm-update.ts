@@ -13,9 +13,11 @@ import { attemptsToday, DAILY_CALL_CAP, inFlight, LAST_ATTEMPT_HOUR, MAX_ATTEMPT
  * as the edition itself (usableSnowReport, current reports only).
  *
  *  - Settling: a morning edition waits, until SETTLE_UNTIL_MINUTES local, while
- *    a resort's report shows a snowfall conflict that its previous morning did
- *    not. Resorts publish their morning numbers field by field; a conflict that
- *    persists from day to day (a stuck source field) never holds an edition.
+ *    a resort's report published today shows a snowfall conflict that its
+ *    previous morning did not. Resorts publish their morning numbers field by
+ *    field; a conflict that persists from day to day (a stuck source field), or
+ *    one in a report from an earlier day (or with no report time) that cannot
+ *    settle before the deadline, never holds an edition.
  *  - Storm update: once per local day, before the regional cutoff, today's
  *    edition is rewritten when some resort's reported new snow has risen by at
  *    least STORM_UPDATE_MIN_IN since the edition froze its observations. It uses
@@ -44,9 +46,16 @@ export function newSnowIn(snowfall: SnowfallSet | undefined): number | null {
   return xs.length ? Math.max(...xs) : null;
 }
 
+/** Only a report the resort published today can still be mid-update this morning. */
+function publishedToday(report: ResortReport, today: string, zone: string): boolean {
+  const at = report.reportTime ? new Date(report.reportTime) : null;
+  return !!at && Number.isFinite(at.getTime()) && localDate(at, zone) === today;
+}
+
 /** `snapshot` is a regional snapshot (regionalSnapshot). */
 export function regionalSignals(snapshot: Snapshot, now: Date): RegionalSignals {
   const zone = channelById(snapshot.region ?? "utah")!.timeZone;
+  const today = localDate(now, zone);
   const yesterday = localDate(new Date(now.getTime() - 24 * HOUR), zone);
   const signals: RegionalSignals = { newSnow: {}, settling: [] };
   for (const r of RESORTS) {
@@ -56,7 +65,7 @@ export function regionalSignals(snapshot: Snapshot, now: Date): RegionalSignals 
     const amount = newSnowIn(usableSnowReport(raw)?.snowfall);
     if (amount !== null) signals.newSnow[r.id] = amount;
     const before = snapshot.snowLog?.resorts[r.id]?.[yesterday];
-    if (raw && snowfallIssues(raw.snowfall).length && !before?.qualityNote) signals.settling.push(r.name);
+    if (raw && publishedToday(raw, today, zone) && snowfallIssues(raw.snowfall).length && !before?.qualityNote) signals.settling.push(r.name);
   }
   return signals;
 }
