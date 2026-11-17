@@ -1,18 +1,24 @@
 /* Snowfall timeline: 7 past days | last 24 h | 7 forecast days. Mobile first: all
-   15 columns fit a 360px phone (~22px each), so the strip never scrolls. From 901px
-   the middle column widens into the large "Last 24 h" figure. */
+   15 columns fit a 360px phone (~22px each), so the strip never scrolls. The middle
+   column is a number, never a bar: compact on phones, a large figure from 901px. */
 .snowtl { --plot-h: 64px; --today-col: minmax(44px, 1.6fr); min-width: 0; }
 
 /* Phones: a fixed two-row header, so every resort's is the same height. Heading over
-   the page's line on the left; "Reported" over the report time on the right, each
-   row sharing a baseline. Desktop: one row, with the report time in the middle column. */
+   the page's line on the left; the report's freshness over its time on the right, each
+   row sharing a baseline. Desktop: one row, freshness at the right and the report time
+   in the middle column. */
 .snowtl__head { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; align-items: baseline; gap: 2px 12px; margin-bottom: 12px; }
 .snowtl__heading, .snowtl__reported { display: contents; }
 .snowtl__heading > :first-child { grid-area: 1 / 1; min-width: 0; }
 .snowtl__meta { grid-area: 2 / 1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--muted); font-size: var(--fs-caption); }
 .snowtl__reported > * { color: var(--muted); font-size: var(--fs-caption); text-align: right; white-space: nowrap; }
-.snowtl__reported-label { grid-area: 1 / 2; }
+.snowtl__fresh { grid-area: 1 / 2; justify-self: end; display: inline-flex; align-items: center; gap: 6px; }
 .snowtl__reported-time { grid-area: 2 / 2; }
+/* Freshness: green current, yellow late or unknown, red unavailable. */
+.snowtl__fresh-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.snowtl__fresh--ok .snowtl__fresh-dot { background: #2f9e5b; }
+.snowtl__fresh--warn .snowtl__fresh-dot { background: #e0a91b; }
+.snowtl__fresh--bad .snowtl__fresh-dot { background: #d64538; }
 .snowtl__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 .snowtl__strip { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)) var(--today-col) repeat(7, minmax(0, 1fr)); column-gap: 2px; align-items: end; }
@@ -49,10 +55,17 @@
 .snowtl__date { font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; }
 .snowtl__day--weekend :is(.snowtl__weekday, .snowtl__date) { color: var(--text); font-weight: 750; }
 
-.snowtl__day--today { background: var(--panel); }
+/* The current day: the forecast day under way, marked as now by its label alone (a
+   tint beside the Last 24 h panel read as a second panel). */
+.snowtl__day--current :is(.snowtl__weekday, .snowtl__date) { color: var(--accent); font-weight: 750; }
+
+.snowtl__day--today { align-self: stretch; background: var(--panel); }
+.snowtl__now { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; height: 100%; text-align: center; }
+.snowtl__now-label { color: var(--muted); font-size: 10px; font-weight: 650; line-height: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+.snowtl__now .metric--xl { font-size: 15px; line-height: 1.1; }
+/* Phones: the report time sits in the header instead. */
+.snowtl__now-time { display: none; }
 .snowtl__footer { display: flex; margin-top: 8px; }
-.snowtl__compact { display: contents; }
-.snowtl__hero { display: none; }
 
 @media (min-width: 901px) {
   .snowtl { --plot-h: 96px; --today-col: 152px; }
@@ -60,12 +73,12 @@
   .snowtl__span--now { visibility: visible; }
   .snowtl__head { display: flex; align-items: baseline; }
   .snowtl__heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
-  .snowtl__reported { display: none; }
+  .snowtl__reported { display: flex; margin-left: auto; }
+  .snowtl__reported-time { display: none; }
   .snowtl__amount { font-size: 13px; }
   .snowtl__weekday { font-size: 12px; }
-  .snowtl__compact { display: none; }
-  .snowtl__hero { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; align-self: stretch; height: 100%; padding: 0 8px; text-align: center; }
-  .snowtl__day--today { align-self: stretch; }
-  .snowtl__hero .metric--xl { font-size: 44px; }
-  .snowtl__hero-time { font-size: var(--fs-caption); }
+  .snowtl__now { gap: 6px; padding: 0 8px; }
+  .snowtl__now-label { display: none; }
+  .snowtl__now .metric--xl { font-size: 44px; line-height: 1; }
+  .snowtl__now-time { display: block; color: var(--muted); font-size: var(--fs-caption); }
 }

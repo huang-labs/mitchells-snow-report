@@ -51,7 +51,7 @@ describe("repeated 24 h reports on the timeline", () => {
   it("counts one 5″ storm once: 4″ then 1″, a 5″ week, and a 1″ last 24 h", () => {
     const model = build(brighton(reading(5, "2026-11-15T14:00:00.000Z", 5)), report());
     expect(model.past.slice(-2).map((d) => d.amountIn)).toEqual([4, 1]);
-    expect(model.past.at(-1)!.detail).toBe("Sun, Nov 15 · 1″ new; Brighton’s 24 h total of 5″ repeats 4″ from the previous morning’s report (“Snow 24 Hrs.” at 7:00 AM)");
+    expect(model.past.at(-1)!.detail).toBe("Sat, Nov 14 · 1″ new; Brighton’s 24 h total of 5″ repeats 4″ from the previous morning’s report (“Snow 24 Hrs.” at Nov 15, 7:00 AM)");
     expect(model.pastTotal?.amountIn).toBe(5);
     expect(model.last24.metric).toMatchObject({ state: "reported", value: 1 });
     expect(model.last24.detail).toMatch(/^Last 24 h · 1″ new; Brighton’s 24 h total of 5″ repeats 4″/);

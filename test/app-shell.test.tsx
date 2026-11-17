@@ -265,8 +265,9 @@ describe("app shell", () => {
   it("renders explicit unavailable states when nothing has been collected", async () => {
     mockApi(buildReport(null, FIXTURE_NOW));
     let view = renderAt("/alta");
-    expect(await screen.findByText("Unavailable", { selector: ".banner .badge" })).toBeTruthy();
     expect(await screen.findByText("Alta report unavailable")).toBeTruthy();
+    // No global banner for missing feeds: each page states its own unavailable data.
+    expect(document.querySelector(".banner")).toBeNull();
     view.unmount();
     view = renderAt("/plumes");
     expect(await screen.findByText("Plume charts unavailable")).toBeTruthy();

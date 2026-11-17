@@ -3,7 +3,8 @@ import type { CanyonId, PrimaryResortId, ResortReport } from "../types";
 /**
  * A snow day, keyed by the morning it ends: `2026-11-06` is the 24 hours ending at
  * 6 AM in the destination time zone on Nov 6. Local snow days can be 23 or
- * 25 hours across DST; source reporting windows remain unchanged.
+ * 25 hours across DST; source reporting windows remain unchanged. The timeline names
+ * each day for the date it starts (`2026-11-06` shows as Nov 5), the day its snow falls.
  */
 export type SnowDayKey = string;
 
