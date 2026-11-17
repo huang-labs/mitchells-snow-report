@@ -148,11 +148,11 @@ export const RESORTS = [
     elevationFt: null,
   },
   {
-    id: "taos-ski-valley",
+    id: "taos",
     name: "Taos",
     region: "new-mexico",
     state: "New Mexico",
-    canyon: "taos-ski-valley",
+    canyon: "taos",
     station: "Official snow report",
     elevationFt: null,
   },
@@ -200,7 +200,7 @@ export const FORECAST_AREAS: ReadonlyArray<{
   { id: "winter-park", name: "Winter Park", region: "colorado", latitude: 39.864, longitude: -105.775 },
   { id: "steamboat", name: "Steamboat", region: "colorado", latitude: 40.459, longitude: -106.769 },
   { id: "telluride", name: "Telluride", region: "colorado", latitude: 37.922, longitude: -107.84 },
-  { id: "taos-ski-valley", name: "Taos", region: "new-mexico", latitude: 36.594, longitude: -105.452 },
+  { id: "taos", name: "Taos", region: "new-mexico", latitude: 36.594, longitude: -105.452 },
   { id: "crystal-mountain", name: "Crystal Mountain", region: "washington", latitude: 46.936, longitude: -121.479 },
   { id: "mt-bachelor", name: "Mt. Bachelor", region: "oregon", latitude: 43.994, longitude: -121.68 },
 ];
@@ -241,7 +241,7 @@ export const CAM_PAGES: Partial<Record<ResortId, string>> = {
   "winter-park": "https://www.winterparkresort.com/the-mountain/mountain-cams",
   steamboat: "https://www.steamboat.com/the-mountain/live-cams",
   telluride: "https://tellurideskiresort.com/webcams/",
-  "taos-ski-valley": "https://www.skitaos.com/weather",
+  "taos": "https://www.skitaos.com/weather",
   "crystal-mountain": "https://www.crystalmountainresort.com/the-mountain/mountain-report-and-webcams/webcams",
   "mt-bachelor": "https://www.mtbachelor.com/the-mountain/webcams/",
 };

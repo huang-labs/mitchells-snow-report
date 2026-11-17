@@ -150,7 +150,7 @@ export async function embeddedCams(
   if (resort === "jackson-hole") {
     return verifiedImages(ctx, resort, pageUrl, parseJacksonCams(await ctx.fetchJson(JACKSON_CAMS_API)));
   }
-  if (resort === "taos-ski-valley") return verifiedImages(ctx, resort, pageUrl, TAOS_CAMS);
+  if (resort === "taos") return verifiedImages(ctx, resort, pageUrl, TAOS_CAMS);
   const html = await ctx.fetchText(pageUrl, { browserLike: true });
   assertValid(
     !/Request unsuccessful[\s\S]*Incapsula incident ID|<title>Just a moment\.{3}<\/title>/i.test(html),

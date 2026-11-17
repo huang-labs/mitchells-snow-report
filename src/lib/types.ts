@@ -81,7 +81,7 @@ export type SourceId =
   | "brighton"
   | "park-city" | "deer-valley"
   | "snowbasin" | "palisades-tahoe" | "mammoth-mountain" | "jackson-hole" | "big-sky"
-  | "winter-park" | "steamboat" | "telluride" | "taos-ski-valley" | "crystal-mountain" | "mt-bachelor"
+  | "winter-park" | "steamboat" | "telluride" | "taos" | "crystal-mountain" | "mt-bachelor"
   | "plumes"
   | "nws"
   | "resortcams"

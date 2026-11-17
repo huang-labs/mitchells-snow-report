@@ -45,7 +45,7 @@ function signature(r: Pick<ResortReport, "snowfall" | "base">): string {
 export function parseTaos(feed: TaosConditions, previous: ResortReport | null, now: Date): ResortReport {
   const snow = feed.snowData;
   assertValid(snow && typeof snow === "object", "Taos conditions missing snowData");
-  const def = resortById("taos-ski-valley")!;
+  const def = resortById("taos")!;
   // An absent field is not published; a null one is published but not reported.
   const field = (key: keyof typeof snow, label: string) =>
     key in snow ? fromField(snow[key], "in", label) : unavailable(label);
@@ -85,7 +85,7 @@ export function parseTaos(feed: TaosConditions, previous: ResortReport | null, n
 }
 
 export const taosSource: SourceDefinition<ResortReport> = {
-  id: "taos-ski-valley",
+  id: "taos",
   label: "Taos",
   category: "resort",
   required: true,
